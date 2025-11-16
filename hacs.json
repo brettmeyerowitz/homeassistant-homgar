@@ -1,0 +1,14 @@
+{
+    "name": "HomGar Cloud",
+    "country": [
+        "ZA"
+    ],
+    "domains": [
+        "homgar"
+    ],
+    "render_readme": true,
+    "homeassistant": "2024.5.0",
+    "iot_class": [
+        "Cloud Polling"
+    ]
+}

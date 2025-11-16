@@ -1,0 +1,16 @@
+{
+    "domain": "homgar",
+    "name": "HomGar Cloud",
+    "version": "0.1.0",
+    "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
+    "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
+    "requirements": [],
+    "codeowners": [
+        "@brettmeyerowitz"
+    ],
+    "config_flow": true,
+    "iot_class": "cloud_polling",
+    "loggers": [
+        "custom_components.homgar"
+    ]
+}
