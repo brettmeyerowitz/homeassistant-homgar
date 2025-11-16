@@ -1,0 +1,27 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "HomGar Cloud",
+                "description": "Log in with your HomGar account.",
+                "data": {
+                    "area_code": "Area code",
+                    "email": "Email",
+                    "password": "Password"
+                }
+            },
+            "select_homes": {
+                "title": "Select HomGar Home",
+                "description": "Choose which HomGar Home to add to Home Assistant.",
+                "data": {
+                    "hids": "Home"
+                }
+            }
+        },
+        "error": {
+            "auth": "Authentication failed. Please check your credentials.",
+            "select_at_least_one": "Please select a home.",
+            "unknown": "Unexpected error while connecting to HomGar."
+        }
+    }
+}

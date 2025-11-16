@@ -37,7 +37,7 @@ The integration talks to the cloud endpoints used by the HomGar app (`region3.ho
 1. Go to **HACS → Integrations → 3-dot menu → Custom repositories**
 2. Add your repository URL:
    ```
-   https://github.com/YOUR_GITHUB_USERNAME/homeassistant-homgar
+   https://github.com/brettmeyerowitz/homeassistant-homgar
    ```
 3. Category: **Integration**
 4. Install
