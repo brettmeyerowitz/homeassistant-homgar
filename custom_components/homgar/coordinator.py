@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
+from homeassistant.components.persistent_notification import async_create
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
@@ -41,6 +42,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
         self._client = client
         self._entry = entry
         self._hids = entry.data.get(CONF_HIDS, [])
+        self._notified_unknown_models: set[str] = set()
 
     async def _async_update_data(self):
         """Fetch and decode data from HomGar."""
@@ -109,8 +111,38 @@ class HomGarCoordinator(DataUpdateCoordinator):
                                 from .homgar_api import decode_hws019wrf_v2
                                 decoded = decode_hws019wrf_v2(raw_value)
                             else:
-                                decoded = None
-                                _LOGGER.warning("Unknown/unsupported model=%s for mid=%s addr=%s, raw_value=%s", model, mid, addr, raw_value)
+                                # Store raw data for unknown models so users can report it
+                                decoded = {
+                                    "type": "unknown",
+                                    "model": model,
+                                    "raw_value": raw_value,
+                                }
+                                _LOGGER.warning(
+                                    "="*60 + "\n"
+                                    "UNSUPPORTED SENSOR MODEL DETECTED\n"
+                                    "Please report this to: https://github.com/brettmeyerowitz/homeassistant-homgar/issues\n"
+                                    "Include the following information:\n"
+                                    "  Model: %s\n"
+                                    "  Device ID (mid): %s\n"
+                                    "  Address: %s\n"
+                                    "  Raw Payload: %s\n"
+                                    + "="*60,
+                                    model, mid, addr, raw_value
+                                )
+                                # Send persistent notification (once per model)
+                                if model and model not in self._notified_unknown_models:
+                                    self._notified_unknown_models.add(model)
+                                    async_create(
+                                        self.hass,
+                                        f"HomGar detected an unsupported sensor model: **{model}**\n\n"
+                                        f"To help add support for this sensor, please open an issue at:\n"
+                                        f"https://github.com/brettmeyerowitz/homeassistant-homgar/issues\n\n"
+                                        f"Include the following raw payload data:\n"
+                                        f"```\n{raw_value}\n```\n\n"
+                                        f"You can also find this data in the sensor's attributes in Home Assistant.",
+                                        title="HomGar: Unsupported Sensor Detected",
+                                        notification_id=f"homgar_unsupported_{model}",
+                                    )
                             _LOGGER.debug("Decoded data for mid=%s addr=%s: %s", mid, addr, decoded)
                         except Exception as ex:  # noqa: BLE001
                             _LOGGER.warning(

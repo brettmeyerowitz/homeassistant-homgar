@@ -74,13 +74,13 @@ Go to **Settings → Devices & Services → Add Integration** and search for **H
 
 ## Example manifest.json
 
-Below is the manifest file for this integration (as of version 0.1.1):
+Below is the manifest file for this integration (as of version 0.2.6):
 
 ```json
 {
     "domain": "homgar",
     "name": "HomGar Cloud",
-    "version": "0.1.1",
+    "version": "0.2.6",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "requirements": [],
@@ -95,6 +95,27 @@ Below is the manifest file for this integration (as of version 0.1.1):
     ]
 }
 ```
+
+---
+
+## Reporting Unsupported Sensors
+
+If you have a HomGar sensor that isn't supported yet, the integration will:
+
+1. **Show a persistent notification** in Home Assistant with the sensor model and raw payload data
+2. **Create a diagnostic entity** named `[Sensor Name] Unsupported ([Model])` with the raw payload in its attributes
+3. **Log a warning** with full details to the Home Assistant logs
+
+To help add support for your sensor:
+
+1. Open the HomGar app on your phone and note the sensor values being displayed (e.g., temperature, humidity, battery level)
+2. In Home Assistant, go to **Settings → Devices & Services → HomGar** and find the unsupported sensor entity
+3. Click on the entity and copy the `raw_payload` attribute value
+4. Open an issue at https://github.com/brettmeyerowitz/homeassistant-homgar/issues with:
+   - Your sensor model (e.g., `HCS015ARF+`)
+   - The raw payload data
+   - **Screenshots or values from the HomGar app** showing what the sensor is currently reading
+   - This helps us decode the payload by matching the raw bytes to actual values
 
 ---
 

@@ -11,6 +11,7 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorStateClass,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -105,6 +106,11 @@ async def async_setup_entry(
             entities.append(HomGarPoolHighTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolLowTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolBatterySensor(coordinator, key, info, base_slug))
+        else:
+            # Unknown/unsupported model - create diagnostic entity
+            data = info.get("data", {})
+            if data and data.get("type") == "unknown":
+                entities.append(HomGarUnknownSensor(coordinator, key, info, base_slug))
 
     if entities:
         async_add_entities(entities)
@@ -712,3 +718,45 @@ class HomGarPoolBatterySensor(HomGarSensorBase):
     def native_value(self):
         data = self._sensor_data
         return data.get("tempbatt") if data else None
+
+
+class HomGarUnknownSensor(HomGarSensorBase):
+    """Diagnostic sensor for unknown/unsupported models.
+    
+    This sensor surfaces raw payload data in Home Assistant so users can
+    easily copy it when reporting issues for new sensor support.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:help-circle-outline"
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        model = sensor_info.get("model", "unknown")
+        self._attr_unique_id = f"homgar_{base_slug}_unknown_{model}"
+        sub_name = sensor_info.get("sub_name") or "Sensor"
+        self._attr_name = f"{sub_name} Unsupported ({model})"
+
+    @property
+    def native_value(self) -> str:
+        """Return the model name as the state."""
+        data = self._sensor_data
+        if data:
+            return f"Unsupported: {data.get('model', 'unknown')}"
+        return "No data"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Include raw payload and instructions for reporting."""
+        attrs = super().extra_state_attributes
+        data = self._sensor_data or {}
+        
+        attrs["model"] = data.get("model")
+        attrs["raw_payload"] = data.get("raw_value")
+        attrs["report_url"] = "https://github.com/brettmeyerowitz/homeassistant-homgar/issues"
+        attrs["instructions"] = (
+            "This sensor model is not yet supported. "
+            "Please open a GitHub issue with the model and raw_payload values above."
+        )
+        
+        return attrs
