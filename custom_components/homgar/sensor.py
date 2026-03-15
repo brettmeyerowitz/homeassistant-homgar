@@ -26,6 +26,7 @@ from .const import (
     MODEL_FLOWMETER,
     MODEL_CO2,
     MODEL_POOL,
+    MODEL_POOL_PLUS,
     MODEL_DISPLAY_HUB
 )
 from .coordinator import HomGarCoordinator
@@ -106,6 +107,16 @@ async def async_setup_entry(
             entities.append(HomGarPoolHighTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolLowTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolBatterySensor(coordinator, key, info, base_slug))
+        elif model == MODEL_POOL_PLUS:
+            entities.append(HomGarPoolPlusPoolCurrentTempSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarPoolPlusPoolHighTempSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarPoolPlusPoolLowTempSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarPoolPlusAmbientCurrentTempSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarPoolPlusAmbientHighTempSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarPoolPlusAmbientLowTempSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarPoolPlusHumidityCurrentSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarPoolPlusHumidityHighSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarPoolPlusHumidityLowSensor(coordinator, key, info, base_slug))
         else:
             # Unknown/unsupported model - create diagnostic entity
             data = info.get("data", {})
@@ -718,6 +729,151 @@ class HomGarPoolBatterySensor(HomGarSensorBase):
     def native_value(self):
         data = self._sensor_data
         return data.get("tempbatt") if data else None
+
+
+# HCS015ARF+ (Pool + Ambient temp/humidity)
+class HomGarPoolPlusPoolCurrentTempSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_pool_current_temp"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool Temperature"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("pool_tempcurrent") if data else None
+
+
+class HomGarPoolPlusPoolHighTempSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_pool_high_temp"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool High Temperature"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("pool_temphigh") if data else None
+
+
+class HomGarPoolPlusPoolLowTempSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_pool_low_temp"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool Low Temperature"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("pool_templow") if data else None
+
+
+class HomGarPoolPlusAmbientCurrentTempSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_ambient_current_temp"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient Temperature"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("ambient_tempcurrent") if data else None
+
+
+class HomGarPoolPlusAmbientHighTempSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_ambient_high_temp"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient High Temperature"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("ambient_temphigh") if data else None
+
+
+class HomGarPoolPlusAmbientLowTempSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_ambient_low_temp"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient Low Temperature"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("ambient_templow") if data else None
+
+
+class HomGarPoolPlusHumidityCurrentSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.HUMIDITY
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_humidity_current"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient Humidity"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("humidity_current") if data else None
+
+
+class HomGarPoolPlusHumidityHighSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.HUMIDITY
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_humidity_high"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient High Humidity"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("humidity_high") if data else None
+
+
+class HomGarPoolPlusHumidityLowSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.HUMIDITY
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_humidity_low"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient Low Humidity"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("humidity_low") if data else None
 
 
 class HomGarUnknownSensor(HomGarSensorBase):

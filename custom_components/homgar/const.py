@@ -22,4 +22,5 @@ MODEL_TEMPHUM = "HCS014ARF"          # Temperature/Humidity
 MODEL_FLOWMETER = "HCS008FRF"        # Flowmeter
 MODEL_CO2 = "HCS0530THO"             # CO2/Temp/Humidity
 MODEL_POOL = "HCS0528ARF"            # Pool/Temperature
+MODEL_POOL_PLUS = "HCS015ARF+"       # Pool + Ambient temp/humidity
 MODEL_DISPLAY_HUB = "HWS019WRF-V2"   # Smart+ Irrigation Display Hub

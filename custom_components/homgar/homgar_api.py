@@ -191,10 +191,10 @@ class HomGarClient:
     # --- Payload decoding helpers ---
 
 def _parse_homgar_payload(raw: str) -> list[int]:
-    """Turn '10#E1...' into [0-255] bytes list."""
-    if not raw or not raw.startswith("10#"):
+    """Turn '10#E1...' or '11#...' (N#hex) into [0-255] bytes list."""
+    if not raw or "#" not in raw:
         raise ValueError(f"Unexpected payload format: {raw!r}")
-    hex_str = raw[3:]
+    hex_str = raw.split("#", 1)[1]
     if len(hex_str) % 2 != 0:
         raise ValueError(f"Hex payload length must be even: {hex_str}")
     out: list[int] = []
@@ -456,5 +456,53 @@ def decode_pool(raw: str) -> dict:
         "temphigh": round(temphigh, 2) if temphigh is not None else None,
         "tempcurrent": round(tempcurrent, 2) if tempcurrent is not None else None,
         "tempbatt": round(tempbatt, 2) if tempbatt is not None else None,
+        "raw_bytes": b,
+    }
+
+
+def decode_pool_plus(raw: str) -> dict:
+    """
+    Decode HCS015ARF+ (pool + ambient temperature/humidity) payload.
+    Layout (payload prefix 11#): pool temp 16-bit F*10 at b[7:9] (offset may need
+    verification per firmware); ambient temp at b[29:31] (low), b[31:33] (current/
+    high); humidity at b[26].
+    """
+    b = _parse_homgar_payload(raw)
+    if len(b) < 34:
+        return {"type": "pool_plus", "raw_bytes": b}
+
+    def le16(idx: int) -> int:
+        return b[idx] | (b[idx + 1] << 8)
+
+    def f10_to_c(val: int) -> float:
+        return round((val / 10.0 - 32.0) * (5.0 / 9.0), 2)
+
+    # Pool temperature: 16-bit LE F*10 at b[7:9] (byte layout may vary by firmware)
+    pool_raw = le16(7)
+    pool_tempcurrent = f10_to_c(pool_raw) if 400 <= pool_raw <= 1200 else None
+    pool_templow = None
+    pool_temphigh = None
+
+    # Ambient temperature: 16-bit LE F*10 at b[29:31], b[31:33]
+    ambient_templow = f10_to_c(le16(29)) if 400 <= le16(29) <= 1200 else None
+    ambient_tempcurrent = f10_to_c(le16(31)) if 400 <= le16(31) <= 1200 else None
+    ambient_temphigh = ambient_tempcurrent  # same slice as current when equal
+
+    # Ambient humidity: single byte at b[26] (0-100)
+    humidity_low = b[26] if 0 <= b[26] <= 100 else None
+    humidity_current = b[26] if humidity_low is not None else None
+    humidity_high = humidity_current
+
+    return {
+        "type": "pool_plus",
+        "pool_templow": pool_templow,
+        "pool_temphigh": pool_temphigh,
+        "pool_tempcurrent": pool_tempcurrent,
+        "ambient_templow": ambient_templow,
+        "ambient_tempcurrent": ambient_tempcurrent,
+        "ambient_temphigh": ambient_temphigh,
+        "humidity_low": humidity_low,
+        "humidity_current": humidity_current,
+        "humidity_high": humidity_high,
         "raw_bytes": b,
     }

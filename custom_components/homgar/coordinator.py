@@ -18,12 +18,13 @@ from .const import (
     MODEL_FLOWMETER,
     MODEL_CO2,
     MODEL_POOL,
+    MODEL_POOL_PLUS,
     MODEL_DISPLAY_HUB,
 )
 from .homgar_api import (
     HomGarClient, HomGarApiError,
     decode_moisture_simple, decode_moisture_full, decode_rain,
-    decode_temphum, decode_flowmeter, decode_co2, decode_pool
+    decode_temphum, decode_flowmeter, decode_co2, decode_pool, decode_pool_plus,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -107,6 +108,8 @@ class HomGarCoordinator(DataUpdateCoordinator):
                                 decoded = decode_co2(raw_value)
                             elif model == MODEL_POOL:
                                 decoded = decode_pool(raw_value)
+                            elif model == MODEL_POOL_PLUS:
+                                decoded = decode_pool_plus(raw_value)
                             elif model == MODEL_DISPLAY_HUB:
                                 from .homgar_api import decode_hws019wrf_v2
                                 decoded = decode_hws019wrf_v2(raw_value)

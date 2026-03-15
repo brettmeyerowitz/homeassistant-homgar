@@ -21,6 +21,8 @@ Tested with:
   - `HCS0530THO`
 - Pool/Temperature:
   - `HCS0528ARF`
+- Pool + Ambient temp/humidity:
+  - `HCS015ARF+`
 
 The integration communicates with the same cloud endpoints as the HomGar app (`region3.homgarus.com`).
 
@@ -44,6 +46,7 @@ The integration communicates with the same cloud endpoints as the HomGar app (`r
   - Flowmeter readings (HCS008FRF)
   - CO2, temperature, humidity (HCS0530THO)
   - Pool temperature (HCS0528ARF)
+  - Pool + ambient temperature and humidity (HCS015ARF+)
 - Attributes:
   - `rssi_dbm`
   - `battery_status_code`
