@@ -1,7 +1,7 @@
 {
     "domain": "homgar",
     "name": "HomGar Cloud",
-    "version": "0.2.7",
+    "version": "0.2.8",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "requirements": [],

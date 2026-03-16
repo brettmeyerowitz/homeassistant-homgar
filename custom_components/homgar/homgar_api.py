@@ -463,9 +463,9 @@ def decode_pool(raw: str) -> dict:
 def decode_pool_plus(raw: str) -> dict:
     """
     Decode HCS015ARF+ (pool + ambient temperature/humidity) payload.
-    Layout (payload prefix 11#): pool temp 16-bit F*10 at b[7:9] (offset may need
-    verification per firmware); ambient temp at b[29:31] (low), b[31:33] (current/
-    high); humidity at b[26].
+    Layout (payload prefix 11#): pool temp 16-bit LE F*10 at b[2:4] (low/current),
+    b[4:6] (high); ambient temp at b[29:31] (low), b[31:33] (current/high);
+    humidity at b[25] (low), b[26] (current), b[15] (high).
     """
     b = _parse_homgar_payload(raw)
     if len(b) < 34:
@@ -477,21 +477,22 @@ def decode_pool_plus(raw: str) -> dict:
     def f10_to_c(val: int) -> float:
         return round((val / 10.0 - 32.0) * (5.0 / 9.0), 2)
 
-    # Pool temperature: 16-bit LE F*10 at b[7:9] (byte layout may vary by firmware)
-    pool_raw = le16(7)
-    pool_tempcurrent = f10_to_c(pool_raw) if 400 <= pool_raw <= 1200 else None
-    pool_templow = None
-    pool_temphigh = None
+    # Pool temperature: 16-bit LE F*10 at b[2:4] (low/current), b[4:6] (high)
+    pool_raw_low = le16(2)
+    pool_raw_high = le16(4)
+    pool_templow = f10_to_c(pool_raw_low) if 400 <= pool_raw_low <= 1200 else None
+    pool_temphigh = f10_to_c(pool_raw_high) if 400 <= pool_raw_high <= 1200 else None
+    pool_tempcurrent = pool_templow  # device often reports current same as low
 
-    # Ambient temperature: 16-bit LE F*10 at b[29:31], b[31:33]
+    # Ambient temperature: 16-bit LE F*10 at b[29:31] (low/current), b[31:33] (high)
     ambient_templow = f10_to_c(le16(29)) if 400 <= le16(29) <= 1200 else None
-    ambient_tempcurrent = f10_to_c(le16(31)) if 400 <= le16(31) <= 1200 else None
-    ambient_temphigh = ambient_tempcurrent  # same slice as current when equal
+    ambient_temphigh = f10_to_c(le16(31)) if 400 <= le16(31) <= 1200 else None
+    ambient_tempcurrent = ambient_templow  # current from same slice as low
 
-    # Ambient humidity: single byte at b[26] (0-100)
-    humidity_low = b[26] if 0 <= b[26] <= 100 else None
-    humidity_current = b[26] if humidity_low is not None else None
-    humidity_high = humidity_current
+    # Ambient humidity: b[25]=low, b[26]=current, b[15]=high (0-100)
+    humidity_low = b[25] if len(b) > 25 and 0 <= b[25] <= 100 else None
+    humidity_current = b[26] if len(b) > 26 and 0 <= b[26] <= 100 else None
+    humidity_high = b[15] if len(b) > 15 and 0 <= b[15] <= 100 else None
 
     return {
         "type": "pool_plus",
