@@ -477,12 +477,14 @@ def decode_pool_plus(raw: str) -> dict:
     def f10_to_c(val: int) -> float:
         return round((val / 10.0 - 32.0) * (5.0 / 9.0), 2)
 
-    # Pool temperature: 16-bit LE F*10 at b[2:4] (low/current), b[4:6] (high)
-    pool_raw_low = le16(2)
+    # Pool temperature: 16-bit LE F*10 at b[2:4] (current), b[4:6] (high).
+    # Min is not present in payload (device may track it internally); avoid using
+    # current for min so "Pool Low" doesn't incorrectly track the live reading.
+    pool_raw_current = le16(2)
     pool_raw_high = le16(4)
-    pool_templow = f10_to_c(pool_raw_low) if 400 <= pool_raw_low <= 1200 else None
+    pool_tempcurrent = f10_to_c(pool_raw_current) if 400 <= pool_raw_current <= 1200 else None
     pool_temphigh = f10_to_c(pool_raw_high) if 400 <= pool_raw_high <= 1200 else None
-    pool_tempcurrent = pool_templow  # device often reports current same as low
+    pool_templow = None  # not decoded from payload
 
     # Ambient temperature: 16-bit LE F*10 at b[29:31] (low/current), b[31:33] (high)
     ambient_templow = f10_to_c(le16(29)) if 400 <= le16(29) <= 1200 else None
