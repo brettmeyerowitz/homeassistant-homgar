@@ -225,6 +225,7 @@ class HomGarMoisturePercentSensor(HomGarSensorBase):
     _attr_device_class = SensorDeviceClass.MOISTURE
     _attr_native_unit_of_measurement = "%"
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:water-percent"
 
     def __init__(
         self,
@@ -282,6 +283,7 @@ class HomGarIlluminanceSensor(HomGarSensorBase):
     _attr_device_class = SensorDeviceClass.ILLUMINANCE
     _attr_native_unit_of_measurement = "lx"
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:brightness-5"
 
     def __init__(
         self,
@@ -309,6 +311,7 @@ class HomGarRainSensor(HomGarSensorBase):
     _attr_device_class = SensorDeviceClass.PRECIPITATION
     _attr_native_unit_of_measurement = "mm"
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:weather-rainy"
 
     def __init__(
         self,
