@@ -32,7 +32,6 @@ from .const import (
     MODEL_HCS005FRF,
     MODEL_HCS003FRF,
     MODEL_HCS024FRF_V1,
-    MODEL_HCS014ARF,
     MODEL_HCS015ARF,
     MODEL_HCS0528ARF,
     MODEL_HCS027ARF,
@@ -156,14 +155,6 @@ async def async_setup_entry(
             entities.append(HomGarMoisturePercentSensor(coordinator, key, info, base_slug, simple=False))
             entities.append(HomGarTemperatureSensor(coordinator, key, info, base_slug))
             entities.append(HomGarIlluminanceSensor(coordinator, key, info, base_slug))
-        elif model == MODEL_HCS014ARF:
-            # Temperature/humidity sensor - same as MODEL_TEMPHUM
-            entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS015ARF:
             # Pool temperature sensor - same as MODEL_POOL
             entities.append(HomGarPoolCurrentTempSensor(coordinator, key, info, base_slug))

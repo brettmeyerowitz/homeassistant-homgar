@@ -22,17 +22,27 @@ APP_CODE_MAPPING = {
     APP_TYPE_RAINPOINT: "2",
 }
 
-# Known models
-MODEL_MOISTURE_SIMPLE = "HCS026FRF"  # Moisture only
-MODEL_MOISTURE_FULL = "HCS021FRF"    # Moisture + temp + lux
-MODEL_RAIN = "HCS012ARF"             # Rain gauge
-# Additional models from Node-RED flow
-MODEL_TEMPHUM = "HCS014ARF"          # Temperature/Humidity
-MODEL_FLOWMETER = "HCS008FRF"        # Flowmeter
-MODEL_CO2 = "HCS0530THO"             # CO2/Temp/Humidity
-MODEL_POOL = "HCS0528ARF"            # Pool/Temperature
-MODEL_POOL_PLUS = "HCS015ARF+"       # Pool + Ambient temp/humidity
-MODEL_DISPLAY_HUB = "HWS019WRF-V2"   # Smart+ Irrigation Display Hub
+# Known models (original devices)
+MODEL_HCS026FRF = "HCS026FRF"     # Moisture only
+MODEL_HCS021FRF = "HCS021FRF"     # Moisture + temp + lux
+MODEL_HCS012ARF = "HCS012ARF"     # Rain gauge
+MODEL_HCS014ARF = "HCS014ARF"     # Temperature/Humidity
+MODEL_HCS008FRF = "HCS008FRF"     # Flowmeter
+MODEL_HCS0530THO = "HCS0530THO"   # CO2/Temp/Humidity
+MODEL_HCS0528ARF = "HCS0528ARF"   # Pool/Temperature
+MODEL_HCS015ARF_PLUS = "HCS015ARF+"  # Pool + Ambient temp/humidity
+MODEL_HWS019WRF_V2 = "HWS019WRF-V2"  # Smart+ Irrigation Display Hub
+
+# Legacy aliases for backward compatibility
+MODEL_MOISTURE_SIMPLE = MODEL_HCS026FRF
+MODEL_MOISTURE_FULL = MODEL_HCS021FRF
+MODEL_RAIN = MODEL_HCS012ARF
+MODEL_TEMPHUM = MODEL_HCS014ARF
+MODEL_FLOWMETER = MODEL_HCS008FRF
+MODEL_CO2 = MODEL_HCS0530THO
+MODEL_POOL = MODEL_HCS0528ARF
+MODEL_POOL_PLUS = MODEL_HCS015ARF_PLUS
+MODEL_DISPLAY_HUB = MODEL_HWS019WRF_V2
 
 # === HCS Sensor Series (v1.3.0) ===
 
@@ -63,9 +73,14 @@ MODEL_HCS0600ARF = "HCS0600ARF"      # Advanced environmental sensor
 
 # Pool temperature sensors
 MODEL_HCS015ARF = "HCS015ARF"        # Pool temperature sensor
-MODEL_HCS0528ARF = "HCS0528ARF"      # Pool temperature sensor
+# Note: MODEL_HCS0528ARF defined above as primary pool sensor
 
 # === Valve Controllers (v1.2.0) ===
-MODEL_VALVE_213 = "HTV213FRF"        # Single-zone RF irrigation timer (similar to HTV0540FRF)
-MODEL_VALVE_245 = "HTV245FRF"        # Irrigation valve (similar to HTV0540FRF)
-MODEL_VALVE_HUB = "HTV0540FRF"       # Multi-zone valve hub (fully supported)
+MODEL_HTV213FRF = "HTV213FRF"        # Single-zone RF irrigation timer (similar to HTV0540FRF)
+MODEL_HTV245FRF = "HTV245FRF"        # Irrigation valve (similar to HTV0540FRF)
+MODEL_HTV0540FRF = "HTV0540FRF"      # Multi-zone valve hub (fully supported)
+
+# Legacy valve aliases
+MODEL_VALVE_213 = MODEL_HTV213FRF
+MODEL_VALVE_245 = MODEL_HTV245FRF
+MODEL_VALVE_HUB = MODEL_HTV0540FRF
