@@ -123,9 +123,9 @@ class HomGarClient:
             "deviceId": device_id,
         }
 
-        _LOGGER.debug("HomGar login request for %s", self._email)
+        _LOGGER.debug("HomGar login request for %s with appCode=%s", self._email, self._app_code)
 
-        async with self._session.post(url, json=payload, headers={"Content-Type": "application/json", "lang": "en", "appCode": "1"}) as resp:
+        async with self._session.post(url, json=payload, headers={"Content-Type": "application/json", "lang": "en", "appCode": self._app_code}) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"Login HTTP {resp.status}")
             data = await resp.json()

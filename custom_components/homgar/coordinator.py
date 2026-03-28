@@ -84,6 +84,11 @@ class HomGarCoordinator(DataUpdateCoordinator):
                     multiple_status = await self._client.get_multiple_device_status(device_list)
                     _LOGGER.debug("multipleDeviceStatus successful, got data for %d devices", len(multiple_status))
                     
+                    # If multipleDeviceStatus returns empty data, fall back to individual calls
+                    if not multiple_status:
+                        _LOGGER.warning("multipleDeviceStatus returned empty data, falling back to individual calls")
+                        raise Exception("Empty response from multipleDeviceStatus")
+                    
                     # Convert response to status_by_mid format
                     for device_data in multiple_status:
                         mid = device_data["mid"]
