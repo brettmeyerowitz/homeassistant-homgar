@@ -75,8 +75,8 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_EMAIL): str,
                 vol.Required(CONF_PASSWORD): str,
                 vol.Required(CONF_APP_TYPE, default=APP_TYPE_HOMGAR): vol.In({
-                    APP_TYPE_HOMGAR: "HomGar App",
-                    APP_TYPE_RAINPOINT: "RainPoint App",
+                    APP_TYPE_HOMGAR: "HomGar",
+                    APP_TYPE_RAINPOINT: "RainPoint",
                 }),
             }
         )

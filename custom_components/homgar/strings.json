@@ -1,0 +1,39 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "HomGar/RainPoint Cloud",
+        "description": "Connect your RainPoint Smart+ devices via HomGar cloud API. Select the mobile app you use on your phone.",
+        "data": {
+          "area_code": "Area Code",
+          "email": "Email",
+          "password": "Password",
+          "app_type": "Mobile App Type"
+        }
+      },
+      "select_homes": {
+        "title": "Select Homes",
+        "description": "Choose which homes to include in Home Assistant"
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials",
+      "cannot_connect": "Failed to connect",
+      "no_homes": "No homes found",
+      "invalid_app_type": "Invalid app type selected"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HomGar/RainPoint Cloud Options",
+        "data": {
+          "area_code": "Area Code",
+          "email": "Email", 
+          "password": "Password",
+          "app_type": "Mobile App Type"
+        }
+      }
+    }
+  }
+}
