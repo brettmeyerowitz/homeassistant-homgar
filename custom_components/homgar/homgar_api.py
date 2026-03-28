@@ -46,6 +46,8 @@ from .const import (
     CONF_TOKEN,
     CONF_TOKEN_EXPIRES_AT,
     CONF_REFRESH_TOKEN,
+    CONF_APP_TYPE,
+    APP_CODE_MAPPING,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,11 +58,13 @@ class HomGarApiError(Exception):
 
 
 class HomGarClient:
-    def __init__(self, area_code: str, email: str, password: str, session: aiohttp.ClientSession):
+    def __init__(self, area_code: str, email: str, password: str, session: aiohttp.ClientSession, app_type: str = "homgar"):
         self._area_code = area_code
         self._email = email
         self._password = password  # cleartext, HA will store
         self._session = session
+        self._app_type = app_type
+        self._app_code = APP_CODE_MAPPING.get(app_type, "1")  # Default to homgar
 
         self._token: str | None = None
         self._refresh_token: str | None = None
@@ -143,7 +147,13 @@ class HomGarClient:
     def _auth_headers(self) -> dict:
         if not self._token:
             raise HomGarApiError("Token not available")
-        return {"auth": self._token, "lang": "en", "appCode": "1"}
+        return {
+            "auth": self._token, 
+            "lang": "en", 
+            "appCode": self._app_code,  # Use dynamic app_code based on user selection
+            "version": "1.16.1065",
+            "sceneType": "1"
+        }
 
     # --- API calls ---
 
@@ -187,6 +197,42 @@ class HomGarClient:
         if data.get("code") != 0:
             raise HomGarApiError(f"getDeviceStatus failed: {data}")
         return data.get("data", {})
+
+    async def get_multiple_device_status(self, devices: list[dict]) -> list[dict]:
+        """Get status for multiple devices in one API call (more efficient)."""
+        await self.ensure_logged_in()
+        url = f"{self._base_url}/app/device/multipleDeviceStatus"
+        
+        # Format devices array as expected by API
+        device_list = []
+        for device in devices:
+            device_list.append({
+                "deviceName": device.get("deviceName", ""),
+                "mid": device["mid"],
+                "productKey": device.get("productKey", "")
+            })
+        
+        payload = {"devices": device_list}
+        _LOGGER.debug("API call: get_multiple_device_status URL=%s payload=%s", url, payload)
+        async with self._session.post(url, json=payload, headers=self._auth_headers()) as resp:
+            if resp.status != 200:
+                raise HomGarApiError(f"multipleDeviceStatus HTTP {resp.status}")
+            data = await resp.json()
+        _LOGGER.debug("API response: get_multiple_device_status data=%s", data)
+        if data.get("code") != 0:
+            raise HomGarApiError(f"multipleDeviceStatus failed: {data}")
+        
+        # Convert response format to match individual device status format
+        # Response has: [{"propVer": X, "status": [...], "mid": Y, "iotId": Z}, ...]
+        # We need: [{"mid": Y, "subDeviceStatus": [...]}]
+        converted_data = []
+        for device_data in data.get("data", []):
+            converted_data.append({
+                "mid": device_data["mid"],
+                "subDeviceStatus": device_data.get("status", [])
+            })
+        
+        return converted_data
     
     # --- Payload decoding helpers ---
 
@@ -225,6 +271,11 @@ def decode_moisture_simple(raw: str) -> dict:
     b5 = 0x88  (moisture tag)
     b6 = moisture % (0-100)
     b7,b8 = status/battery field
+    
+    Based on actual payload: 10#E1C600DC01881AFF0F5E21F718
+    E1 C6 00 DC 01 88 1A FF 0F 5E 21 F7 18
+    b[1]=0xC6=198-256=-58 RSSI
+    b[6]=0x1A=26% moisture
     """
     b = _parse_homgar_payload(raw)
     if len(b) < 9:
@@ -261,6 +312,13 @@ def decode_moisture_full(raw: str) -> dict:
     b11,b12= lux_raw * 10 LE
     b13    = 0x00
     b14,b15= 0xFF,0x0F (status/battery)
+    
+    Based on actual payload: 10#E1A200DC0185AB02881FC6600600FF0FFA28F718
+    E1 A2 00 DC 01 85 AB 02 88 1F C6 60 06 00 FF 0F FA 28 F7 18
+    b[1]=0xA2=162-256=-94 RSSI
+    b[6:7]=0x02AB=683°F*10 → 68.3°F → 20.2°C
+    b[9]=0x1F=31% moisture
+    b[11:12]=0x0660=1632 lux*10 → 163.2 lux
     """
     b = _parse_homgar_payload(raw)
     if len(b) < 16:
@@ -309,6 +367,13 @@ def decode_rain(raw: str) -> dict:
     b20,b21 = 0x00,0x00
     b22,b23 = 0xFF,0x0F (status/battery)
     b24..b27 = tail
+    
+    Based on actual payload: 10#E10000FD040000FD054E07FD064E07DC01974E070000FF0F0410F718
+    E1 00 00 FD 04 00 00 FD 05 4E 07 FD 06 4E 07 DC 01 97 4E 07 00 00 FF 0F 04 10 F7 18
+    b[5:6]=0x0000=0.0mm last hour
+    b[9:10]=0x074E=1870mm*10 → 187.0mm last 24h
+    b[13:14]=0x074E=1870mm*10 → 187.0mm last 7d
+    b[18:19]=0x074E=1870mm*10 → 187.0mm total
     """
     b = _parse_homgar_payload(raw)
     if len(b) < 24:

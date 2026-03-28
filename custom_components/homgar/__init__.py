@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN, DEFAULT_SCAN_INTERVAL
+from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_APP_TYPE
 from .homgar_api import HomGarClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,8 +26,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     area_code = entry.data["area_code"]
     email = entry.data["email"]
     password = entry.data["password"]
+    # Default existing users to HomGar for backward compatibility
+    app_type = entry.data.get(CONF_APP_TYPE, "homgar")
 
-    client = HomGarClient(area_code, email, password, session)
+    client = HomGarClient(area_code, email, password, session, app_type)
     # Restore tokens if present
     client.restore_tokens(entry.data)
 

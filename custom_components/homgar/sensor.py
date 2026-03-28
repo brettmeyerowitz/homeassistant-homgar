@@ -55,12 +55,15 @@ async def async_setup_entry(
 
     for key, info in sensors_cfg.items():
         model = info.get("model")
-        sub_name = info.get("sub_name") or f"addr_{info['addr']}"
+        sub_name = info.get("sub_name") or f"Sensor {info['addr']}"
         home_name = info.get("home_name") or ""
+        brand = info.get("brand", "HomGar")
         base_slug_parts = []
         if home_name:
             base_slug_parts.append(_slugify(home_name))
         base_slug_parts.append(_slugify(sub_name))
+        if brand != "HomGar":
+            base_slug_parts.append(_slugify(brand.lower()))
         base_slug = "_".join(base_slug_parts)
         _LOGGER.debug("Creating sensor entity: key=%s, model=%s, sub_name=%s, home_name=%s, base_slug=%s, info=%s", key, model, sub_name, home_name, base_slug, info)
 
@@ -122,6 +125,9 @@ async def async_setup_entry(
             data = info.get("data", {})
             if data and data.get("type") == "unknown":
                 entities.append(HomGarUnknownSensor(coordinator, key, info, base_slug))
+        
+        # Add raw payload sensor for all devices (disabled by default)
+        entities.append(HomGarRawPayloadSensor(coordinator, key, info, base_slug))
 
     if entities:
         async_add_entities(entities)
@@ -178,12 +184,13 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
         addr = self._sensor_info["addr"]
         sub_name = self._sensor_info.get("sub_name") or f"Sensor {addr}"
         model = self._sensor_info.get("model") or "Unknown"
+        brand = self._sensor_info.get("brand", "HomGar")
 
         return {
             # Unique per subdevice
             "identifiers": {(DOMAIN, f"{hid}_{mid}_{addr}")},
             "name": f"{sub_name}",
-            "manufacturer": "HomGar",
+            "manufacturer": f"{brand}",
             "model": model,
         }
 
@@ -916,3 +923,33 @@ class HomGarUnknownSensor(HomGarSensorBase):
         )
         
         return attrs
+
+
+class HomGarRawPayloadSensor(HomGarSensorBase):
+    """Raw hex payload sensor (diagnostic, disabled by default)."""
+    
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:code-braces"
+    _attr_entity_registry_enabled_default = False  # Disabled by default
+    
+    def __init__(
+        self,
+        coordinator: HomGarCoordinator,
+        sensor_key: str,
+        sensor_info: dict,
+        base_slug: str,
+    ) -> None:
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        sub_name = sensor_info.get("sub_name") or "Sensor"
+        self._attr_unique_id = f"homgar_{base_slug}_raw_payload"
+        self._attr_name = f"{sub_name} Raw Payload"
+    
+    @property
+    def native_value(self) -> str | None:
+        """Return the raw hex payload string."""
+        sensors = self.coordinator.data.get("sensors", {})
+        info = sensors.get(self._sensor_key) or {}
+        raw_status = info.get("raw_status") or {}
+        value = raw_status.get("value")
+        _LOGGER.debug("native_value for %s (raw_payload): %s", self._sensor_key, value)
+        return value

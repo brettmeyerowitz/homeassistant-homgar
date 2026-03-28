@@ -17,6 +17,9 @@ from .const import (
     CONF_EMAIL,
     CONF_PASSWORD,
     CONF_HIDS,
+    CONF_APP_TYPE,
+    APP_TYPE_HOMGAR,
+    APP_TYPE_RAINPOINT,
 )
 from .homgar_api import HomGarClient, HomGarApiError
 
@@ -24,7 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for HomGar."""
+    """Handle a config flow for HomGar/RainPoint Smart+ devices."""
 
     VERSION = 1
 
@@ -35,13 +38,14 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             area_code = user_input[CONF_AREA_CODE]
             email = user_input[CONF_EMAIL]
             password = user_input[CONF_PASSWORD]
+            app_type = user_input[CONF_APP_TYPE]
 
             # Single account per HA instance
             await self.async_set_unique_id(f"{DOMAIN}_{email}")
             self._abort_if_unique_id_configured()
 
             session = async_get_clientsession(self.hass)
-            client = HomGarClient(area_code, email, password, session)
+            client = HomGarClient(area_code, email, password, session, app_type)
 
             try:
                 await client.ensure_logged_in()
@@ -60,6 +64,7 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     self._area_code = area_code
                     self._email = email
                     self._password = password
+                    self._app_type = app_type
                     self._homes = homes
                     self._client = client
                     return await self.async_step_select_homes()
@@ -69,6 +74,10 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_AREA_CODE, default="27"): str,
                 vol.Required(CONF_EMAIL): str,
                 vol.Required(CONF_PASSWORD): str,
+                vol.Required(CONF_APP_TYPE, default=APP_TYPE_HOMGAR): vol.In({
+                    APP_TYPE_HOMGAR: "HomGar App",
+                    APP_TYPE_RAINPOINT: "RainPoint App",
+                }),
             }
         )
 
@@ -97,12 +106,13 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_AREA_CODE: self._area_code,
                     CONF_EMAIL: self._email,
                     CONF_PASSWORD: self._password,
+                    CONF_APP_TYPE: self._app_type,
                     CONF_HIDS: hids,
                     **token_data,
                 }
 
                 return self.async_create_entry(
-                    title=f"HomGar ({self._email})",
+                    title=f"HomGar/RainPoint ({self._email})",
                     data=data,
                 )
 

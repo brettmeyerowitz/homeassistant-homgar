@@ -5,6 +5,7 @@ CONF_AREA_CODE = "area_code"
 CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
 CONF_HIDS = "hids"  # list of selected home IDs
+CONF_APP_TYPE = "app_type"  # "homgar" or "rainpoint"
 
 DEFAULT_SCAN_INTERVAL = 120  # seconds
 
@@ -12,6 +13,14 @@ DEFAULT_SCAN_INTERVAL = 120  # seconds
 CONF_TOKEN = "token"
 CONF_REFRESH_TOKEN = "refresh_token"
 CONF_TOKEN_EXPIRES_AT = "token_expires_at"
+
+# App type mappings
+APP_TYPE_HOMGAR = "homgar"
+APP_TYPE_RAINPOINT = "rainpoint"
+APP_CODE_MAPPING = {
+    APP_TYPE_HOMGAR: "1",
+    APP_TYPE_RAINPOINT: "2",
+}
 
 # Known models
 MODEL_MOISTURE_SIMPLE = "HCS026FRF"  # Moisture only

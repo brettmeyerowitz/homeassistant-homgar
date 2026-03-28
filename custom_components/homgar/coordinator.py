@@ -46,7 +46,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
         self._notified_unknown_models: set[str] = set()
 
     async def _async_update_data(self):
-        """Fetch and decode data from HomGar."""
+        """Fetch and decode data from HomGar/RainPoint."""
         try:
             homes = self._hids
             hubs: list[dict] = []
@@ -55,17 +55,58 @@ class HomGarCoordinator(DataUpdateCoordinator):
                 for hub in devices:
                     hub_copy = dict(hub)
                     hub_copy["hid"] = hid
+                    # Use app_type to determine brand
+                    if self._client._app_type == "rainpoint":
+                        brand = "RainPoint"
+                    else:
+                        brand = "HomGar"
+                    hub_copy["brand"] = brand
                     hubs.append(hub_copy)
 
+            # Use efficient multipleDeviceStatus API if available, fall back to individual calls
             status_by_mid: dict[int, dict] = {}
             decoded_sensors: dict[str, dict] = {}
+            
+            if hubs:
+                # Prepare device list for multipleDeviceStatus API
+                device_list = []
+                for hub in hubs:
+                    device_list.append({
+                        "mid": hub["mid"],
+                        "deviceName": hub.get("deviceName", ""),
+                        "productKey": hub.get("productKey", "")
+                    })
+                
+                # Try multipleDeviceStatus first (more efficient)
+                try:
+                    multiple_status = await self._client.get_multiple_device_status(device_list)
+                    _LOGGER.debug("multipleDeviceStatus successful, got data for %d devices", len(multiple_status))
+                    
+                    # Convert response to status_by_mid format
+                    for device_data in multiple_status:
+                        mid = device_data["mid"]
+                        status_by_mid[mid] = {"subDeviceStatus": device_data.get("status", [])}
+                        _LOGGER.debug("Fetched status for mid=%s using multipleDeviceStatus", mid)
+                        
+                except Exception as e:
+                    _LOGGER.warning("multipleDeviceStatus failed, falling back to individual calls: %s", e)
+                    
+                    # Fall back to individual device status calls
+                    for hub in hubs:
+                        mid = hub["mid"]
+                        try:
+                            status = await self._client.get_device_status(mid)
+                            status_by_mid[mid] = status
+                            _LOGGER.debug("Fetched status for mid=%s using individual call", mid)
+                        except Exception as individual_e:
+                            _LOGGER.error("Failed to get status for mid=%s: %s", mid, individual_e)
+                            status_by_mid[mid] = {"subDeviceStatus": []}
 
             for hub in hubs:
                 mid = hub["mid"]
-                status = await self._client.get_device_status(mid)
-                status_by_mid[mid] = status
+                status = status_by_mid.get(mid, {"subDeviceStatus": []})
 
-                _LOGGER.debug("Fetched status for mid=%s: %s", mid, status)
+                _LOGGER.debug("Processing hub mid=%s with status", mid)
 
                 sub_status = {s["id"]: s for s in status.get("subDeviceStatus", [])}
 
