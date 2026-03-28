@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-03-28
+
+### Added
+- **Full valve hub support (HTV0540FRF)** - Thanks to @gavinwoolley!
+  - Valve entities for open/close control per zone
+  - Duration number entities (1-60 min) per zone
+  - Dynamic zone detection from payload
+  - Immediate state reflection after commands
+- **Valve platform** - New valve entities for irrigation control
+- **Number platform** - Duration configuration entities
+
+### Improved
+- TLV payload parsing for valve devices
+- Coordinator now supports valve hub decoding
+- Added valve models to recognized devices list
+
+### Technical
+- Added `decode_valve_hub()` function with TLV parsing
+- Added `valve.py` and `number.py` platforms
+- Updated coordinator to handle valve sub-devices
+
 ## [1.1.0] - 2026-03-28
 
 ### Added

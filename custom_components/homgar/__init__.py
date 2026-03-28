@@ -11,7 +11,7 @@ from .homgar_api import HomGarClient
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[str] = ["sensor"]
+PLATFORMS: list[str] = ["sensor", "valve", "number"]
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:

@@ -20,11 +20,13 @@ from .const import (
     MODEL_POOL,
     MODEL_POOL_PLUS,
     MODEL_DISPLAY_HUB,
+    MODEL_VALVE_HUB,
 )
 from .homgar_api import (
     HomGarClient, HomGarApiError,
     decode_moisture_simple, decode_moisture_full, decode_rain,
     decode_temphum, decode_flowmeter, decode_co2, decode_pool, decode_pool_plus,
+    decode_valve_hub,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -160,6 +162,8 @@ class HomGarCoordinator(DataUpdateCoordinator):
                             elif model == MODEL_DISPLAY_HUB:
                                 from .homgar_api import decode_hws019wrf_v2
                                 decoded = decode_hws019wrf_v2(raw_value)
+                            elif model == MODEL_VALVE_HUB:
+                                decoded = decode_valve_hub(raw_value)
                             else:
                                 # Store raw data for unknown models so users can report it
                                 decoded = {

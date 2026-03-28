@@ -1,3 +1,9 @@
+# DP IDs for valve hub zone state and duration (confirmed via payload capture)
+# Zone N state DP   = _DP_HUB_STATE + N  (0x19 = zone 1, 0x1A = zone 2, ...)
+# Zone N duration DP = _DP_BASE_DURATION + N (0x25 = zone 1, 0x26 = zone 2, ...)
+_DP_HUB_STATE = 0x18
+_DP_BASE_DURATION = 0x24  # zone N duration DP = 0x24 + N
+
 # Decoder for HWS019WRF-V2 (Display Hub) CSV/semicolon payload
 def decode_hws019wrf_v2(raw: str) -> dict:
     """
@@ -575,4 +581,79 @@ def decode_pool_plus(raw: str) -> dict:
         "humidity_current": humidity_current,
         "humidity_high": humidity_high,
         "raw_bytes": b,
+    }
+
+
+def _parse_tlv_payload(raw: str) -> dict[int, tuple[int, int, bytes]]:
+    """
+    Parse a TLV (Type-Length-Value) payload used by valve hubs.
+    Returns dict: {dp_id: (type_byte, value_int, raw_bytes)}
+    """
+    b = _parse_homgar_payload(raw)
+    tlv: dict[int, tuple[int, int, bytes]] = {}
+    i = 0
+    while i < len(b):
+        if i + 2 >= len(b):
+            break
+        dp_id = b[i]
+        type_byte = b[i + 1]
+        length = b[i + 2]
+        i += 3
+        if i + length > len(b):
+            break
+        raw_bytes = bytes(b[i : i + length])
+        value_int = int.from_bytes(raw_bytes, "big") if raw_bytes else 0
+        tlv[dp_id] = (type_byte, value_int, raw_bytes)
+        i += length
+    return tlv
+
+
+def decode_valve_hub(raw: str) -> dict:
+    """
+    Decode an irrigation valve hub TLV payload (e.g. HTV0540FRF).
+
+    Confirmed DP map (derived from live payload capture):
+      0x18      hub online state     DC  1-byte  0x01 = online
+      0x18+N    zone N open state    D8  1-byte  0x00 = closed, non-zero = open
+      0x24+N    zone N run duration  AD  2-byte  little-endian seconds
+
+    Zone state DPs are detected dynamically from the payload so that hubs with
+    any number of zones (1, 2, 3, 4, ...) are handled without code changes.
+    """
+    tlv = _parse_tlv_payload(raw)
+
+    def get_val(dp: int) -> int | None:
+        entry = tlv.get(dp)
+        return entry[1] if entry else None
+
+    def get_raw_bytes(dp: int) -> bytes:
+        entry = tlv.get(dp)
+        return entry[2] if entry else b""
+
+    hub_state = get_val(_DP_HUB_STATE)
+
+    # Dynamically detect zones: any DP of type 0xD8 (state byte) with
+    # dp > _DP_HUB_STATE follows the pattern zone_num = dp - _DP_HUB_STATE.
+    zones: dict[int, dict] = {}
+    for dp, entry in tlv.items():
+        type_byte = entry[0]
+        if type_byte != 0xD8 or dp <= _DP_HUB_STATE:
+            continue
+        zone_num = dp - _DP_HUB_STATE
+        state_val = entry[1]
+        dur_dp = _DP_BASE_DURATION + zone_num
+        dur_bytes = get_raw_bytes(dur_dp)
+        duration_s = int.from_bytes(dur_bytes, "little") if len(dur_bytes) == 2 else None
+        zones[zone_num] = {
+            # Bit 0 = valve physically open. 0x21 = open, 0x20 = closing/transitional, 0x00 = closed.
+            "open": bool(state_val & 0x01) if state_val is not None else None,
+            "state_raw": state_val,
+            "duration_seconds": duration_s,
+        }
+
+    return {
+        "type": "valve_hub",
+        "hub_online": hub_state == 1,
+        "zones": zones,
+        "raw_tlv": {f"0x{k:02X}": v[1] for k, v in tlv.items()},
     }
