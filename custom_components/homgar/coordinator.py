@@ -114,8 +114,10 @@ class HomGarCoordinator(DataUpdateCoordinator):
                 status = status_by_mid.get(mid, {"subDeviceStatus": []})
 
                 _LOGGER.debug("Processing hub mid=%s with status", mid)
+                _LOGGER.debug("Status data for mid=%s: %s", mid, status)
 
                 sub_status = {s["id"]: s for s in status.get("subDeviceStatus", [])}
+                _LOGGER.debug("Parsed sub_status for mid=%s: %s keys", mid, len(sub_status))
 
                 # Map addr -> subDevice
                 addr_map = {sd["addr"]: sd for sd in hub.get("subDevices", [])}
