@@ -267,6 +267,39 @@ def _f10_to_c(raw_f10: int) -> float:
     return (f - 32.0) / 1.8
 
 
+def _extract_rssi(bytes_: list[int]) -> int:
+    """Extract RSSI from position 1 using signed byte conversion."""
+    return bytes_[1] - 256 if bytes_[1] >= 128 else bytes_[1]
+
+
+def _extract_status_code(bytes_: list[int], hi_pos: int, lo_pos: int) -> int:
+    """Extract status code from specified positions (little-endian)."""
+    return (bytes_[hi_pos] << 8) | bytes_[lo_pos]
+
+
+def _validate_payload(raw: str, min_length: int) -> list[int]:
+    """Parse and validate basic payload structure."""
+    b = _parse_homgar_payload(raw)
+    if len(b) < min_length:
+        raise ValueError(f"Payload too short: {b}")
+    return b
+
+
+def _validate_tag(bytes_: list[int], position: int, expected_tag: int, device_name: str) -> None:
+    """Validate sensor tag at specific position."""
+    if bytes_[position] != expected_tag:
+        raise ValueError(f"{device_name}: Expected 0x{expected_tag:02x} tag at b[{position}], got 0x{bytes_[position]:02x}")
+
+
+def _base_decoder_dict(device_type: str, rssi: int, raw_bytes: list[int]) -> dict:
+    """Create base decoder return dictionary."""
+    return {
+        "type": device_type,
+        "rssi_dbm": rssi,
+        "raw_bytes": raw_bytes,
+    }
+
+
 def decode_moisture_simple(raw: str) -> dict:
     """
     Decode HCS026FRF (moisture-only) payload.
@@ -285,22 +318,19 @@ def decode_moisture_simple(raw: str) -> dict:
     b[1]=0xC6=198-256=-58 RSSI
     b[6]=0x1A=26% moisture
     """
-    b = _parse_homgar_payload(raw)
-    if len(b) < 9:
-        raise ValueError(f"Moisture simple payload too short: {b}")
-    if b[5] != 0x88:
-        raise ValueError(f"Expected 0x88 moisture tag at b[5], got {b[5]:02x}")
-    rssi = b[1] - 256 if b[1] >= 128 else b[1]
+    b = _validate_payload(raw, 9)
+    _validate_tag(b, 5, 0x88, "HCS026FRF")
+    
+    rssi = _extract_rssi(b)
     moisture = b[6]
-    status_code = (b[7] << 8) | b[8]
+    status_code = _extract_status_code(b, 7, 8)
 
-    return {
-        "type": "moisture_simple",
-        "rssi_dbm": rssi,
+    result = _base_decoder_dict("moisture_simple", rssi, b)
+    result.update({
         "moisture_percent": moisture,
         "battery_status_code": status_code,
-        "raw_bytes": b,
-    }
+    })
+    return result
 
 
 def decode_moisture_full(raw: str) -> dict:
@@ -328,36 +358,32 @@ def decode_moisture_full(raw: str) -> dict:
     b[9]=0x1F=31% moisture
     b[11:12]=0x0660=1632 lux*10 → 163.2 lux
     """
-    b = _parse_homgar_payload(raw)
-    if len(b) < 16:
-        raise ValueError(f"Moisture full payload too short: {b}")
-    rssi = b[1] - 256 if b[1] >= 128 else b[1]
-
+    b = _validate_payload(raw, 16)
+    _validate_tag(b, 5, 0x85, "HCS021FRF")
+    
+    rssi = _extract_rssi(b)
     temp_raw_f10 = _le16(b, 6)
     temp_c = _f10_to_c(temp_raw_f10)
 
-    if b[8] != 0x88:
-        raise ValueError(f"Expected 0x88 moisture tag at b[8], got {b[8]:02x}")
+    _validate_tag(b, 8, 0x88, "HCS021FRF")
     moisture = b[9]
 
-    if b[10] != 0xC6:
-        raise ValueError(f"Expected 0xC6 lux tag at b[10], got {b[10]:02x}")
+    _validate_tag(b, 10, 0xC6, "HCS021FRF")
     lux_raw10 = _le16(b, 11)
     lux = lux_raw10 / 10.0
 
-    status_code = (b[14] << 8) | b[15]
+    status_code = _extract_status_code(b, 14, 15)
 
-    return {
-        "type": "moisture_full",
-        "rssi_dbm": rssi,
+    result = _base_decoder_dict("moisture_full", rssi, b)
+    result.update({
         "moisture_percent": moisture,
         "temperature_c": temp_c,
         "temperature_f10": temp_raw_f10,
         "illuminance_lux": lux,
         "illuminance_raw10": lux_raw10,
         "battery_status_code": status_code,
-        "raw_bytes": b,
-    }
+    })
+    return result
 
 
 def decode_rain(raw: str) -> dict:
@@ -383,28 +409,26 @@ def decode_rain(raw: str) -> dict:
     b[13:14]=0x074E=1870mm*10 → 187.0mm last 7d
     b[18:19]=0x074E=1870mm*10 → 187.0mm total
     """
-    b = _parse_homgar_payload(raw)
-    if len(b) < 24:
-        raise ValueError(f"Rain payload too short: {b}")
+    b = _validate_payload(raw, 24)
 
+    # Validate rain-specific tags
     if not (b[3] == 0xFD and b[4] == 0x04):
-        raise ValueError("Rain payload missing FD 04 at [3:5]")
+        raise ValueError("HCS012ARF: Missing FD 04 at [3:5]")
     if not (b[7] == 0xFD and b[8] == 0x05):
-        raise ValueError("Rain payload missing FD 05 at [7:9]")
+        raise ValueError("HCS012ARF: Missing FD 05 at [7:9]")
     if not (b[11] == 0xFD and b[12] == 0x06):
-        raise ValueError("Rain payload missing FD 06 at [11:13]")
-    if b[17] != 0x97:
-        raise ValueError(f"Rain payload missing 0x97 at b[17], got {b[17]:02x}")
+        raise ValueError("HCS012ARF: Missing FD 06 at [11:13]")
+    _validate_tag(b, 17, 0x97, "HCS012ARF")
 
     last_hour_raw10 = _le16(b, 5)
     last_24h_raw10 = _le16(b, 9)
     last_7d_raw10 = _le16(b, 13)
     total_raw10 = _le16(b, 18)
 
-    status_code = (b[22] << 8) | b[23]
+    status_code = _extract_status_code(b, 22, 23)
 
-    return {
-        "type": "rain",
+    result = _base_decoder_dict("rain", 0, b)  # Rain gauge doesn't have RSSI in standard position
+    result.update({
         "rain_last_hour_mm": last_hour_raw10 / 10.0,
         "rain_last_24h_mm": last_24h_raw10 / 10.0,
         "rain_last_7d_mm": last_7d_raw10 / 10.0,
@@ -414,8 +438,8 @@ def decode_rain(raw: str) -> dict:
         "rain_last_7d_raw10": last_7d_raw10,
         "rain_total_raw10": total_raw10,
         "battery_status_code": status_code,
-        "raw_bytes": b,
-    }
+    })
+    return result
 
 
 # --- Additional decoders (stubs) for new sensor types ---
@@ -423,30 +447,22 @@ def decode_temphum(raw: str) -> dict:
     """
     Decode HCS014ARF (temperature/humidity) payload.
     """
-    b = _parse_homgar_payload(raw)
+    b = _validate_payload(raw, 40)  # Minimum length for basic data
     # See Node-RED: function "Temperature HCS014ARF"
-    part1 = b[7:9]
-    part2 = b[5:7]
-    part3 = b[11:13]
-    part4 = b[9:11]
-    part5 = b[25:27]
-    part6 = b[23:25]
-    part7 = b[29]
-    part8 = b[35]
-    part9 = b[33]
-    part10 = b[39:41]
-    part11 = b[37:39]
+    
     def le_val(parts):
         return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
-    templow = (((le_val(part1+part2) / 10) - 32) * (5 / 9)) if part1 and part2 else None
-    temphigh = (((le_val(part3+part4) / 10) - 32) * (5 / 9)) if part3 and part4 else None
-    tempcurrent = (((le_val(part5+part6) / 10) - 32) * (5 / 9)) if part5 and part6 else None
+    
+    templow = (((le_val(b[7:9]+b[5:7]) / 10) - 32) * (5 / 9)) if len(b) >= 9 else None
+    temphigh = (((le_val(b[11:13]+b[9:11]) / 10) - 32) * (5 / 9)) if len(b) >= 13 else None
+    tempcurrent = (((le_val(b[25:27]+b[23:25]) / 10) - 32) * (5 / 9)) if len(b) >= 27 else None
     humiditycurrent = b[29] if len(b) > 29 else None
     humidityhigh = b[35] if len(b) > 35 else None
     humiditylow = b[33] if len(b) > 33 else None
-    tempbatt = (le_val(part10+part11) / 4095 * 100) if part10 and part11 else None
-    return {
-        "type": "temphum",
+    tempbatt = (le_val(b[39:41]+b[37:39]) / 4095 * 100) if len(b) >= 41 else None
+    
+    result = _base_decoder_dict("temphum", _extract_rssi(b), b)
+    result.update({
         "templow": round(templow, 2) if templow is not None else None,
         "temphigh": round(temphigh, 2) if temphigh is not None else None,
         "tempcurrent": round(tempcurrent, 2) if tempcurrent is not None else None,
@@ -454,17 +470,19 @@ def decode_temphum(raw: str) -> dict:
         "humidityhigh": humidityhigh,
         "humiditylow": humiditylow,
         "tempbatt": round(tempbatt, 2) if tempbatt is not None else None,
-        "raw_bytes": b,
-    }
+    })
+    return result
 
 def decode_flowmeter(raw: str) -> dict:
     """
     Decode HCS008FRF (flowmeter) payload.
     """
-    b = _parse_homgar_payload(raw)
+    b = _validate_payload(raw, 111)  # Need full length for all data
     # See Node-RED: function "Flowmeter HCS008FRF"
+    
     def le_val(parts):
         return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
+    
     flowcurrentused = le_val(b[49:52]) / 10 if len(b) >= 52 else None
     flowcurrenduration = le_val(b[59:62]) if len(b) >= 62 else None
     flowlastused = le_val(b[69:72]) / 10 if len(b) >= 72 else None
@@ -472,8 +490,9 @@ def decode_flowmeter(raw: str) -> dict:
     flowtotaltoday = le_val(b[91:94]) / 10 if len(b) >= 94 else None
     flowtotal = le_val(b[103:107]) / 10 if len(b) >= 107 else None
     flowbatt = le_val(b[107:111]) / 4095 * 100 if len(b) >= 111 else None
-    return {
-        "type": "flowmeter",
+    
+    result = _base_decoder_dict("flowmeter", _extract_rssi(b), b)
+    result.update({
         "flowcurrentused": flowcurrentused,
         "flowcurrenduration": flowcurrenduration,
         "flowlastused": flowlastused,
@@ -481,26 +500,29 @@ def decode_flowmeter(raw: str) -> dict:
         "flowtotaltoday": flowtotaltoday,
         "flowtotal": flowtotal,
         "flowbatt": round(flowbatt, 2) if flowbatt is not None else None,
-        "raw_bytes": b,
-    }
+    })
+    return result
 
 def decode_co2(raw: str) -> dict:
     """
     Decode HCS0530THO (CO2/temp/humidity) payload.
     """
-    b = _parse_homgar_payload(raw)
+    b = _validate_payload(raw, 63)  # Minimum for basic CO2 data
     # See Node-RED: function "CO2 HCS0530THO"
+    
     def le_val(parts):
         return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
+    
     co2 = le_val(b[7:9]+b[5:7]) if len(b) >= 9 else None
     co2low = le_val(b[53:55]+b[51:53]) if len(b) >= 55 else None
     co2high = le_val(b[57:59]+b[55:57]) if len(b) >= 59 else None
     co2temp = (((le_val(b[35:37]+b[33:35]) / 10) - 32) * (5 / 9)) if len(b) >= 37 else None
     co2humidity = b[39] if len(b) > 39 else None
     co2batt = le_val(b[61:63]+b[59:61]) / 4095 * 100 if len(b) >= 63 else None
-    co2rssi = b[67] - 256 if len(b) > 67 and b[67] > 127 else b[67] if len(b) > 67 else None
-    return {
-        "type": "co2",
+    co2rssi = b[67] - 256 if len(b) > 67 and b[67] > 127 else (b[67] if len(b) > 67 else None)
+    
+    result = _base_decoder_dict("co2", co2rssi if co2rssi is not None else _extract_rssi(b), b)
+    result.update({
         "co2": co2,
         "co2low": co2low,
         "co2high": co2high,
@@ -508,29 +530,32 @@ def decode_co2(raw: str) -> dict:
         "co2humidity": co2humidity,
         "co2batt": round(co2batt, 2) if co2batt is not None else None,
         "co2rssi": co2rssi,
-        "raw_bytes": b,
-    }
+    })
+    return result
 
 def decode_pool(raw: str) -> dict:
     """
     Decode HCS0528ARF (pool/temperature) payload.
     """
-    b = _parse_homgar_payload(raw)
+    b = _validate_payload(raw, 31)  # Minimum for basic data
     # See Node-RED: function "Pool"
+    
     def le_val(parts):
         return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
+    
     templow = (((le_val(b[7:9]+b[5:7]) / 10) - 32) * (5 / 9)) if len(b) >= 9 else None
     temphigh = (((le_val(b[11:13]+b[9:11]) / 10) - 32) * (5 / 9)) if len(b) >= 13 else None
     tempcurrent = (((le_val(b[25:27]+b[23:25]) / 10) - 32) * (5 / 9)) if len(b) >= 27 else None
     tempbatt = le_val(b[29:31]+b[25:27]) / 4095 * 100 if len(b) >= 31 else None
-    return {
-        "type": "pool",
+    
+    result = _base_decoder_dict("pool", _extract_rssi(b), b)
+    result.update({
         "templow": round(templow, 2) if templow is not None else None,
         "temphigh": round(temphigh, 2) if temphigh is not None else None,
         "tempcurrent": round(tempcurrent, 2) if tempcurrent is not None else None,
         "tempbatt": round(tempbatt, 2) if tempbatt is not None else None,
-        "raw_bytes": b,
-    }
+    })
+    return result
 
 
 def decode_pool_plus(raw: str) -> dict:
@@ -540,9 +565,7 @@ def decode_pool_plus(raw: str) -> dict:
     b[4:6] (high); ambient temp at b[29:31] (low), b[31:33] (current/high);
     humidity at b[25] (low), b[26] (current), b[15] (high).
     """
-    b = _parse_homgar_payload(raw)
-    if len(b) < 34:
-        return {"type": "pool_plus", "raw_bytes": b}
+    b = _validate_payload(raw, 34)
 
     def le16(idx: int) -> int:
         return b[idx] | (b[idx + 1] << 8)
@@ -569,8 +592,8 @@ def decode_pool_plus(raw: str) -> dict:
     humidity_current = b[26] if len(b) > 26 and 0 <= b[26] <= 100 else None
     humidity_high = b[15] if len(b) > 15 and 0 <= b[15] <= 100 else None
 
-    return {
-        "type": "pool_plus",
+    result = _base_decoder_dict("pool_plus", _extract_rssi(b), b)
+    result.update({
         "pool_templow": pool_templow,
         "pool_temphigh": pool_temphigh,
         "pool_tempcurrent": pool_tempcurrent,
@@ -580,8 +603,8 @@ def decode_pool_plus(raw: str) -> dict:
         "humidity_low": humidity_low,
         "humidity_current": humidity_current,
         "humidity_high": humidity_high,
-        "raw_bytes": b,
-    }
+    })
+    return result
 
 
 def _parse_tlv_payload(raw: str) -> dict[int, tuple[int, int, bytes]]:
@@ -589,7 +612,7 @@ def _parse_tlv_payload(raw: str) -> dict[int, tuple[int, int, bytes]]:
     Parse a TLV (Type-Length-Value) payload used by valve hubs.
     Returns dict: {dp_id: (type_byte, value_int, raw_bytes)}
     """
-    b = _parse_homgar_payload(raw)
+    b = _validate_payload(raw, 3)  # Minimum for one TLV entry
     tlv: dict[int, tuple[int, int, bytes]] = {}
     i = 0
     while i < len(b):
@@ -651,9 +674,452 @@ def decode_valve_hub(raw: str) -> dict:
             "duration_seconds": duration_s,
         }
 
-    return {
-        "type": "valve_hub",
+    result = _base_decoder_dict("valve_hub", 0, _parse_homgar_payload(raw))  # TLV doesn't use standard RSSI
+    result.update({
         "hub_online": hub_state == 1,
+        "hub_state_raw": hub_state,
         "zones": zones,
-        "raw_tlv": {f"0x{k:02X}": v[1] for k, v in tlv.items()},
-    }
+        "tlv_raw": tlv,
+    })
+    return result
+
+
+# --- Additional Device Decoders ---
+
+def decode_hcs005frf(raw: str) -> dict:
+    """
+    Decode HCS005FRF (moisture-only sensor).
+    Layout: 10#E1[RSSI][00][DC][01][88][MOISTURE][STATUS_HI][STATUS_LO][TAIL...]
+    """
+    b = _validate_payload(raw, 9)
+    _validate_tag(b, 5, 0x88, "HCS005FRF")
+    
+    rssi = _extract_rssi(b)
+    moisture = b[6]
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs005frf", rssi, b)
+    result.update({
+        "device_model": "HCS005FRF",
+        "moisture_percent": moisture,
+        "battery_status_code": status_code,
+    })
+    return result
+
+
+def decode_hcs003frf(raw: str) -> dict:
+    """
+    Decode HCS003FRF (moisture-only sensor).
+    Layout: 10#E1[RSSI][00][DC][01][88][MOISTURE][STATUS_HI][STATUS_LO][TAIL...]
+    """
+    b = _validate_payload(raw, 9)
+    _validate_tag(b, 5, 0x88, "HCS003FRF")
+    
+    rssi = _extract_rssi(b)
+    moisture = b[6]
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs003frf", rssi, b)
+    result.update({
+        "device_model": "HCS003FRF",
+        "moisture_percent": moisture,
+        "battery_status_code": status_code,
+    })
+    return result
+
+
+def decode_hcs024frf_v1(raw: str) -> dict:
+    """
+    Decode HCS024FRF-V1 (multi-sensor).
+    Layout: 10#E1[RSSI][00][DC][01][85][TEMP_LO][TEMP_HI][88][MOISTURE][C6][LUX_LO][LUX_HI][00][STATUS_HI][STATUS_LO][TAIL...]
+    """
+    b = _validate_payload(raw, 16)
+    _validate_tag(b, 5, 0x85, "HCS024FRF-V1")
+    
+    rssi = _extract_rssi(b)
+    temp_raw_f10 = _le16(b, 6)
+    temp_c = _f10_to_c(temp_raw_f10)
+
+    _validate_tag(b, 8, 0x88, "HCS024FRF-V1")
+    moisture = b[9]
+
+    _validate_tag(b, 10, 0xC6, "HCS024FRF-V1")
+    lux_raw10 = _le16(b, 11)
+    lux = lux_raw10 / 10.0
+
+    status_code = _extract_status_code(b, 14, 15)
+
+    result = _base_decoder_dict("hcs024frf_v1", rssi, b)
+    result.update({
+        "device_model": "HCS024FRF-V1",
+        "moisture_percent": moisture,
+        "temperature_c": temp_c,
+        "temperature_f10": temp_raw_f10,
+        "illuminance_lux": lux,
+        "illuminance_raw10": lux_raw10,
+        "battery_status_code": status_code,
+    })
+    return result
+
+
+def decode_hcs014arf(raw: str) -> dict:
+    """
+    Decode HCS014ARF (temperature/humidity sensor).
+    Temperature/humidity sensor with complex multi-part data structures.
+    """
+    b = _validate_payload(raw, 40)
+    
+    # Temperature/humidity sensors use complex multi-part data structures
+    def le_val(parts):
+        return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
+    
+    rssi = _extract_rssi(b)
+    
+    templow = (((le_val(b[7:9]+b[5:7]) / 10) - 32) * (5 / 9)) if len(b) >= 9 else None
+    temphigh = (((le_val(b[11:13]+b[9:11]) / 10) - 32) * (5 / 9)) if len(b) >= 13 else None
+    tempcurrent = (((le_val(b[25:27]+b[23:25]) / 10) - 32) * (5 / 9)) if len(b) >= 27 else None
+    humiditycurrent = b[29] if len(b) > 29 else None
+    humidityhigh = b[35] if len(b) > 35 else None
+    humiditylow = b[33] if len(b) > 33 else None
+    tempbatt = (le_val(b[39:41]+b[37:39]) / 4095 * 100) if len(b) >= 41 else None
+
+    result = _base_decoder_dict("hcs014arf", rssi, b)
+    result.update({
+        "device_model": "HCS014ARF",
+        "templow": round(templow, 2) if templow is not None else None,
+        "temphigh": round(temphigh, 2) if temphigh is not None else None,
+        "tempcurrent": round(tempcurrent, 2) if tempcurrent is not None else None,
+        "humiditycurrent": humiditycurrent,
+        "humidityhigh": humidityhigh,
+        "humiditylow": humiditylow,
+        "tempbatt": round(tempbatt, 2) if tempbatt is not None else None,
+    })
+    return result
+
+
+def decode_hcs015arf(raw: str) -> dict:
+    """
+    Decode HCS015ARF (pool temperature sensor).
+    Pool temperature sensor with similar structure to other temperature sensors.
+    """
+    b = _validate_payload(raw, 31)
+    
+    def le_val(parts):
+        return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
+    
+    rssi = _extract_rssi(b)
+    
+    # Pool temperature data - similar structure to other temp sensors
+    templow = (((le_val(b[7:9]+b[5:7]) / 10) - 32) * (5 / 9)) if len(b) >= 9 else None
+    temphigh = (((le_val(b[11:13]+b[9:11]) / 10) - 32) * (5 / 9)) if len(b) >= 13 else None
+    tempcurrent = (((le_val(b[25:27]+b[23:25]) / 10) - 32) * (5 / 9)) if len(b) >= 27 else None
+    tempbatt = le_val(b[29:31]+b[25:27]) / 4095 * 100 if len(b) >= 31 else None
+
+    result = _base_decoder_dict("hcs015arf", rssi, b)
+    result.update({
+        "device_model": "HCS015ARF",
+        "templow": round(templow, 2) if templow is not None else None,
+        "temphigh": round(temphigh, 2) if temphigh is not None else None,
+        "tempcurrent": round(tempcurrent, 2) if tempcurrent is not None else None,
+        "tempbatt": round(tempbatt, 2) if tempbatt is not None else None,
+    })
+    return result
+
+
+def decode_hcs0528arf(raw: str) -> dict:
+    """
+    Decode HCS0528ARF (pool temperature sensor).
+    Pool temperature sensor - alias for decode_pool with proper device model.
+    """
+    result = decode_pool(raw)
+    result["type"] = "hcs0528arf"
+    result["device_model"] = "HCS0528ARF"
+    return result
+
+
+def decode_hcs027arf(raw: str) -> dict:
+    """
+    Decode HCS027ARF (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs027arf", rssi, b)
+    result.update({
+        "device_model": "HCS027ARF",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs016arf(raw: str) -> dict:
+    """
+    Decode HCS016ARF (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs016arf", rssi, b)
+    result.update({
+        "device_model": "HCS016ARF",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs044frf(raw: str) -> dict:
+    """
+    Decode HCS044FRF (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs044frf", rssi, b)
+    result.update({
+        "device_model": "HCS044FRF",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs666frf(raw: str) -> dict:
+    """
+    Decode HCS666FRF (unknown sensor variant).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs666frf", rssi, b)
+    result.update({
+        "device_model": "HCS666FRF",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs666rfr_p(raw: str) -> dict:
+    """
+    Decode HCS666RFR-P (unknown sensor variant).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs666rfr_p", rssi, b)
+    result.update({
+        "device_model": "HCS666RFR-P",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs999frf(raw: str) -> dict:
+    """
+    Decode HCS999FRF (unknown sensor variant).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs999frf", rssi, b)
+    result.update({
+        "device_model": "HCS999FRF",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs999frf_p(raw: str) -> dict:
+    """
+    Decode HCS999FRF-P (unknown sensor variant).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs999frf_p", rssi, b)
+    result.update({
+        "device_model": "HCS999FRF-P",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs666frf_x(raw: str) -> dict:
+    """
+    Decode HCS666FRF-X (unknown sensor variant).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs666frf_x", rssi, b)
+    result.update({
+        "device_model": "HCS666FRF-X",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs701b(raw: str) -> dict:
+    """
+    Decode HCS701B (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs701b", rssi, b)
+    result.update({
+        "device_model": "HCS701B",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs596wb(raw: str) -> dict:
+    """
+    Decode HCS596WB (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs596wb", rssi, b)
+    result.update({
+        "device_model": "HCS596WB",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs596wb_v4(raw: str) -> dict:
+    """
+    Decode HCS596WB-V4 (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs596wb_v4", rssi, b)
+    result.update({
+        "device_model": "HCS596WB-V4",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs706arf(raw: str) -> dict:
+    """
+    Decode HCS706ARF (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs706arf", rssi, b)
+    result.update({
+        "device_model": "HCS706ARF",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs802arf(raw: str) -> dict:
+    """
+    Decode HCS802ARF (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs802arf", rssi, b)
+    result.update({
+        "device_model": "HCS802ARF",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs048b(raw: str) -> dict:
+    """
+    Decode HCS048B (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs048b", rssi, b)
+    result.update({
+        "device_model": "HCS048B",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs888arf_v1(raw: str) -> dict:
+    """
+    Decode HCS888ARF-V1 (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs888arf_v1", rssi, b)
+    result.update({
+        "device_model": "HCS888ARF-V1",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result
+
+
+def decode_hcs0600arf(raw: str) -> dict:
+    """
+    Decode HCS0600ARF (unknown sensor type).
+    Basic sensor structure until real payload is available.
+    """
+    b = _validate_payload(raw, 9)
+    rssi = _extract_rssi(b)
+    status_code = _extract_status_code(b, 7, 8)
+
+    result = _base_decoder_dict("hcs0600arf", rssi, b)
+    result.update({
+        "device_model": "HCS0600ARF",
+        "battery_status_code": status_code,
+        "note": "Device type unknown - basic structure only",
+    })
+    return result

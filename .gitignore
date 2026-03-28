@@ -8,3 +8,8 @@ __pycache__/
 # Internal documentation
 PUBLISHING_GUIDE.md
 backup_guide.sh
+
+# Documentation moved to external repo
+docs/
+post_with_curl.py
+POST_RESPONSES_README.md
