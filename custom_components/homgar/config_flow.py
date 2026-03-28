@@ -45,11 +45,14 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             session = async_get_clientsession(self.hass)
+            _LOGGER.info("Creating client with app_type: %s", app_type)
             client = HomGarClient(area_code, email, password, session, app_type)
 
             try:
                 await client.ensure_logged_in()
                 homes = await client.list_homes()
+                _LOGGER.info("Found %d homes for app_type %s", len(homes), app_type)
+                _LOGGER.debug("Homes data: %s", homes)
             except HomGarApiError:
                 _LOGGER.exception("Error logging in to HomGar")
                 errors["base"] = "auth_failed"
@@ -75,8 +78,8 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_EMAIL): str,
                 vol.Required(CONF_PASSWORD): str,
                 vol.Required(CONF_APP_TYPE, default=APP_TYPE_HOMGAR): vol.In({
-                    APP_TYPE_HOMGAR: "HomGar",
-                    APP_TYPE_RAINPOINT: "RainPoint",
+                    APP_TYPE_HOMGAR: "HomGar",  # Note: HA vol.In() doesn't support translation strings for options
+                    APP_TYPE_RAINPOINT: "RainPoint",  # Field label is translated via strings.json
                 }),
             }
         )

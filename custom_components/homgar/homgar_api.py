@@ -65,6 +65,8 @@ class HomGarClient:
         self._session = session
         self._app_type = app_type
         self._app_code = APP_CODE_MAPPING.get(app_type, "1")  # Default to homgar
+        
+        _LOGGER.info("HomGarClient initialized with app_type: %s, app_code: %s", self._app_type, self._app_code)
 
         self._token: str | None = None
         self._refresh_token: str | None = None

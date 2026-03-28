@@ -2,17 +2,18 @@
     "config": {
         "step": {
             "user": {
-                "title": "HomGar Cloud",
-                "description": "Log in with your HomGar account.",
+                "title": "HomGar/RainPoint Cloud",
+                "description": "Log in with your HomGar/RainPoint account.",
                 "data": {
                     "area_code": "Area code",
                     "email": "Email",
-                    "password": "Password"
+                    "password": "Password",
+                    "app_type": "Mobile App Type"
                 }
             },
             "select_homes": {
-                "title": "Select HomGar Home",
-                "description": "Choose which HomGar Home to add to Home Assistant.",
+                "title": "Select Home",
+                "description": "Choose which Home to add to Home Assistant.",
                 "data": {
                     "hids": "Home"
                 }
@@ -20,12 +21,13 @@
         },
         "error": {
             "auth_failed": "Authentication failed. Please check your credentials.",
-            "cannot_connect": "Unable to connect to HomGar. Please try again.",
-            "no_homes": "No HomGar homes were found for this account.",
-            "select_at_least_one": "Please select a home."
+            "cannot_connect": "Unable to connect to HomGar/RainPoint. Please try again.",
+            "no_homes": "No homes were found for this account.",
+            "select_at_least_one": "Please select a home.",
+            "invalid_app_type": "Invalid app type selected"
         },
         "abort": {
-            "already_configured": "This HomGar account is already configured."
+            "already_configured": "This account is already configured."
         }
     }
 }
