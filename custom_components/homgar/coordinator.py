@@ -57,12 +57,8 @@ class HomGarCoordinator(DataUpdateCoordinator):
                 for hub in devices:
                     hub_copy = dict(hub)
                     hub_copy["hid"] = hid
-                    # Use app_type to determine brand
-                    if self._client._app_type == "rainpoint":
-                        brand = "RainPoint"
-                    else:
-                        brand = "HomGar"
-                    hub_copy["brand"] = brand
+                    # All devices are RainPoint hardware
+                    hub_copy["brand"] = "RainPoint"
                     hubs.append(hub_copy)
 
             # Use efficient multipleDeviceStatus API if available, fall back to individual calls
@@ -90,9 +86,11 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         raise Exception("Empty response from multipleDeviceStatus")
                     
                     # Convert response to status_by_mid format
+                    # Note: get_multiple_device_status already converts "status" to "subDeviceStatus"
                     for device_data in multiple_status:
                         mid = device_data["mid"]
-                        status_by_mid[mid] = {"subDeviceStatus": device_data.get("status", [])}
+                        status_array = device_data.get("subDeviceStatus", [])
+                        status_by_mid[mid] = {"subDeviceStatus": status_array}
                         _LOGGER.debug("Fetched status for mid=%s using multipleDeviceStatus", mid)
                         
                 except Exception as e:
@@ -114,7 +112,6 @@ class HomGarCoordinator(DataUpdateCoordinator):
                 status = status_by_mid.get(mid, {"subDeviceStatus": []})
 
                 _LOGGER.debug("Processing hub mid=%s with status", mid)
-                _LOGGER.debug("Status data for mid=%s: %s", mid, status)
 
                 sub_status = {s["id"]: s for s in status.get("subDeviceStatus", [])}
                 _LOGGER.debug("Parsed sub_status for mid=%s: %s keys", mid, len(sub_status))

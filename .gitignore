@@ -4,3 +4,7 @@ __pycache__/
 .idea/
 .env
 .DS_Store
+
+# Internal documentation
+PUBLISHING_GUIDE.md
+backup_guide.sh

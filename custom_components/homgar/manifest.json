@@ -1,7 +1,7 @@
 {
     "domain": "homgar",
     "name": "HomGar/RainPoint Cloud",
-    "version": "1.0.3",
+    "version": "1.0.0",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "requirements": [],
