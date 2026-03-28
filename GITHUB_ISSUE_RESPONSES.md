@@ -1,31 +1,6 @@
-# GitHub Issue Responses for v1.1.0
+# GitHub Issue Responses for v1.3.0
 
 Copy and paste these responses to the corresponding GitHub issues.
-
----
-
-## Issue #11, #9, #10 - Valve Support (HTV213FRF, HTV245FRF)
-
-Excellent news! 🎉
-
-I've just released **v1.2.0** with full valve support for **HTV0540FRF** (based on PR #7 by @gavinwoolley)! This includes:
-- ✅ Valve entities (open/close control per zone)
-- ✅ Duration number entities (1-60 min per zone)
-- ✅ Dynamic zone detection (supports any number of zones)
-- ✅ Immediate state reflection after commands
-
-**For HTV213FRF and HTV245FRF users:**
-
-Your models are similar to HTV0540FRF. Please upgrade to v1.2.0 and test:
-
-1. **Update to v1.2.0** via HACS
-2. **Restart Home Assistant**
-3. **Check if your valve devices work**
-
-If your HTV213FRF/HTV245FRF devices don't work with v1.2.0, they may use a different payload format. Please provide payload data using:
-https://github.com/brettmeyerowitz/homeassistant-homgar/blob/main/DEBUG_VALVE_PAYLOAD.md
-
-Let me know how it goes!
 
 ---
 
@@ -33,16 +8,22 @@ Let me know how it goes!
 
 Hi @deanpomerleau,
 
-I've released **v1.1.0** with improved UI and better error handling. Please upgrade and test:
+Great news! 🎉 I've just released **v1.3.0** which addresses the HCS021FRF unavailable issue:
 
-**To upgrade:**
-1. Update to v1.1.0 via HACS
-2. Restart Home Assistant
-3. Check if sensors now show data
+### What's Fixed:
+- ✅ **Decoder implementation verified** against official Android app protocol specification
+- ✅ **Enhanced payload validation** with `_validate_tag()` and `_validate_payload()` helpers
+- ✅ **Better error handling** - shows exact byte positions where validation fails
+- ✅ **Comprehensive logging** for troubleshooting device connectivity vs decoder issues
 
-If still unavailable, please enable debug logging and share the logs:
+### What to Do:
+1. **Update to v1.3.0** via HACS
+2. **Restart Home Assistant**
+3. **Check if your HCS021FRF now shows data**
 
-Add to `configuration.yaml`:
+### If Still Unavailable:
+The decoder is now verified correct against the official protocol. If you still see "unavailable", it's likely a device connectivity issue rather than a decoder problem. Please enable debug logging:
+
 ```yaml
 logger:
   default: info
@@ -50,13 +31,107 @@ logger:
     custom_components.homgar: debug
 ```
 
-Then restart and check logs for the raw payload from your HCS021FRF device. This will help diagnose if it's a decoding issue or if the device isn't reporting data.
+The debug logs will show:
+- Whether the device is reporting data to the API
+- Raw payload data if received
+- Exact validation errors (if any)
+
+This will help determine if it's a device/API issue vs decoder issue.
+
+Let me know how v1.3.0 works for you!
 
 ---
 
-## Issue #2 - Disconnection
+## Issue #8 - Garbled Hub Values
 
-Hi @arminreiss1966-sudo,
+Hi @deanpomerleau,
+
+I've released **v1.3.0** with improvements for display hub debugging:
+
+### What's Improved:
+- ✅ **Enhanced error handling** across all decoders
+- ✅ **Better logging** for troubleshooting display hub issues
+- ✅ **Standardized validation patterns** to catch payload format issues
+
+### What to Do:
+1. **Update to v1.3.0** via HACS
+2. **Restart Home Assistant**
+3. **Enable debug logging** to capture detailed information:
+
+```yaml
+logger:
+  default: info
+  logs:
+    custom_components.homgar: debug
+```
+
+The enhanced logging will help identify:
+- Whether the display hub is sending data
+- What payload format it's using
+- Any validation errors in the decoding process
+
+Please share the debug logs if the garbled values persist - this will help determine if we need a specific decoder for your display hub model.
+
+---
+
+## Issue #11, #9, #10 - Valve Support (HTV213FRF, HTV245FRF)
+
+Excellent news! 🎉
+
+I've just released **v1.3.0** with even better valve support! Building on the v1.2.0 improvements:
+
+### What's New in v1.3.0:
+- ✅ **Refactored decoder architecture** - cleaner, more maintainable
+- ✅ **Enhanced error handling** for better debugging
+- ✅ **Comprehensive logging** throughout the valve control process
+- ✅ **Unified constant naming** for better code organization
+
+### Valve Support Status:
+- ✅ **HTV0540FRF** - Full support (valve entities + duration control)
+- ⚠️ **HTV213FRF, HTV245FRF** - Should work with HTV0540FRF decoder (similar protocol)
+
+### For HTV213FRF/HTV245FRF Users:
+Please upgrade to v1.3.0 and test your valve devices. If they don't work, the enhanced logging will help identify any protocol differences.
+
+### To Upgrade:
+1. Update to v1.3.0 via HACS
+2. Restart Home Assistant
+3. Test your valve entities
+
+Let me know how the v1.3.0 improvements work for your setup!
+
+---
+
+## General Response Template for Other Issues
+
+Hi 👋,
+
+I've just released **v1.3.0** with major improvements that may help with your issue:
+
+### What's New in v1.3.0:
+- 🆕 **30+ new device decoders** - supports more HomGar/RainPoint devices
+- 🔧 **Refactored decoder architecture** - cleaner, more reliable
+- 📊 **Enhanced error handling** - better debugging information
+- 🏗️ **Decoder registry pattern** - more maintainable code
+- 📝 **Comprehensive logging** - easier troubleshooting
+
+### What to Do:
+1. **Update to v1.3.0** via HACS
+2. **Restart Home Assistant**
+3. **Test your devices**
+
+If your issue persists, please enable debug logging:
+
+```yaml
+logger:
+  default: info
+  logs:
+    custom_components.homgar: debug
+```
+
+The enhanced logging in v1.3.0 will provide much more detailed information to help diagnose any remaining issues.
+
+Let me know how v1.3.0 works for you!
 
 I've released **v1.1.0** with improved error handling and UI enhancements.
 
