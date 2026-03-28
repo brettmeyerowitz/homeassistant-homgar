@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.2] - 2026-03-28
+
+### Added
+- **HTV213FRF and HTV245FRF valve support** - Single-zone RF irrigation timers now fully supported
+- **Valve entities** - Open/close control for HTV213FRF and HTV245FRF
+- **Duration number entities** - Configurable run time (1-60 minutes) per zone
+
+### Fixed
+- **Issue #11** - HTV213FRF and HTV245FRF showing as "unsupported device"
+- **Valve entity creation** - Now creates valve and duration entities for all valve models
+
+### Technical
+- HTV213FRF and HTV245FRF use same decoder as HTV0540FRF (confirmed by 11# payload)
+- Updated valve.py and number.py to support all valve models
+- Maintains backward compatibility with existing HTV0540FRF setups
+
 ## [1.3.1] - 2026-03-28
 
 ### Fixed
