@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-03-28
+
+### Fixed
+- **Critical import error** - Fixed MODEL_HCS014ARF import issue that prevented integration from loading
+- **Unified constant naming** - All device models now use consistent MODEL_HCS* format with legacy aliases
+- **Removed duplicate constant references** - Cleaned up conflicting imports
+
+### Technical
+- Maintained backward compatibility with legacy aliases (MODEL_TEMPHUM = MODEL_HCS014ARF)
+- All 30+ new device decoders from v1.3.0 remain fully functional
+- No breaking changes to existing functionality
+
 ## [1.3.0] - 2026-03-28
 
 ### Added
