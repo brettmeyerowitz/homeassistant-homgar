@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MODEL_VALVE_HUB
+from .const import DOMAIN, MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245
 from .coordinator import HomGarCoordinator
 from .homgar_api import decode_valve_hub
 # build_valve_open_command / build_valve_close_command retained in homgar_api for reference
@@ -36,7 +36,8 @@ async def async_setup_entry(
     entities: list[HomGarValveEntity] = []
 
     for key, info in sensors_cfg.items():
-        if info.get("model") != MODEL_VALVE_HUB:
+        model = info.get("model")
+        if model not in [MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245]:
             continue
 
         decoded = info.get("data") or {}

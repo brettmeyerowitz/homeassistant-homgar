@@ -21,6 +21,8 @@ from .const import (
     MODEL_POOL_PLUS,
     MODEL_DISPLAY_HUB,
     MODEL_VALVE_HUB,
+    MODEL_VALVE_213,  # HTV213FRF support
+    MODEL_VALVE_245,  # HTV245FRF support
     # New HCS sensor models
     MODEL_HCS005FRF,
     MODEL_HCS003FRF,
@@ -71,6 +73,8 @@ DECODER_REGISTRY = {
     MODEL_POOL: decode_pool,
     MODEL_POOL_PLUS: decode_pool_plus,
     MODEL_VALVE_HUB: decode_valve_hub,
+    MODEL_VALVE_213: decode_valve_hub,  # HTV213FRF uses same decoder as HTV0540FRF
+    MODEL_VALVE_245: decode_valve_hub,  # HTV245FRF uses same decoder as HTV0540FRF
     # HCS sensor models (v1.3.0)
     MODEL_HCS005FRF: decode_hcs005frf,
     MODEL_HCS003FRF: decode_hcs003frf,
