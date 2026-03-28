@@ -6,24 +6,26 @@ Copy and paste these responses to the corresponding GitHub issues.
 
 ## Issue #11, #9, #10 - Valve Support (HTV213FRF, HTV245FRF)
 
-Great news! 
+Excellent news! 🎉
 
-I'm reviewing and merging PR #7 by @gavinwoolley which adds full valve support for **HTV0540FRF**. This PR includes:
-- ✅ Valve entities (open/close control)
-- ✅ Duration number entities (1-60 min)
-- ✅ Dynamic zone detection
-- ✅ Immediate state reflection
+I've just released **v1.2.0** with full valve support for **HTV0540FRF** (based on PR #7 by @gavinwoolley)! This includes:
+- ✅ Valve entities (open/close control per zone)
+- ✅ Duration number entities (1-60 min per zone)
+- ✅ Dynamic zone detection (supports any number of zones)
+- ✅ Immediate state reflection after commands
 
 **For HTV213FRF and HTV245FRF users:**
 
-These models are similar to HTV0540FRF but may use different payload formats. Once PR #7 is merged, please test and let me know if your devices work. If not, I'll need payload data to add specific support.
+Your models are similar to HTV0540FRF. Please upgrade to v1.2.0 and test:
 
-**To help:**
-1. Wait for v1.2.0 release (coming soon with PR #7 merged)
-2. Test with your HTV213FRF/HTV245FRF devices
-3. If it doesn't work, provide payload data using: https://github.com/brettmeyerowitz/homeassistant-homgar/blob/main/DEBUG_VALVE_PAYLOAD.md
+1. **Update to v1.2.0** via HACS
+2. **Restart Home Assistant**
+3. **Check if your valve devices work**
 
-Thanks for your patience!
+If your HTV213FRF/HTV245FRF devices don't work with v1.2.0, they may use a different payload format. Please provide payload data using:
+https://github.com/brettmeyerowitz/homeassistant-homgar/blob/main/DEBUG_VALVE_PAYLOAD.md
+
+Let me know how it goes!
 
 ---
 
