@@ -50,8 +50,10 @@ class HomGarCoordinator(DataUpdateCoordinator):
         try:
             homes = self._hids
             hubs: list[dict] = []
+            _LOGGER.info("Updating data for HIDs: %s", homes)
             for hid in homes:
                 devices = await self._client.get_devices_by_hid(hid)
+                _LOGGER.info("Found %d devices for HID %s: %s", len(devices), hid, [d.get('model', 'unknown') for d in devices])
                 for hub in devices:
                     hub_copy = dict(hub)
                     hub_copy["hid"] = hid
@@ -212,6 +214,9 @@ class HomGarCoordinator(DataUpdateCoordinator):
 
                     _LOGGER.debug("Sensor entity key=%s info=%s", sensor_key, decoded_sensors[sensor_key])
 
+            _LOGGER.info("Coordinator update complete: %d hubs, %d sensors", len(hubs), len(decoded_sensors))
+            _LOGGER.debug("Final data: hubs=%s, sensors=%s", hubs, list(decoded_sensors.keys()))
+            
             return {
                 "hubs": hubs,
                 "status": status_by_mid,

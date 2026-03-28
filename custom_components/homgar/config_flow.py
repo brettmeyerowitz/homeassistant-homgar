@@ -94,6 +94,11 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         home_options = {str(h["hid"]): h["homeName"] for h in self._homes}
+        _LOGGER.info("Available homes: %s", home_options)
+
+        if user_input is not None:
+            selected_hids = user_input["hids"]
+            _LOGGER.info("Selected home IDs: %s", selected_hids)
 
         if user_input is not None:
             selected = user_input.get(CONF_HIDS)
