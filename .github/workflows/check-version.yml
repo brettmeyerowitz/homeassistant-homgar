@@ -1,0 +1,87 @@
+name: Check Manifest Version
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Get full history for comparison
+        
+    - name: Get changed files
+      id: changed-files
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # For PRs, compare with target branch
+          git diff --name-only origin/${{ github.base_ref }}..HEAD
+        else
+          # For pushes, compare with previous commit
+          git diff --name-only HEAD~1..HEAD
+        fi
+      continue-on-error: true
+        
+    - name: Check if custom_components changed
+      id: check-changes
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}..HEAD | grep -E "custom_components/" || echo "")
+        else
+          CHANGED=$(git diff --name-only HEAD~1..HEAD | grep -E "custom_components/" || echo "")
+        fi
+        
+        if [ -n "$CHANGED" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "files=$CHANGED" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Check manifest version
+      if: steps.check-changes.outputs.changed == 'true'
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # Get current version
+          CURRENT_VERSION=$(jq -r '.version' custom_components/homgar/manifest.json)
+          
+          # Get version from target branch
+          git fetch origin ${{ github.base_ref }}
+          git checkout origin/${{ github.base_ref }} -- custom_components/homgar/manifest.json
+          TARGET_VERSION=$(jq -r '.version' custom_components/homgar/manifest.json)
+          
+          # Restore current manifest
+          git checkout HEAD -- custom_components/homgar/manifest.json
+        else
+          # For pushes, compare with previous commit
+          TARGET_VERSION=$(jq -r '.version' <(git show HEAD~1:custom_components/homgar/manifest.json))
+          CURRENT_VERSION=$(jq -r '.version' custom_components/homgar/manifest.json)
+        fi
+        
+        echo "Target branch version: $TARGET_VERSION"
+        echo "Current version: $CURRENT_VERSION"
+        
+        if [ "$CURRENT_VERSION" = "$TARGET_VERSION" ]; then
+          echo "❌ ERROR: Manifest version not bumped!"
+          echo "custom_components/ files changed but version remained $CURRENT_VERSION"
+          echo ""
+          echo "Please bump the version in custom_components/homgar/manifest.json"
+          echo "Example: $TARGET_VERSION -> $(echo $TARGET_VERSION | awk -F. '{$NF++; print $1"."$2"."$NF}')"
+          echo ""
+          echo "Changed files:"
+          echo "${{ steps.check-changes.outputs.files }}"
+          exit 1
+        else
+          echo "✅ Version bumped: $TARGET_VERSION -> $CURRENT_VERSION"
+        fi
+        
+    - name: Success message
+      if: steps.check-changes.outputs.changed == 'true'
+      run: |
+        echo "✅ Version check passed - manifest version was properly bumped"
