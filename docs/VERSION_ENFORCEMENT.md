@@ -1,9 +1,10 @@
 # Version Enforcement
 
-This repository has automated checks to ensure the manifest version is properly bumped when custom components are modified.
+This repository has automated checks to ensure the manifest version is properly bumped when custom components are modified, and that release tags match the manifest version.
 
-## GitHub Actions Check
+## GitHub Actions Checks
 
+### Commit/PR Check
 **File:** `.github/workflows/check-version.yml`
 
 **Triggers:**
@@ -16,13 +17,29 @@ This repository has automated checks to ensure the manifest version is properly 
 - Blocks the commit/PR if version wasn't updated
 - Provides helpful error message with suggested version bump
 
+### Release Tag Check
+**File:** `.github/workflows/enforce-version-tags.yml`
+
+**Triggers:**
+- Push of any tag starting with `v*`
+
+**Behavior:**
+- Extracts version from tag (removes `v` prefix)
+- Compares tag version with manifest version
+- Blocks tag creation if versions don't match
+- Checks for changelog entry
+- Provides detailed fix instructions
+
 **Example Error:**
 ```
-❌ ERROR: Manifest version not bumped!
-custom_components/ files changed but version remained 1.3.5
+❌ ERROR: Tag version does not match manifest version!
+Tag version: 1.3.6
+Manifest version: 1.3.5
 
-Please bump the version in custom_components/homgar/manifest.json
-Example: 1.3.5 -> 1.3.6
+To fix this:
+1. Update custom_components/homgar/manifest.json to version 1.3.6
+2. Commit and push the version bump
+3. Recreate the tag
 ```
 
 ## Pre-commit Hook (Local Development)
@@ -44,6 +61,27 @@ git commit -m "Add new sensor feature"
 git commit --no-verify -m "Add new sensor feature"
 ```
 
+## Safe Tag Creation Script
+
+**File:** `scripts/create-release-tag.sh`
+
+**Usage:**
+```bash
+# Use manifest version (recommended)
+./scripts/create-release-tag.sh
+
+# Use specific version (must match manifest)
+./scripts/create-release-tag.sh 1.3.6
+```
+
+**Features:**
+- Ensures tag version matches manifest version
+- Checks working directory is clean
+- Prevents duplicate tags
+- Verifies changelog entry exists
+- Creates and pushes tag safely
+- Provides next steps for GitHub release
+
 ## Version Bumping Guidelines
 
 ### When to Bump Version
@@ -56,11 +94,45 @@ git commit --no-verify -m "Add new sensor feature"
 2. Update the `version` field
 3. Update `CHANGELOG.md` with changes
 4. Commit and push
+5. Create release tag using safe script
 
 ### Version Format
 - Semantic versioning: `MAJOR.MINOR.PATCH`
 - Always increment by 1 for the appropriate level
 - No leading zeros (use `1.3.6`, not `1.3.06`)
+
+## Release Workflow
+
+### Safe Release Process
+1. **Make changes** and commit with version bump
+2. **Test thoroughly** in development environment
+3. **Create release tag** using safe script:
+   ```bash
+   ./scripts/create-release-tag.sh
+   ```
+4. **Create GitHub release** at the provided URL
+5. **Tag enforcement** will verify version match automatically
+
+### Manual Tag Creation (Not Recommended)
+```bash
+# This will be blocked by GitHub Actions if version doesn't match
+git tag v1.3.6
+git push origin v1.3.6
+```
+
+### Troubleshooting Tag Issues
+If tag enforcement fails:
+```bash
+# Delete wrong tag
+git tag -d v1.3.6
+git push origin :refs/tags/v1.3.6
+
+# Fix manifest version
+# Edit custom_components/homgar/manifest.json
+
+# Create correct tag
+./scripts/create-release-tag.sh
+```
 
 ## Troubleshooting
 
@@ -76,15 +148,23 @@ Make sure the pre-commit hook is executable:
 chmod +x .git/hooks/pre-commit
 ```
 
+### Tag Creation Failed
+Use the safe script instead of manual tagging:
+```bash
+./scripts/create-release-tag.sh
+```
+
 ### GitHub Actions Failed
-The GitHub Actions check is just a safety net - if it fails, you can:
+The GitHub Actions checks are safety nets - if they fail:
 1. Update the version locally
 2. Push the version bump
-3. The next push will succeed
+3. The next push/tag will succeed
 
 ## Benefits
 
-1. **Consistent Releases:** Never forget to bump version for releases
-2. **Clear History:** Each version change corresponds to actual code changes
-3. **Automated Safety:** Both local and remote protection against version mistakes
-4. **Developer Experience:** Immediate feedback during development
+1. **Consistent Releases**: Never forget to bump version for releases
+2. **Tag Safety**: Release tags always match manifest version
+3. **Clear History**: Each version change corresponds to actual code changes
+4. **Automated Safety**: Both local and remote protection against version mistakes
+5. **Developer Experience**: Immediate feedback during development
+6. **Release Automation**: Safe script handles all tag creation steps

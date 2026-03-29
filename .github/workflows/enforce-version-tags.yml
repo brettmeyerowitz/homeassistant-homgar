@@ -1,0 +1,75 @@
+name: Enforce Version Tags
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  enforce-version-tag:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Get full history for comparison
+        
+    - name: Extract tag version
+      id: tag-version
+      run: |
+        # Extract version from tag (remove 'v' prefix)
+        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
+        echo "Tag version: $TAG_VERSION"
+        
+    - name: Get manifest version
+      id: manifest-version
+      run: |
+        MANIFEST_VERSION=$(jq -r '.version' custom_components/homgar/manifest.json)
+        echo "manifest_version=$MANIFEST_VERSION" >> $GITHUB_OUTPUT
+        echo "Manifest version: $MANIFEST_VERSION"
+        
+    - name: Compare versions
+      run: |
+        TAG_VERSION="${{ steps.tag-version.outputs.tag_version }}"
+        MANIFEST_VERSION="${{ steps.manifest-version.outputs.manifest_version }}"
+        
+        echo "Comparing tag version ($TAG_VERSION) with manifest version ($MANIFEST_VERSION)"
+        
+        if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+          echo "❌ ERROR: Tag version does not match manifest version!"
+          echo "Tag version: $TAG_VERSION"
+          echo "Manifest version: $MANIFEST_VERSION"
+          echo ""
+          echo "To fix this:"
+          echo "1. Update custom_components/homgar/manifest.json to version $TAG_VERSION"
+          echo "2. Commit and push the version bump"
+          echo "3. Recreate the tag"
+          echo ""
+          echo "Or delete this tag and create the correct one:"
+          echo "git tag -d v$TAG_VERSION"
+          echo "git push origin :refs/tags/v$TAG_VERSION"
+          echo "git tag v$MANIFEST_VERSION"
+          echo "git push origin v$MANIFEST_VERSION"
+          exit 1
+        else
+          echo "✅ Version match confirmed: v$TAG_VERSION"
+        fi
+        
+    - name: Check for version in changelog
+      run: |
+        TAG_VERSION="${{ steps.tag-version.outputs.tag_version }}"
+        CHANGELOG_VERSION="## [$TAG_VERSION]"
+        
+        if grep -q "$CHANGELOG_VERSION" CHANGELOG.md; then
+          echo "✅ Changelog entry found for v$TAG_VERSION"
+        else
+          echo "⚠️ WARNING: No changelog entry found for v$TAG_VERSION"
+          echo "Consider adding an entry to CHANGELOG.md for this version"
+        fi
+        
+    - name: Success
+      run: |
+        echo "🎉 All checks passed!"
+        echo "Tag v${{ steps.tag-version.outputs.tag_version }} is ready for release"
