@@ -645,6 +645,12 @@ def decode_valve_hub(raw: str) -> dict:
     """
     tlv = _parse_tlv_payload(raw)
 
+    # DEBUG: Log all TLV entries for troubleshooting
+    _LOGGER.debug("TLV payload entries: %s", {
+        f"0x{dp:02X}": (f"0x{type_byte:02X}", f"0x{value_int:02X}" if value_int < 256 else value_int, raw_bytes.hex())
+        for dp, (type_byte, value_int, raw_bytes) in tlv.items()
+    })
+
     def get_val(dp: int) -> int | None:
         entry = tlv.get(dp)
         return entry[1] if entry else None
@@ -654,25 +660,36 @@ def decode_valve_hub(raw: str) -> dict:
         return entry[2] if entry else b""
 
     hub_state = get_val(_DP_HUB_STATE)
+    _LOGGER.debug("Hub state DP 0x%02X: %s", _DP_HUB_STATE, hub_state)
 
     # Dynamically detect zones: any DP of type 0xD8 (state byte) with
     # dp > _DP_HUB_STATE follows the pattern zone_num = dp - _DP_HUB_STATE.
     zones: dict[int, dict] = {}
+    zone_candidates = []
+    
     for dp, entry in tlv.items():
         type_byte = entry[0]
         if type_byte != 0xD8 or dp <= _DP_HUB_STATE:
             continue
+        zone_candidates.append(dp)
         zone_num = dp - _DP_HUB_STATE
         state_val = entry[1]
         dur_dp = _DP_BASE_DURATION + zone_num
         dur_bytes = get_raw_bytes(dur_dp)
         duration_s = int.from_bytes(dur_bytes, "little") if len(dur_bytes) == 2 else None
+        
+        _LOGGER.debug("Zone %d: DP 0x%02X state=0x%02X, duration DP 0x%02X=%s seconds", 
+                     zone_num, dp, state_val, dur_dp, duration_s)
+        
         zones[zone_num] = {
             # Bit 0 = valve physically open. 0x21 = open, 0x20 = closing/transitional, 0x00 = closed.
             "open": bool(state_val & 0x01) if state_val is not None else None,
             "state_raw": state_val,
             "duration_seconds": duration_s,
         }
+
+    _LOGGER.debug("Zone candidates (type 0xD8): %s", [f"0x{dp:02X}" for dp in zone_candidates])
+    _LOGGER.debug("Detected zones: %s", list(zones.keys()))
 
     result = _base_decoder_dict("valve_hub", 0, _parse_homgar_payload(raw))  # TLV doesn't use standard RSSI
     result.update({

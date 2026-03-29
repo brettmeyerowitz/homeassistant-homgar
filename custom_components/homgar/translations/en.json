@@ -9,11 +9,34 @@
                     "email": "Email",
                     "password": "Password",
                     "app_type": "Mobile App Type"
+                },
+                "data_description": {
+                    "app_type": "Choose which mobile app you use with your devices."
                 }
             },
             "select_homes": {
                 "title": "Select Home",
                 "description": "Choose which Home to add to Home Assistant.",
+                "data": {
+                    "hids": "Home"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigure HomGar/RainPoint",
+                "description": "Update your HomGar/RainPoint credentials.",
+                "data": {
+                    "area_code": "Area code",
+                    "email": "Email",
+                    "password": "Password",
+                    "app_type": "Mobile App Type"
+                },
+                "data_description": {
+                    "app_type": "Choose which mobile app you use with your devices."
+                }
+            },
+            "select_homes_reconfigure": {
+                "title": "Select Home",
+                "description": "Choose which Home to use with this integration.",
                 "data": {
                     "hids": "Home"
                 }
@@ -27,7 +50,8 @@
             "invalid_app_type": "Invalid app type selected"
         },
         "abort": {
-            "already_configured": "This account is already configured."
+            "already_configured": "This account is already configured.",
+            "reconfigure_successful": "HomGar/RainPoint integration has been successfully reconfigured."
         }
     }
 }

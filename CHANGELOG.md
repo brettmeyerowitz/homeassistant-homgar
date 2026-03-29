@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.3] - 2026-03-29
+
+### Added
+- **Credential reconfiguration support** - Users can now edit credentials without deleting integration
+- **Reconfiguration flow** - Pre-fills current values and validates new credentials
+- **Enhanced valve debugging** - Added extensive logging for HTV213FRF/HTV245FRF troubleshooting
+
+### Fixed
+- **Translation support** - Added proper translations for reconfiguration steps
+- **App type dropdown** - Shows "HomGar" and "RainPoint" options instead of internal values
+
+### Technical
+- Added async_step_reconfigure method to config flow
+- Added async_reload_entry and async_supports_reconfigure
+- Enhanced decode_valve_hub with debug logging for TLV structure analysis
+- Updated translations/en.json with reconfiguration strings
+
 ## [1.3.2] - 2026-03-28
 
 ### Added
