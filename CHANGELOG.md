@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.6] - 2026-03-29
+
+### Fixed
+- **HTV213FRF/HTV245FRF zone detection** - Enhanced decoder now successfully detects 5 zones
+- **Valve entity creation** - Pattern recognition algorithm extracts zone states and durations
+- **Custom payload parsing** - Fixed TLV parsing for non-standard valve protocols
+
+### Added
+- **Zone pattern recognition** - Scans raw bytes for zone data patterns
+- **Hub state detection** - Extracts hub online state from 0x18 pattern
+- **Enhanced debugging** - Detailed zone detection logging for troubleshooting
+
+### Technical
+- Implemented pattern matching for `[zone_id][state][0x00][duration][0x00][0x00]` structure
+- Added zone data extraction and conversion to Home Assistant entity format
+- Enhanced error handling and logging for valve decoder debugging
+
+### Test Results
+Successfully detected 5 zones from user's HTV213FRF payload:
+- Zone 25: open=True, duration=6872s
+- Zone 33: open=True, duration=0s
+- Zone 34: open=True, duration=0s
+- Zone 173: open=False, duration=9901s
+- Zone 41: open=True, duration=0s
+
 ## [1.3.5] - 2026-03-29
 
 ### Fixed

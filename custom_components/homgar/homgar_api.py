@@ -675,11 +675,13 @@ def decode_htv213frf_valve(raw: str) -> dict:
     Decode HTV213FRF/HTV245FRF valve hub payload.
     
     These devices use a different TLV structure than standard HTV0540FRF.
-    Based on analysis, they have a custom format that needs special handling.
+    Based on analysis, they use a custom format with fixed-length records.
     """
     try:
         b = _parse_homgar_payload(raw)
         _LOGGER.debug("HTV213FRF raw bytes: %s", b)
+        
+        zones = {}
         
         # Try to parse as standard TLV first (for debugging)
         try:
@@ -696,29 +698,73 @@ def decode_htv213frf_valve(raw: str) -> dict:
         if tlv:
             return decode_valve_hub(raw)
         
-        # Custom HTV213FRF parsing
-        # Based on the payload structure, let's try to find zone patterns
-        zones = {}
+        # Custom HTV213FRF parsing based on observed patterns
+        # The payload seems to use fixed-length records:
+        # [zone_id][state][0x00][duration_high][duration_low][0x00][0x00]
         
-        # Look for patterns that might indicate zones
-        # The payload seems to have repeated patterns that could be zone data
-        # Let's try to extract zone information by analyzing the byte structure
+        # Look for zone patterns in the raw bytes
+        # Based on the user's payload, zones appear to start at specific positions
+        if len(b) >= 20:  # Minimum length for zone data
+            # Try to extract zones from the pattern
+            # Zone 1: bytes 4-9 (19 D8 00 1A D8 00)
+            # Zone 2: bytes 10-15 (1D 20 1E 20 21 B7) - this looks different
+            
+            # Let's try a different approach - look for repeated patterns
+            # The pattern seems to be: [zone_id][state][0x00][duration][0x00][0x00]
+            
+            zone_data = []
+            # Scan through bytes looking for potential zone patterns
+            i = 4  # Start after the header
+            while i < len(b) - 6:
+                zone_id = b[i]
+                state = b[i + 1]
+                if b[i + 2] == 0x00 and b[i + 5] == 0x00:  # Pattern match
+                    duration = (b[i + 3] << 8) | b[i + 4]
+                    zone_data.append({
+                        'zone_id': zone_id,
+                        'state': state,
+                        'duration': duration,
+                        'position': i
+                    })
+                    _LOGGER.debug("Found potential zone %d: state=%d, duration=%d", zone_id, state, duration)
+                    i += 6
+                else:
+                    i += 1
+            
+            # Convert zone data to expected format
+            for zone in zone_data:
+                zone_num = zone['zone_id']
+                zones[zone_num] = {
+                    'open': zone['state'] != 0x00,
+                    'duration_seconds': zone['duration'],
+                    'raw_position': zone['position']
+                }
         
-        # For now, return a basic structure with no zones (will be enhanced with more data)
+        # Extract hub online state (looking for 0x18 pattern)
+        hub_online = False
+        if len(b) >= 28 and b[26] == 0x18:
+            hub_online = b[27] == 0x01
+            _LOGGER.debug("Hub state: %s (byte 27: 0x%02X)", hub_online, b[27])
+        
         result = {
             "type": "valve_hub",
             "rssi_dbm": _extract_rssi(b) if len(b) > 1 else 0,
             "raw_bytes": b,
             "zones": zones,
             "tlv_raw": tlv,
+            "hub_online": hub_online,
+            "hub_state_raw": b[27] if len(b) > 27 else None,
             "decoder": "htv213frf_custom",
             "debug_info": {
                 "payload_length": len(b),
                 "hex_payload": raw,
-                "tlv_entries": len(tlv)
+                "tlv_entries": len(tlv),
+                "zones_found": len(zones),
+                "zone_data": zone_data if 'zone_data' in locals() else []
             }
         }
         
+        _LOGGER.debug("HTV213FRF decoded: %d zones, hub_online=%s", len(zones), hub_online)
         return result
         
     except Exception as e:
