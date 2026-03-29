@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.13] - 2026-03-29
+
+### 🔧 BUG FIXES
+- **Fixed HTV213FRF hub online detection** - Added support for 0xDC hub online pattern
+- **Fixed HTV213FRF zone numbering** - Map raw zone IDs to sequential numbers (1,2,3,4,5)
+- **Enhanced HTV213FRF logging** - Added comprehensive debugging for valve troubleshooting
+- **Resolved unavailable valve entities** - Hub online detection now works correctly
+
+### 🎯 ISSUE RESOLUTION
+- **Issue #11**: HTV213FRF devices now show available valve entities instead of unavailable
+- **Zone numbering**: Raw IDs (25,33,34,41,173) now mapped to sequential (1,2,3,4,5)
+- **Hub state**: 0xDC pattern recognized as online indicator for HTV213FRF devices
+
+### 📊 TECHNICAL IMPROVEMENTS
+- **Hub state detection**: Multiple patterns supported (0x01, 0xDC)
+- **Zone mapping**: Sequential numbering while preserving raw zone ID data
+- **Debug logging**: Enhanced INFO-level logging for troubleshooting without debug mode
+- **Payload analysis**: Better zone pattern detection and state tracking
+
+### 🧪 TESTING REQUESTED
+- **Zone mapping validation**: Users requested to test zone 1/2 state changes
+- **Mobile app screenshots**: Requested for zone mapping verification
+- **State change tracking**: Enhanced logging captures zone transitions automatically
+
+---
+
 ## [1.3.12] - 2026-03-29
 
 ### NEW FEATURES
