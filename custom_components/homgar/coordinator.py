@@ -50,7 +50,7 @@ from .homgar_api import (
     HomGarClient, HomGarApiError,
     decode_moisture_simple, decode_moisture_full, decode_rain,
     decode_temphum, decode_flowmeter, decode_co2, decode_pool, decode_pool_plus,
-    decode_valve_hub,
+    decode_valve_hub, decode_htv213frf_valve,
     # New HCS decoder functions
     decode_hcs005frf, decode_hcs003frf, decode_hcs024frf_v1,
     decode_hcs015arf, decode_hcs0528arf, decode_hcs027arf, decode_hcs016arf,
@@ -73,8 +73,8 @@ DECODER_REGISTRY = {
     MODEL_POOL: decode_pool,
     MODEL_POOL_PLUS: decode_pool_plus,
     MODEL_VALVE_HUB: decode_valve_hub,
-    MODEL_VALVE_213: decode_valve_hub,  # HTV213FRF uses same decoder as HTV0540FRF
-    MODEL_VALVE_245: decode_valve_hub,  # HTV245FRF uses same decoder as HTV0540FRF
+    MODEL_VALVE_213: decode_htv213frf_valve,  # HTV213FRF uses custom decoder
+    MODEL_VALVE_245: decode_htv213frf_valve,  # HTV245FRF uses custom decoder
     # HCS sensor models (v1.3.0)
     MODEL_HCS005FRF: decode_hcs005frf,
     MODEL_HCS003FRF: decode_hcs003frf,

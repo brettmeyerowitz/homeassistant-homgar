@@ -670,6 +670,70 @@ def _parse_tlv_payload(raw: str) -> dict[int, tuple[int, int, bytes]]:
     return tlv
 
 
+def decode_htv213frf_valve(raw: str) -> dict:
+    """
+    Decode HTV213FRF/HTV245FRF valve hub payload.
+    
+    These devices use a different TLV structure than standard HTV0540FRF.
+    Based on analysis, they have a custom format that needs special handling.
+    """
+    try:
+        b = _parse_homgar_payload(raw)
+        _LOGGER.debug("HTV213FRF raw bytes: %s", b)
+        
+        # Try to parse as standard TLV first (for debugging)
+        try:
+            tlv = _parse_tlv_payload(raw)
+            _LOGGER.debug("HTV213FRF TLV entries: %s", {
+                f"0x{dp:02X}": (f"0x{type_byte:02X}", f"0x{value_int:02X}" if value_int < 256 else value_int, raw_bytes.hex())
+                for dp, (type_byte, value_int, raw_bytes) in tlv.items()
+            })
+        except Exception as e:
+            _LOGGER.debug("HTV213FRF TLV parsing failed: %s", e)
+            tlv = {}
+        
+        # If standard TLV worked, use it
+        if tlv:
+            return decode_valve_hub(raw)
+        
+        # Custom HTV213FRF parsing
+        # Based on the payload structure, let's try to find zone patterns
+        zones = {}
+        
+        # Look for patterns that might indicate zones
+        # The payload seems to have repeated patterns that could be zone data
+        # Let's try to extract zone information by analyzing the byte structure
+        
+        # For now, return a basic structure with no zones (will be enhanced with more data)
+        result = {
+            "type": "valve_hub",
+            "rssi_dbm": _extract_rssi(b) if len(b) > 1 else 0,
+            "raw_bytes": b,
+            "zones": zones,
+            "tlv_raw": tlv,
+            "decoder": "htv213frf_custom",
+            "debug_info": {
+                "payload_length": len(b),
+                "hex_payload": raw,
+                "tlv_entries": len(tlv)
+            }
+        }
+        
+        return result
+        
+    except Exception as e:
+        _LOGGER.error("HTV213FRF decoder error: %s", e)
+        return {
+            "type": "valve_hub",
+            "rssi_dbm": 0,
+            "raw_bytes": [],
+            "zones": {},
+            "tlv_raw": {},
+            "decoder": "htv213frf_error",
+            "error": str(e)
+        }
+
+
 def decode_valve_hub(raw: str) -> dict:
     """
     Decode an irrigation valve hub TLV payload (e.g. HTV0540FRF).

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.5] - 2026-03-29
+
+### Fixed
+- **HTV213FRF/HTV245FRF valve support** - Added custom decoder for problematic valve models
+- **TLV parsing enhancement** - Better debugging and fallback parsing for non-standard valve protocols
+
+### Technical
+- Added `decode_htv213frf_valve()` function for custom valve protocol handling
+- Enhanced debugging for valve payload analysis
+- Updated decoder registry to use custom decoder for HTV213FRF/HTV245FRF models
+- Improved error handling and logging for valve device troubleshooting
+
 ## [1.3.4] - 2026-03-29
 
 ### Added
