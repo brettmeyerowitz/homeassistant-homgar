@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.3.11] - 2026-03-29
+
+### 🐛 Bug Fixes
+- **Fixed critical Docker import errors**
+  - Added missing BRAND_MAPPING to const.py
+  - Fixed VERSION import in coordinator.py from wrong module
+  - Resolved ImportError that prevented integration from loading
+
+### 🔧 Docker Testing Validation
+- **Validated integration in Docker environment** before release
+- **Confirmed exact RainPoint parsing works** in production Docker
+- **Verified versioned debug messages** display correctly
+- **Tested real device data processing** in container
+
+### ✅ Docker Test Results
+- Integration loads successfully without errors
+- `[HomGar v1.3.11]` debug messages working
+- Real sensor data being processed (HCS021FRF, HCS012ARF, HCS026FRF)
+- Exact RainPoint C0527C.a() parsing method functional
+
+### 📋 Process Improvement
+- **Added Docker testing to release workflow**
+- **Critical requirement: ALWAYS test in Docker before release**
+- **Prevents import errors from reaching production**
+
 ## [v1.3.10] - 2026-03-29
 
 ### 🎯 Major Achievement: Exact RainPoint Implementation

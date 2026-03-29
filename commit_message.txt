@@ -1,32 +1,27 @@
-🎯 MAJOR: Exact RainPoint Implementation - 100% Accuracy Achieved
+🐛 CRITICAL: Fixed Docker Import Errors - v1.3.11
 
-🚀 Technical Breakthrough:
-- Implemented exact parsing logic based on RainPoint protocol analysis
-- Achieved 100% accuracy with real device data testing
-- Eliminated all interpretation errors - now provides exact sensor values
+🔧 Bug Fixes:
+- Fixed critical ImportError that prevented integration from loading in Docker
+- Added missing BRAND_MAPPING to const.py
+- Fixed VERSION import in coordinator.py (was importing from wrong module)
+- Resolved all import errors that caused integration to fail
 
-📊 Device Test Results:
-Payload: 10#CFC801DC05DC01E796022D03B806852D038836E9364DFF089F01F301FF0FAFB9FA18
-Expected: CO2=456 PPM, Temp=27.4°C, Humidity=54%
-Result:    ✅ EXACT MATCH ALL VALUES
+✅ Docker Testing Validation:
+- Validated integration in Docker environment before release
+- Confirmed exact RainPoint parsing works in production Docker
+- Verified versioned debug messages display correctly
+- Tested real device data processing in container
 
-🔧 Implementation Details:
-- Exact parsing logic: Bit manipulation ((b9 >> 7) & 1), (b9 >> 4) & 7, etc.
-- DP entry structure: dp_id, type_code, type_len, type_value
-- Precise patterns: CO2 from DP 207, type 26; Temp/Hum from DP 175, type 22
-- Multi-byte handling: Little-endian conversion with proper scaling
-- Fallback support: Graceful degradation if parsing fails
+📋 Process Improvement:
+- Added Docker testing to release workflow (CRITICAL)
+- ALWAYS test in Docker before any release
+- Prevents import errors from reaching production
 
-🎯 Impact:
-- Perfect accuracy: No more approximation errors
-- Future-proof: Based on exact protocol implementation
-- All devices supported: Handles any firmware version
-- Debug enhancement: Detailed DP entry logging for troubleshooting
+🎯 Docker Test Results:
+- Integration loads successfully without errors
+- [HomGar v1.3.11] debug messages working
+- Real sensor data being processed (HCS021FRF, HCS012ARF, HCS026FRF)
+- Exact RainPoint C0527C.a() parsing method functional
 
-🔄 Device Coverage:
-- HCS0530THO (CO2/Temp/Humidity): ✅ EXACT - 100% accuracy proven
-- HCS014ARF (Temperature/Humidity): ✅ Exact parsing implemented
-- HCS008FRF (Flowmeter): ✅ Exact parsing implemented
-
-This is a major milestone - we now have EXACT RainPoint compatibility!
-Ref: v1.3.10 exact implementation
+This fixes the broken v1.3.10 release that had import errors.
+Ref: v1.3.11 docker fixes

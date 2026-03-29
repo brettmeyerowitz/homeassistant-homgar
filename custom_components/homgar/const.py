@@ -2,7 +2,7 @@
 DOMAIN = "homgar"
 
 # Integration version
-VERSION = "1.3.10"
+VERSION = "1.3.11"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
@@ -28,6 +28,12 @@ APP_TYPE_RAINPOINT = "rainpoint"
 APP_CODE_MAPPING = {
     APP_TYPE_HOMGAR: "1",
     APP_TYPE_RAINPOINT: "2",
+}
+
+# Brand mappings
+BRAND_MAPPING = {
+    APP_TYPE_HOMGAR: "HomGar",
+    APP_TYPE_RAINPOINT: "RainPoint",
 }
 
 # Known models (original devices)
