@@ -942,12 +942,12 @@ def decode_htv213frf_valve(raw: str) -> dict:
         # Try to parse as standard TLV first (for debugging)
         try:
             tlv = _parse_tlv_payload(raw)
-            _LOGGER.debug(debug_with_version("HTV213FRF TLV entries: %s"), {
+            _LOGGER.info(debug_with_version("HTV213FRF TLV entries: %s"), {
                 f"0x{dp:02X}": (f"0x{type_byte:02X}", f"0x{value_int:02X}" if value_int < 256 else value_int, raw_bytes.hex())
                 for dp, (type_byte, value_int, raw_bytes) in tlv.items()
             })
         except Exception as e:
-            _LOGGER.debug(debug_with_version("HTV213FRF TLV parsing failed: %s"), e)
+            _LOGGER.info(debug_with_version("HTV213FRF TLV parsing failed: %s"), e)
             tlv = {}
         
         # If standard TLV worked, use it
@@ -988,19 +988,45 @@ def decode_htv213frf_valve(raw: str) -> dict:
                     i += 1
             
             # Convert zone data to expected format
+            # Map raw zone IDs to sequential zone numbers
+            zone_mapping = {}
+            sequential_zone = 1
+            
             for zone in zone_data:
-                zone_num = zone['zone_id']
-                zones[zone_num] = {
+                zone_num = sequential_zone  # Use sequential numbering
+                zone_mapping[sequential_zone] = {
+                    'raw_zone_id': zone['zone_id'],
                     'open': zone['state'] != 0x00,
                     'duration_seconds': zone['duration'],
                     'raw_position': zone['position']
                 }
+                _LOGGER.info("HTV213FRF Zone %d (raw ID %d): state=%d, duration=%d, position=%d", 
+                           sequential_zone, zone['zone_id'], zone['state'], zone['duration'], zone['position'])
+                sequential_zone += 1
+            
+            zones = zone_mapping
         
         # Extract hub online state (looking for 0x18 pattern)
         hub_online = False
+        _LOGGER.info(debug_with_version("HTV213FRF checking hub state - len(b)=%d, b[26]=0x%02X, b[27]=0x%02X"), 
+                     len(b), b[26] if len(b) > 26 else None, b[27] if len(b) > 27 else None)
+        
         if len(b) >= 28 and b[26] == 0x18:
-            hub_online = b[27] == 0x01
-            _LOGGER.debug("Hub state: %s (byte 27: 0x%02X)", hub_online, b[27])
+            # Standard pattern: 0x18 at position 26
+            # For HTV213FRF, position 27 might use different values than 0x01
+            # Let's try multiple possibilities for "online"
+            if b[27] == 0x01:
+                hub_online = True
+                _LOGGER.info("Hub state (0x18 pattern, 0x01): %s (byte 27: 0x%02X)", hub_online, b[27])
+            elif b[27] == 0xDC:
+                # Based on user's payload, 0xDC might mean online for HTV213FRF
+                hub_online = True
+                _LOGGER.info("Hub state (0x18 pattern, 0xDC): %s (byte 27: 0x%02X)", hub_online, b[27])
+            else:
+                hub_online = False
+                _LOGGER.info("Hub state (0x18 pattern, other): %s (byte 27: 0x%02X)", hub_online, b[27])
+        else:
+            _LOGGER.warning("HTV213FRF: Could not determine hub state from payload")
         
         result = {
             "type": "valve_hub",
