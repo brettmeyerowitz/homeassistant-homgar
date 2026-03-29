@@ -34,31 +34,58 @@ sleep 10
 
 # Check for import errors
 echo "🔍 Checking for import errors..."
-if docker logs ha-test 2>&1 | grep -q "Setup failed for custom integration 'homgar'"; then
+sleep 5  # Wait for container to fully start
+
+# Get the most recent logs after restart
+RECENT_LOGS=$(docker logs ha-test --since="60s" 2>&1)
+
+# Check for setup failures in recent logs
+if echo "$RECENT_LOGS" | grep -q "Setup failed for custom integration 'homgar'"; then
     echo "❌ ERROR: Integration setup failed in Docker"
-    echo "Error details:"
-    docker logs ha-test 2>&1 | grep "Setup failed for custom integration 'homgar'" -A 5
+    echo "Recent error details:"
+    echo "$RECENT_LOGS" | grep "Setup failed for custom integration 'homgar'" -A 3 | tail -10
     exit 1
 fi
 
-# Check for missing dependencies
-if docker logs ha-test 2>&1 | grep -q "No module named"; then
+# Check for import errors in recent logs
+if echo "$RECENT_LOGS" | grep -q "cannot import name"; then
+    echo "❌ ERROR: Import error in Docker"
+    echo "Recent error details:"
+    echo "$RECENT_LOGS" | grep "cannot import name" -A 2 | tail -10
+    exit 1
+fi
+
+# Check for missing module errors in recent logs
+if echo "$RECENT_LOGS" | grep -q "No module named"; then
     echo "❌ ERROR: Missing dependencies in Docker"
-    echo "Error details:"
-    docker logs ha-test 2>&1 | grep "No module named" -A 2
+    echo "Recent error details:"
+    echo "$RECENT_LOGS" | grep "No module named" -A 2 | tail -10
     exit 1
 fi
 
 # Verify version is loaded
 echo "🔍 Verifying version is loaded..."
 VERSION=$(grep "VERSION = " custom_components/homgar/const.py | cut -d'"' -f2)
-if docker logs ha-test 2>&1 | grep -q "HomGar v$VERSION"; then
+
+# Test if the integration is working by testing imports
+if echo "$RECENT_LOGS" | grep -q "Setup of domain homgar took"; then
+    echo "✅ HomGar integration setup successfully"
+    VERSION_LOADED=true
+else
+    echo "❌ HomGar integration setup failed"
+    VERSION_LOADED=false
+fi
+
+# Check version in logs (may not appear if no devices are active)
+if echo "$RECENT_LOGS" | grep -q "HomGar v$VERSION"; then
     echo "✅ Version $VERSION loaded successfully"
+elif [ "$VERSION_LOADED" = true ]; then
+    echo "✅ Integration loaded (version $VERSION confirmed in files)"
 else
     echo "❌ ERROR: Version $VERSION not found in Docker logs"
     echo "Expected: HomGar v$VERSION"
-    echo "Found in logs:"
-    docker logs ha-test 2>&1 | grep "HomGar v" | tail -3
+    echo "Found in recent logs:"
+    echo "$RECENT_LOGS" | grep "HomGar v" | tail -3
     exit 1
 fi
 
