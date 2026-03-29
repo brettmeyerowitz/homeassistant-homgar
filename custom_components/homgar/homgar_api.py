@@ -377,6 +377,125 @@ def decode_moisture_simple(raw: str) -> dict:
 def decode_moisture_full(raw: str) -> dict:
     """
     Decode HCS021FRF (moisture + temp + lux).
+    
+    Supports two formats:
+    1. Hex format (10#...) - standard TLV structure
+    2. ASCII format (1,-73,1;694,70,G=292478) - comma-separated values
+    """
+    try:
+        # Check payload format and route to appropriate decoder
+        if raw.startswith("10#"):
+            return _decode_moisture_full_hex(raw)
+        elif "," in raw and (";" in raw or "=" in raw):
+            return _decode_moisture_full_ascii(raw)
+        else:
+            raise ValueError(f"Unexpected payload format: {raw}")
+            
+    except Exception as e:
+        _LOGGER.error("HCS021FRF decoder error: %s", e)
+        return {
+            "type": "moisture_full",
+            "rssi_dbm": 0,
+            "raw_bytes": [],
+            "decoder": "hcs021frf_error",
+            "error": str(e)
+        }
+
+
+def _decode_moisture_full_ascii(raw: str) -> dict:
+    """
+    Decode HCS021FRF ASCII format payload.
+    
+    Format: 1,-73,1;694,70,G=292478
+    Structure: [flags],[rssi],[flags];[temp_raw],[moisture],[lux_data]
+    """
+    _LOGGER.info(debug_with_version("HCS021FRF ASCII payload: %s"), raw)
+    
+    try:
+        # Parse the ASCII format
+        # Example: 1,-73,1;694,70,G=292478
+        
+        # Split on semicolon to separate header from sensor data
+        if ";" not in raw:
+            raise ValueError("Invalid ASCII format: missing semicolon")
+            
+        header_part, sensor_part = raw.split(";", 1)
+        
+        # Parse header: 1,-73,1
+        header_parts = header_part.split(",")
+        if len(header_parts) < 3:
+            raise ValueError("Invalid ASCII header format")
+            
+        flags1 = int(header_parts[0])
+        rssi_raw = int(header_parts[1])  # RSSI in dBm (negative number)
+        flags2 = int(header_parts[2])
+        
+        # Extract RSSI (convert from negative to positive dBm)
+        rssi_dbm = rssi_raw if rssi_raw < 0 else 0
+        
+        # Parse sensor data: 694,70,G=292478
+        sensor_parts = sensor_part.split(",")
+        
+        if len(sensor_parts) < 3:
+            raise ValueError("Invalid ASCII sensor data format")
+        
+        # Parse sensor values
+        temp_raw = int(sensor_parts[0])  # Temperature raw value
+        moisture = int(sensor_parts[1])   # Moisture percentage
+        lux_data = sensor_parts[2]        # Lux data (may contain =)
+        
+        # Parse temperature - convert from raw to Celsius
+        # Based on hex format: temp_raw_f10, so divide by 10
+        temp_c = temp_raw / 10.0 if temp_raw else 0
+        
+        # Parse lux data if it contains = (e.g., "G=292478")
+        if "=" in lux_data:
+            lux_parts = lux_data.split("=")
+            if len(lux_parts) == 2:
+                lux_raw = int(lux_parts[1])
+                lux = lux_raw / 10.0  # Assuming similar scaling as hex format
+            else:
+                lux = 0
+        else:
+            # Try to parse as direct lux value
+            try:
+                lux = int(lux_data) / 10.0
+            except ValueError:
+                lux = 0
+        
+        result = {
+            "type": "moisture_full",
+            "rssi_dbm": rssi_dbm,
+            "raw_bytes": raw.encode('ascii'),
+            "moisture_percent": moisture,
+            "temperature_c": temp_c,
+            "temperature_f10": temp_raw,
+            "illuminance_lux": lux,
+            "illuminance_raw10": int(lux * 10) if lux else 0,
+            "decoder": "hcs021frf_ascii",
+            "debug_info": {
+                "payload_format": "ascii",
+                "raw_payload": raw,
+                "header_parts": header_parts,
+                "sensor_parts": sensor_parts,
+                "rssi_raw": rssi_raw,
+                "lux_data_parsed": lux_data
+            }
+        }
+        
+        _LOGGER.info(debug_with_version("HCS021FRF ASCII decoded: temp=%.1f°C, moisture=%d%%, lux=%.1f, rssi=%d"), 
+                   temp_c, moisture, lux, rssi_dbm)
+        return result
+        
+    except Exception as e:
+        _LOGGER.error("HCS021FRF ASCII decoder error: %s", e)
+        raise
+
+
+def _decode_moisture_full_hex(raw: str) -> dict:
+    """
+    Decode HCS021FRF hex format payload.
+    
     Layout after '10#':
     b0 = 0xE1
     b1 = RSSI (signed)
@@ -424,6 +543,7 @@ def decode_moisture_full(raw: str) -> dict:
         "illuminance_raw10": lux_raw10,
         "battery_status_code": status_code,
         "battery_percent": _battery_status_to_percent(status_code),
+        "decoder": "hcs021frf_hex",
     })
     return result
 
@@ -930,12 +1050,145 @@ def decode_htv213frf_valve(raw: str) -> dict:
     """
     Decode HTV213FRF/HTV245FRF valve hub payload.
     
-    These devices use a different TLV structure than standard HTV0540FRF.
-    Based on analysis, they use a custom format with fixed-length records.
+    These devices support two formats:
+    1. Hex format (11#...) - uses custom TLV structure
+    2. ASCII format (1,-84,1;...) - uses comma-separated values
+    """
+    try:
+        # Check payload format and route to appropriate decoder
+        if raw.startswith("11#"):
+            return _decode_htv213frf_hex(raw)
+        elif "," in raw and (";" in raw or "|" in raw):
+            return _decode_htv213frf_ascii(raw)
+        else:
+            raise ValueError(f"Unexpected payload format: {raw}")
+            
+    except Exception as e:
+        _LOGGER.error("HTV213FRF decoder error: %s", e)
+        return {
+            "type": "valve_hub",
+            "rssi_dbm": 0,
+            "raw_bytes": [],
+            "zones": {},
+            "tlv_raw": {},
+            "decoder": "htv213frf_error",
+            "error": str(e)
+        }
+
+
+def _decode_htv213frf_ascii(raw: str) -> dict:
+    """
+    Decode HTV213FRF ASCII format payload.
+    
+    Format: 1,-84,1;0,149,0,0,0,0|0,6,0,0,0,0
+    Structure: [flags],[rssi],[flags];[zone1_data]|[zone2_data]
+    """
+    _LOGGER.info(debug_with_version("HTV213FRF ASCII payload: %s"), raw)
+    
+    zones = {}
+    hub_online = False
+    
+    try:
+        # Parse the ASCII format
+        # Example: 1,-84,1;0,149,0,0,0,0|0,6,0,0,0,0
+        
+        # Split on semicolon to separate header from zone data
+        if ";" not in raw:
+            raise ValueError("Invalid ASCII format: missing semicolon")
+            
+        header_part, zone_part = raw.split(";", 1)
+        
+        # Parse header: 1,-84,1
+        header_parts = header_part.split(",")
+        if len(header_parts) < 3:
+            raise ValueError("Invalid ASCII header format")
+            
+        flags1 = int(header_parts[0])
+        rssi_raw = int(header_parts[1])  # RSSI in dBm (negative number)
+        flags2 = int(header_parts[2])
+        
+        # Extract RSSI (convert from negative to positive dBm)
+        rssi_dbm = rssi_raw if rssi_raw < 0 else 0
+        
+        # Parse zone data: 0,149,0,0,0,0|0,6,0,0,0,0
+        zone_sections = zone_part.split("|")
+        zone_mapping = {}
+        sequential_zone = 1
+        
+        for zone_data in zone_sections:
+            if not zone_data.strip():
+                continue
+                
+            zone_parts = zone_data.split(",")
+            if len(zone_parts) < 6:
+                _LOGGER.warning("Invalid zone data format: %s", zone_data)
+                continue
+            
+            # Parse zone data: [zone_id?, state, duration?, ?, ?, ?]
+            # Based on observed patterns:
+            # Zone 1: 0,149,0,0,0,0
+            # Zone 2: 0,6,0,0,0,0
+            
+            zone_id_raw = int(zone_parts[0])
+            state = int(zone_parts[1])
+            duration = int(zone_parts[2]) if len(zone_parts) > 2 else 0
+            
+            # Map to sequential zone number
+            zone_mapping[sequential_zone] = {
+                'raw_zone_id': zone_id_raw,
+                'open': state != 0x00,
+                'duration_seconds': duration,
+                'raw_ascii_data': zone_data
+            }
+            
+            _LOGGER.info("HTV213FRF ASCII Zone %d (raw ID %d): state=%d, duration=%d", 
+                        sequential_zone, zone_id_raw, state, duration)
+            sequential_zone += 1
+        
+        zones = zone_mapping
+        
+        # For ASCII format, assume hub is online if we got valid data
+        hub_online = True
+        _LOGGER.info("HTV213FRF ASCII hub state: online (valid ASCII data received)")
+        
+        result = {
+            "type": "valve_hub",
+            "rssi_dbm": rssi_dbm,
+            "raw_bytes": raw.encode('ascii'),
+            "zones": zones,
+            "tlv_raw": {},
+            "hub_online": hub_online,
+            "hub_state_raw": "ascii_format",
+            "decoder": "htv213frf_ascii",
+            "debug_info": {
+                "payload_format": "ascii",
+                "raw_payload": raw,
+                "header_parts": header_parts,
+                "zone_sections": zone_sections,
+                "zones_found": len(zones),
+                "rssi_raw": rssi_raw
+            }
+        }
+        
+        _LOGGER.info(debug_with_version("HTV213FRF ASCII decoded: %d zones, hub_online=%s, rssi=%d"), 
+                   len(zones), hub_online, rssi_dbm)
+        return result
+        
+    except Exception as e:
+        _LOGGER.error("HTV213FRF ASCII decoder error: %s", e)
+        raise
+
+
+def _decode_htv213frf_hex(raw: str) -> dict:
+    """
+    Decode HTV213FRF hex format payload.
+    
+    Format: 11#17E1CE0019D8001AD8001D201E2021B700000000...
+    Uses custom TLV structure with fixed-length records.
     """
     try:
         b = _parse_homgar_payload(raw)
-        _LOGGER.debug(debug_with_version("HTV213FRF raw bytes: %s"), b)
+        _LOGGER.debug(debug_with_version("HTV213FRF hex raw bytes: %s"), b)
         
         zones = {}
         

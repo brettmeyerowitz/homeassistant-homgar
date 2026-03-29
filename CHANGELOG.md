@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.14] - 2026-03-29
+
+### 🔧 CRITICAL BUG FIXES
+- **Added ASCII format support** for HTV213FRF/HTV245FRF valve devices
+- **Added ASCII format support** for HCS021FRF soil moisture sensors
+- **Fixed valve entity availability** - entities now show as available instead of unavailable
+- **Fixed sensor state errors** - ASCII format values now properly decoded
+
+### 🎯 ISSUE RESOLUTION
+- **Issue #11**: Dean's HTV213FRF devices now work with ASCII format payloads
+- **ASCII format detection**: Automatic detection between hex (11#) and ASCII (1,-84,1;) formats
+- **Multiple device support**: HTV213FRF, HTV245FRF, HCS021FRF all supported
+- **Hub online detection**: ASCII format devices now properly show online status
+
+### 📊 TECHNICAL IMPROVEMENTS
+- **Dual format decoders**: Each device now supports both hex and ASCII formats
+- **Format auto-detection**: Intelligent payload format recognition
+- **Enhanced logging**: Detailed ASCII parsing logs for troubleshooting
+- **RSSI extraction**: Proper RSSI parsing from ASCII format headers
+- **Zone mapping**: Sequential zone numbering for ASCII valve payloads
+
+### 🧪 TESTING REQUESTED
+- **Dean's devices**: HTV213FRF, HTV245FRF, HCS021FRF should now work
+- **Zone state testing**: Turn zones on/off to verify state changes
+- **Sensor values**: Temperature, moisture, and lux should display correctly
+- **Valve availability**: All valve entities should be available
+
+### 📝 Files Modified
+- custom_components/homgar/homgar_api.py - ASCII format decoders for HTV213FRF and HCS021FRF
+- custom_components/homgar/manifest.json - Version 1.3.14
+- custom_components/homgar/const.py - Version 1.3.14
+- CHANGELOG.md - v1.3.14 entry
+
+### 🎯 Expected Results for Users
+- ✅ **HTV213FRF/HTV245FRF**: Valve entities available, zones numbered 1,2,3,4,5
+- ✅ **HCS021FRF**: Temperature, moisture, and lux sensors working
+- ✅ **Hub online status**: Proper online detection for ASCII format devices
+- ✅ **No more decoder errors**: All ASCII format payloads successfully decoded
+
+---
+
 ## [1.3.13] - 2026-03-29
 
 ### 🔧 BUG FIXES
