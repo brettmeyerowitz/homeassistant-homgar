@@ -2,7 +2,7 @@
 DOMAIN = "homgar"
 
 # Integration version
-VERSION = "1.3.11"
+VERSION = "1.3.12"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
@@ -29,6 +29,14 @@ APP_CODE_MAPPING = {
     APP_TYPE_HOMGAR: "1",
     APP_TYPE_RAINPOINT: "2",
 }
+
+# Debug data submission
+CONF_DEBUG_ENABLED = "debug_enabled"
+CONF_DEBUG_AUTO_SUBMIT = "debug_auto_submit"
+CONF_DEBUG_LAST_SUBMISSION = "debug_last_submission"
+
+DEBUG_WORKER_URL = "https://homgar-debug-worker.funkypeople.workers.dev/submit"
+DEBUG_SUBMISSION_INTERVAL = 86400  # 24 hours in seconds
 
 # Brand mappings
 BRAND_MAPPING = {

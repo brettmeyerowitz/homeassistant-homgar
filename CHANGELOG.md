@@ -2,9 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.12] - 2026-03-29
+
+### NEW FEATURES
+- **Debug Data Collection**: Added "Submit Debug Data" switch for community-driven decoder improvement
+- **Cloudflare Worker**: Deployed data collection service for pattern discovery and analysis
+- **Device Type Classification**: Enhanced data collection with device type information (moisture_full, rain, etc.)
+- **Web Data Viewer**: Interactive interface for browsing submitted device patterns
+
+### IMPROVEMENTS  
+- **Privacy-Conscious Design**: Anonymous data collection with no personal information
+- **User Control**: Opt-in debug submission with one-time toggle switch
+- **Enhanced Validation**: Comprehensive data validation and error handling
+- **Pattern Discovery Framework**: Foundation for automated decoder improvements
+
+### DATA COLLECTION
+- **Device Models**: HCS021FRF, HCS012ARF, HCS026FRF, and more
+- **Raw Payloads**: Hex strings for reverse engineering
+- **Decoded Values**: Sensor readings for validation
+- **Metadata**: RSSI, battery, firmware versions
+- **Device Types**: Functional classification for pattern grouping
+
+### PRIVACY & SECURITY
+- **Anonymous Submissions**: No user identifiers or personal data
+- **Rate Limiting**: Prevents abuse and ensures fair usage
+- **Data Retention**: Automatic cleanup policies implemented
+- **Opt-In Only**: Explicit user action required for data sharing
+
+### COMMUNITY BENEFITS
+- **Pattern Discovery**: Community-sourced data for new device support
+- **Decoder Accuracy**: Real-world validation improves precision
+- **Firmware Variations**: Discover differences across device versions
+- **Edge Cases**: Identify and fix unusual device behaviors
+
+---
+
 ## [v1.3.11] - 2026-03-29
 
-### 🐛 Bug Fixes
+### Bug Fixes
 - **Fixed critical Docker import errors**
   - Added missing BRAND_MAPPING to const.py
   - Fixed VERSION import in coordinator.py from wrong module

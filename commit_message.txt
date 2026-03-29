@@ -1,27 +1,48 @@
-🐛 CRITICAL: Fixed Docker Import Errors - v1.3.11
+Add debug data collection system for community-driven decoder improvement
 
-🔧 Bug Fixes:
-- Fixed critical ImportError that prevented integration from loading in Docker
-- Added missing BRAND_MAPPING to const.py
-- Fixed VERSION import in coordinator.py (was importing from wrong module)
-- Resolved all import errors that caused integration to fail
+This major update introduces a privacy-conscious debug data submission system that allows users to voluntarily share anonymous device data to help improve decoder accuracy and discover new device patterns.
 
-✅ Docker Testing Validation:
-- Validated integration in Docker environment before release
-- Confirmed exact RainPoint parsing works in production Docker
-- Verified versioned debug messages display correctly
-- Tested real device data processing in container
+### 🎉 New Features
+- Added "Submit Debug Data" switch in Home Assistant for opt-in data sharing
+- Deployed Cloudflare Worker for secure data collection and storage
+- Created web viewer for browsing submitted device patterns
+- Enhanced data collection with device type classification
 
-📋 Process Improvement:
-- Added Docker testing to release workflow (CRITICAL)
-- ALWAYS test in Docker before any release
-- Prevents import errors from reaching production
+### 🔧 Technical Implementation
+- Created debug.py with HomGarDebugSwitchEntity for data collection
+- Added switch.py platform for HA integration
+- Implemented device type capture (moisture_full, rain, moisture_simple, etc.)
+- Added comprehensive data validation and error handling
 
-🎯 Docker Test Results:
-- Integration loads successfully without errors
-- [HomGar v1.3.11] debug messages working
-- Real sensor data being processed (HCS021FRF, HCS012ARF, HCS026FRF)
-- Exact RainPoint C0527C.a() parsing method functional
+### 📊 Data Collection Features
+- Anonymous submission of device models, raw payloads, and decoded values
+- Metadata collection (RSSI, battery, firmware, device names)
+- Integration version tracking for compatibility analysis
+- Rate limiting and privacy safeguards
 
-This fixes the broken v1.3.10 release that had import errors.
-Ref: v1.3.11 docker fixes
+### 🔒 Privacy & Security
+- Opt-in only - explicit user action required
+- No personal data or credentials collected
+- Rate limiting to prevent abuse
+- Data retention policies with automatic cleanup
+
+### 🌐 Community Benefits
+- Pattern discovery for new device support
+- Real-world decoder accuracy validation
+- Firmware variation identification
+- Edge case detection and resolution
+
+### 📋 Files Added/Modified
+- custom_components/homgar/debug.py (new)
+- custom_components/homgar/switch.py (new) 
+- custom_components/homgar/__init__.py (updated platforms)
+- custom_components/homgar/const.py (added debug constants)
+- CHANGELOG.md (v1.3.12 entry)
+
+### 🚀 Testing & Validation
+- Successfully tested in Docker Home Assistant environment
+- Cloudflare Worker deployed and accepting submissions
+- Web viewer functional for data analysis
+- All device types collecting data correctly
+
+This system enables community-driven improvement of HomGar/RainPoint device support while maintaining strict privacy protections.
