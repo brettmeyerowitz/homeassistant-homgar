@@ -2,7 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.7] - 2026-03-29
+## [v1.3.8] - 2026-03-29
+
+### Bug Fixes
+- **Fixed debug message versioning**
+  - Add VERSION constant and debug_with_version helper to const.py
+  - Update key debug messages in coordinator.py to include version info
+  - Update HTV213FRF decoder debug messages with versioning
+  - Import debug_with_version in homgar_api.py for consistent logging
+
+### Improvements
+- **Enhanced debugging experience**
+  - All debug messages now include integration version prefix
+  - Easier troubleshooting for users and developers
+  - Better identification of which integration version is generating logs
+
+### Technical Details
+- Added `VERSION = "1.3.8"` constant in `const.py`
+- Added `debug_with_version()` helper function for consistent versioned logging
+- Updated `_LOGGER.debug()` calls in `coordinator.py` to use versioned messages
+- Updated HTV213FRF decoder debug messages in `homgar_api.py`
+- Improved traceability in debug logs
+
+## [v1.3.7] - 2026-03-29
 
 ### Fixed
 - **HCS decoder payload length issues** - Flexible parsing for shorter payloads

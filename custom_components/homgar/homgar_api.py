@@ -52,8 +52,12 @@ from .const import (
     CONF_TOKEN,
     CONF_TOKEN_EXPIRES_AT,
     CONF_REFRESH_TOKEN,
-    CONF_APP_TYPE,
+    DEFAULT_SCAN_INTERVAL,
+    APP_TYPE_HOMGAR,
+    APP_TYPE_RAINPOINT,
     APP_CODE_MAPPING,
+    BRAND_MAPPING,
+    debug_with_version,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -741,19 +745,19 @@ def decode_htv213frf_valve(raw: str) -> dict:
     """
     try:
         b = _parse_homgar_payload(raw)
-        _LOGGER.debug("HTV213FRF raw bytes: %s", b)
+        _LOGGER.debug(debug_with_version("HTV213FRF raw bytes: %s"), b)
         
         zones = {}
         
         # Try to parse as standard TLV first (for debugging)
         try:
             tlv = _parse_tlv_payload(raw)
-            _LOGGER.debug("HTV213FRF TLV entries: %s", {
+            _LOGGER.debug(debug_with_version("HTV213FRF TLV entries: %s"), {
                 f"0x{dp:02X}": (f"0x{type_byte:02X}", f"0x{value_int:02X}" if value_int < 256 else value_int, raw_bytes.hex())
                 for dp, (type_byte, value_int, raw_bytes) in tlv.items()
             })
         except Exception as e:
-            _LOGGER.debug("HTV213FRF TLV parsing failed: %s", e)
+            _LOGGER.debug(debug_with_version("HTV213FRF TLV parsing failed: %s"), e)
             tlv = {}
         
         # If standard TLV worked, use it
@@ -826,7 +830,7 @@ def decode_htv213frf_valve(raw: str) -> dict:
             }
         }
         
-        _LOGGER.debug("HTV213FRF decoded: %d zones, hub_online=%s", len(zones), hub_online)
+        _LOGGER.debug(debug_with_version("HTV213FRF decoded: %d zones, hub_online=%s"), len(zones), hub_online)
         return result
         
     except Exception as e:

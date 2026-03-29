@@ -58,6 +58,7 @@ from .homgar_api import (
     decode_hcs999frf_p, decode_hcs666frf_x, decode_hcs701b, decode_hcs596wb,
     decode_hcs596wb_v4, decode_hcs706arf, decode_hcs802arf, decode_hcs048b,
     decode_hcs888arf_v1, decode_hcs0600arf,
+    VERSION, debug_with_version,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -148,7 +149,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                 # Try multipleDeviceStatus first (more efficient)
                 try:
                     multiple_status = await self._client.get_multiple_device_status(device_list)
-                    _LOGGER.debug("multipleDeviceStatus successful, got data for %d devices", len(multiple_status))
+                    _LOGGER.debug(debug_with_version("multipleDeviceStatus successful, got data for %d devices"), len(multiple_status))
                     
                     # If multipleDeviceStatus returns empty data, fall back to individual calls
                     if not multiple_status:
@@ -161,7 +162,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         mid = device_data["mid"]
                         status_array = device_data.get("subDeviceStatus", [])
                         status_by_mid[mid] = {"subDeviceStatus": status_array}
-                        _LOGGER.debug("Fetched status for mid=%s using multipleDeviceStatus", mid)
+                        _LOGGER.debug(debug_with_version("Fetched status for mid=%s using multipleDeviceStatus"), mid)
                         
                 except Exception as e:
                     _LOGGER.warning("multipleDeviceStatus failed, falling back to individual calls: %s", e)
@@ -172,7 +173,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         try:
                             status = await self._client.get_device_status(mid)
                             status_by_mid[mid] = status
-                            _LOGGER.debug("Fetched status for mid=%s using individual call", mid)
+                            _LOGGER.debug(debug_with_version("Fetched status for mid=%s using individual call"), mid)
                         except Exception as individual_e:
                             _LOGGER.error("Failed to get status for mid=%s: %s", mid, individual_e)
                             status_by_mid[mid] = {"subDeviceStatus": []}
@@ -181,10 +182,10 @@ class HomGarCoordinator(DataUpdateCoordinator):
                 mid = hub["mid"]
                 status = status_by_mid.get(mid, {"subDeviceStatus": []})
 
-                _LOGGER.debug("Processing hub mid=%s with status", mid)
+                _LOGGER.debug(debug_with_version("Processing hub mid=%s with status"), mid)
 
                 sub_status = {s["id"]: s for s in status.get("subDeviceStatus", [])}
-                _LOGGER.debug("Parsed sub_status for mid=%s: %s keys", mid, len(sub_status))
+                _LOGGER.debug(debug_with_version("Parsed sub_status for mid=%s: %s keys"), mid, len(sub_status))
 
                 # Map addr -> subDevice
                 addr_map = {sd["addr"]: sd for sd in hub.get("subDevices", [])}
@@ -210,7 +211,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                     else:
                         model = sub.get("model")
                         try:
-                            _LOGGER.debug("Decoding payload for model=%s mid=%s addr=%s: %s", model, mid, addr, raw_value)
+                            _LOGGER.debug(debug_with_version("Decoding payload for model=%s mid=%s addr=%s: %s"), model, mid, addr, raw_value)
                             
                             # Special case: Display Hub uses different decoder
                             if model == MODEL_DISPLAY_HUB:
@@ -254,7 +255,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                                             title="HomGar: Unsupported Sensor Detected",
                                             notification_id=f"homgar_unsupported_{model}",
                                         )
-                            _LOGGER.debug("Decoded data for mid=%s addr=%s: %s", mid, addr, decoded)
+                            _LOGGER.debug(debug_with_version("Decoded data for mid=%s addr=%s: %s"), mid, addr, decoded)
                         except Exception as ex:  # noqa: BLE001
                             _LOGGER.warning(
                                 "Failed to decode payload for %s addr=%s: %s",
@@ -290,10 +291,10 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         "data": decoded,
                     }
 
-                    _LOGGER.debug("Sensor entity key=%s info=%s", sensor_key, decoded_sensors[sensor_key])
+                    _LOGGER.debug(debug_with_version("Sensor entity key=%s info=%s"), sensor_key, decoded_sensors[sensor_key])
 
             _LOGGER.info("Coordinator update complete: %d hubs, %d sensors", len(hubs), len(decoded_sensors))
-            _LOGGER.debug("Final data: hubs=%s, sensors=%s", hubs, list(decoded_sensors.keys()))
+            _LOGGER.debug(debug_with_version("Final data: hubs=%s, sensors=%s"), hubs, list(decoded_sensors.keys()))
             
             return {
                 "hubs": hubs,
