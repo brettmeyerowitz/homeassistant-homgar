@@ -277,6 +277,42 @@ def _extract_status_code(bytes_: list[int], hi_pos: int, lo_pos: int) -> int:
     return (bytes_[hi_pos] << 8) | bytes_[lo_pos]
 
 
+def _battery_status_to_percent(status_code: int) -> int:
+    """
+    Convert battery status code to percentage.
+    
+    Common values:
+    - 0xFF0F (65295) = 100% (full battery)
+    - Lower values indicate lower battery levels
+    
+    The status code appears to be a 16-bit value where:
+    - 0xFF0F = full battery (100%)
+    - Values decrease as battery drains
+    """
+    if status_code >= 0xFF0F:  # 65295
+        return 100
+    elif status_code >= 0xFE0F:  # ~65039
+        return 90
+    elif status_code >= 0xFD0F:  # ~64783
+        return 80
+    elif status_code >= 0xFC0F:  # ~64527
+        return 70
+    elif status_code >= 0xFB0F:  # ~64271
+        return 60
+    elif status_code >= 0xFA0F:  # ~64015
+        return 50
+    elif status_code >= 0xF90F:  # ~63759
+        return 40
+    elif status_code >= 0xF80F:  # ~63503
+        return 30
+    elif status_code >= 0xF70F:  # ~63247
+        return 20
+    elif status_code >= 0xF60F:  # ~62991
+        return 10
+    else:
+        return 5  # Low battery
+
+
 def _validate_payload(raw: str, min_length: int) -> list[int]:
     """Parse and validate basic payload structure."""
     b = _parse_homgar_payload(raw)
@@ -329,6 +365,7 @@ def decode_moisture_simple(raw: str) -> dict:
     result.update({
         "moisture_percent": moisture,
         "battery_status_code": status_code,
+        "battery_percent": _battery_status_to_percent(status_code),
     })
     return result
 
@@ -382,6 +419,7 @@ def decode_moisture_full(raw: str) -> dict:
         "illuminance_lux": lux,
         "illuminance_raw10": lux_raw10,
         "battery_status_code": status_code,
+        "battery_percent": _battery_status_to_percent(status_code),
     })
     return result
 
@@ -438,6 +476,7 @@ def decode_rain(raw: str) -> dict:
         "rain_last_7d_raw10": last_7d_raw10,
         "rain_total_raw10": total_raw10,
         "battery_status_code": status_code,
+        "battery_percent": _battery_status_to_percent(status_code),
     })
     return result
 

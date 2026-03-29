@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.4] - 2026-03-29
+
+### Added
+- **Hub device hierarchy** - Hub devices now appear as parent devices with sensors as children
+- **Diagnostic sensor entities** - Separate entities for device information on device page
+  - RSSI signal strength (dBm)
+  - Battery percentage (0-100%)
+  - Firmware version
+  - Last updated timestamp
+  - Hub device ID
+- **Developer reload service** - `homgar.reload` service for quick integration testing
+- **Service documentation** - Complete service descriptions and user-friendly responses
+
+### Changed
+- **Manufacturer correction** - All devices now correctly show "RainPoint" as manufacturer
+- **Battery display** - Battery values now show as percentage instead of raw status codes
+- **Device timestamps** - Extracted from API `time` field for accurate device reporting time
+- **File organization** - Development files moved to `/docs` folder
+
+### Technical
+- Added hub device registry with proper parent-child relationships
+- Implemented diagnostic sensor classes for better device information visibility
+- Enhanced device info with `via_device` linking to parent hub
+- Improved service registration with proper responses and notifications
+- Added battery status code to percentage conversion function
+- Added async_setup_services function for service registration
+- Added async_reload_integration function for targeted reloads
+
 ## [1.3.3] - 2026-03-29
 
 ### Added

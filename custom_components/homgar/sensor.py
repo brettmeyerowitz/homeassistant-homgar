@@ -52,6 +52,20 @@ from .const import (
     MODEL_HCS0600ARF,
 )
 from .coordinator import HomGarCoordinator
+from .diagnostic_sensors import (
+    HomGarRSSISensor,
+    HomGarBatterySensor,
+    HomGarFirmwareVersionSensor,
+    HomGarLastUpdatedSensor,
+)
+from .device import HomGarSubDevice
+from .hub_entities import (
+    HomGarHubDeviceIDSensor,
+    HomGarHubFirmwareSensor,
+    HomGarHubMACSensor,
+    HomGarHubChannelSelect,
+    HomGarHubBroadcastSwitch,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,9 +86,29 @@ async def async_setup_entry(
     coordinator: HomGarCoordinator = data["coordinator"]
 
     sensors_cfg = coordinator.data.get("sensors", {})
+    hubs_cfg = coordinator.data.get("hubs", [])
 
     entities: list[HomGarSensorBase] = []
 
+    # Create hub entities first
+    if isinstance(hubs_cfg, list):
+        # Convert list to dict for easier processing
+        hubs_dict = {str(hub.get("hid", i)): hub for i, hub in enumerate(hubs_cfg)}
+    else:
+        hubs_dict = hubs_cfg
+    
+    for hub_key, hub_info in hubs_dict.items():
+        hub_name = hub_info.get("name", "HomGar Hub")
+        hub_slug = _slugify(f"hub_{hub_name}")
+        
+        # Add hub sensors
+        entities.append(HomGarHubDeviceIDSensor(coordinator, hub_info))
+        entities.append(HomGarHubFirmwareSensor(coordinator, hub_info))
+        entities.append(HomGarHubMACSensor(coordinator, hub_info))
+        entities.append(HomGarHubChannelSelect(coordinator, hub_info))
+        entities.append(HomGarHubBroadcastSwitch(coordinator, hub_info))
+
+    # Create sensor entities for sub-devices
     for key, info in sensors_cfg.items():
         model = info.get("model")
         sub_name = info.get("sub_name") or f"Sensor {info['addr']}"
@@ -96,10 +130,20 @@ async def async_setup_entry(
                 entities.append(DisplayHubReadingSensor(coordinator, key, info, base_slug, reading_key))
         elif model == MODEL_MOISTURE_SIMPLE:
             entities.append(HomGarMoisturePercentSensor(coordinator, key, info, base_slug, simple=True))
+            # Add diagnostic sensors
+            entities.append(HomGarRSSISensor(coordinator, key, info, base_slug))
+            entities.append(HomGarBatterySensor(coordinator, key, info, base_slug))
+            entities.append(HomGarFirmwareVersionSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarLastUpdatedSensor(coordinator, key, info, base_slug))
         elif model == MODEL_MOISTURE_FULL:
             entities.append(HomGarMoisturePercentSensor(coordinator, key, info, base_slug, simple=False))
             entities.append(HomGarTemperatureSensor(coordinator, key, info, base_slug))
             entities.append(HomGarIlluminanceSensor(coordinator, key, info, base_slug))
+            # Add diagnostic sensors
+            entities.append(HomGarRSSISensor(coordinator, key, info, base_slug))
+            entities.append(HomGarBatterySensor(coordinator, key, info, base_slug))
+            entities.append(HomGarFirmwareVersionSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarLastUpdatedSensor(coordinator, key, info, base_slug))
         elif model == MODEL_RAIN:
             entities.append(HomGarRainSensor(coordinator, key, info, base_slug, "rain_last_hour_mm", "rain last hour"))
             entities.append(HomGarRainSensor(coordinator, key, info, base_slug, "rain_last_24h_mm", "rain last 24h"))
@@ -306,49 +350,36 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
         self._sensor_key = sensor_key
         self._sensor_info = sensor_info
         self._base_slug = base_slug
-        _LOGGER.debug("Initialized HomGarSensorBase: sensor_key=%s, sensor_info=%s, base_slug=%s", sensor_key, sensor_info, base_slug)
 
     @property
     def _sensor_data(self) -> dict | None:
         sensors = self.coordinator.data.get("sensors", {})
         info = sensors.get(self._sensor_key)
         if not info:
-            _LOGGER.debug("Sensor key %s not found in coordinator data", self._sensor_key)
             return None
-        data = info.get("data")
-        _LOGGER.debug("Sensor key %s data: %s", self._sensor_key, data)
-        return data
+        return info.get("data")
 
     @property
     def available(self) -> bool:
-        available = self._sensor_data is not None
-        _LOGGER.debug("Sensor %s available: %s", self._sensor_key, available)
-        return available
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        _LOGGER.debug("Sensor entity added to hass: %s", self._sensor_key)
-
-    def _handle_coordinator_update(self) -> None:
-        _LOGGER.debug("Coordinator update for sensor: %s", self._sensor_key)
-        super()._handle_coordinator_update()
+        return self._sensor_data is not None
 
     @property
     def device_info(self) -> dict[str, Any]:
-        """Represent each subDevice as its own HA device."""
+        """Represent each subDevice as its own HA device, child of hub."""
+        from .const import DOMAIN
         hid = self._sensor_info["hid"]
         mid = self._sensor_info["mid"]
         addr = self._sensor_info["addr"]
         sub_name = self._sensor_info.get("sub_name") or f"Sensor {addr}"
         model = self._sensor_info.get("model") or "Unknown"
-        brand = self._sensor_info.get("brand", "HomGar")
 
         return {
             # Unique per subdevice
             "identifiers": {(DOMAIN, f"{hid}_{mid}_{addr}")},
             "name": f"{sub_name}",
-            "manufacturer": f"{brand}",
+            "manufacturer": "RainPoint",  # RainPoint is the actual device manufacturer
             "model": model,
+            "via_device": (DOMAIN, f"hub_{hid}"),  # Link to parent hub
         }
 
     @property
@@ -357,12 +388,30 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
         attrs: dict[str, Any] = {}
         if "rssi_dbm" in data:
             attrs["rssi_dbm"] = data["rssi_dbm"]
-        if "battery_status_code" in data:
+        if "battery_percent" in data:
+            attrs["battery_percent"] = data["battery_percent"]
+        elif "battery_status_code" in data:
             attrs["battery_status_code"] = data["battery_status_code"]
 
-        # Add last_updated from the latest raw_status time (ms since epoch)
+        # Add firmware version from sensor info
         sensors = self.coordinator.data.get("sensors", {})
         info = sensors.get(self._sensor_key) or {}
+        firmware_version = info.get("firmware_version")
+        if firmware_version:
+            attrs["firmware_version"] = firmware_version
+
+        # Add device timestamp from decoded data
+        if "device_timestamp" in data:
+            attrs["device_timestamp"] = data["device_timestamp"]
+            attrs["timestamp_method"] = data.get("timestamp_method")
+            attrs["timestamp_source"] = data.get("timestamp_source", "server")
+        elif "server_timestamp" in data:
+            attrs["device_timestamp"] = data["server_timestamp"]
+            attrs["timestamp_source"] = data.get("timestamp_source", "server")
+        else:
+            _LOGGER.debug("No timestamp found in sensor data: %s", data)
+        
+        # Legacy timestamp from raw_status (fallback)
         raw_status = info.get("raw_status") or {}
         ts = raw_status.get("time")
         if ts:
@@ -373,6 +422,7 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
                 # If anything goes wrong, we simply omit last_updated
                 pass
 
+        _LOGGER.debug("Sensor %s attributes: %s", self._sensor_key, attrs)
         return attrs
 
 

@@ -132,6 +132,24 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
             if dur is not None:
                 attrs["duration_seconds"] = dur
             attrs["state_raw"] = zone.get("state_raw")
+        
+        # Add firmware version from sensor info
+        sensors = self.coordinator.data.get("sensors", {})
+        info = sensors.get(self._sensor_key) or {}
+        firmware_version = info.get("firmware_version")
+        if firmware_version:
+            attrs["firmware_version"] = firmware_version
+        
+        # Add device timestamp from decoded data
+        data = self.coordinator.data.get("sensors", {}).get(self._sensor_key, {}).get("data", {})
+        if "device_timestamp" in data:
+            attrs["device_timestamp"] = data["device_timestamp"]
+            attrs["timestamp_method"] = data.get("timestamp_method")
+            attrs["timestamp_source"] = data.get("timestamp_source", "server")
+        elif "server_timestamp" in data:
+            attrs["device_timestamp"] = data["server_timestamp"]
+            attrs["timestamp_source"] = data.get("timestamp_source", "server")
+        
         return attrs
 
     @property

@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from homeassistant.core import HomeAssistant
 from homeassistant.components.persistent_notification import async_create
@@ -265,14 +265,27 @@ class HomGarCoordinator(DataUpdateCoordinator):
                             decoded = None
 
                     sensor_key = f"{hub['hid']}_{mid}_{addr}"
+                    
+                    # Extract device timestamp from API response
+                    device_time = s.get("time")
+                    if device_time:
+                        try:
+                            dt = datetime.utcfromtimestamp(device_time / 1000).replace(tzinfo=timezone.utc)
+                            if decoded:
+                                decoded["device_timestamp"] = dt.isoformat()
+                                decoded["timestamp_source"] = "device"
+                        except (ValueError, TypeError, OSError):
+                            pass
+                    
                     decoded_sensors[sensor_key] = {
                         "hid": hub["hid"],
                         "mid": mid,
                         "addr": addr,
-                        "home_name": hub.get("homeName"),  # may not be present
+                        "home_name": hub.get("homeName"),
                         "hub_name": hub.get("name", "Hub"),
                         "sub_name": sub.get("name"),
                         "model": sub.get("model"),
+                        "firmware_version": sub.get("softVer"),
                         "raw_status": s,
                         "data": decoded,
                     }
