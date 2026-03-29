@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.7] - 2026-03-29
+
+### Fixed
+- **HCS decoder payload length issues** - Flexible parsing for shorter payloads
+- **HCS014ARF temperature/humidity sensor** - Handles 22+ bytes instead of requiring 40
+- **HCS008FRF flowmeter** - Handles 22+ bytes instead of requiring 111
+- **HCS0530THO CO2/temp/humidity** - Handles 22+ bytes instead of requiring 63
+
+### Added
+- **Graceful fallback parsing** - Extracts available data based on actual payload length
+- **Flexible decoder identification** - Added decoder names for troubleshooting
+- **Error handling improvements** - Returns basic info instead of failing completely
+
+### Technical
+- Replaced strict `_validate_payload()` with graceful length checking
+- Added progressive data extraction based on available payload bytes
+- Enhanced error logging with decoder identification
+- Maintains backward compatibility with full-length payloads
+
+### Resolved Errors
+- Fixed "Payload too short" warnings for HCS sensor models
+- Prevents decoder failures for devices with shorter firmware payloads
+- Maintains sensor functionality with partial data extraction
+
 ## [1.3.6] - 2026-03-29
 
 ### Fixed

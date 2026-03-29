@@ -516,61 +516,123 @@ def decode_flowmeter(raw: str) -> dict:
     """
     Decode HCS008FRF (flowmeter) payload.
     """
-    b = _validate_payload(raw, 111)  # Need full length for all data
-    # See Node-RED: function "Flowmeter HCS008FRF"
-    
-    def le_val(parts):
-        return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
-    
-    flowcurrentused = le_val(b[49:52]) / 10 if len(b) >= 52 else None
-    flowcurrenduration = le_val(b[59:62]) if len(b) >= 62 else None
-    flowlastused = le_val(b[69:72]) / 10 if len(b) >= 72 else None
-    flowlastusedduration = le_val(b[81:84]) if len(b) >= 84 else None
-    flowtotaltoday = le_val(b[91:94]) / 10 if len(b) >= 94 else None
-    flowtotal = le_val(b[103:107]) / 10 if len(b) >= 107 else None
-    flowbatt = le_val(b[107:111]) / 4095 * 100 if len(b) >= 111 else None
-    
-    result = _base_decoder_dict("flowmeter", _extract_rssi(b), b)
-    result.update({
-        "flowcurrentused": flowcurrentused,
-        "flowcurrenduration": flowcurrenduration,
-        "flowlastused": flowlastused,
-        "flowlastusedduration": flowlastusedduration,
-        "flowtotaltoday": flowtotaltoday,
-        "flowtotal": flowtotal,
-        "flowbatt": round(flowbatt, 2) if flowbatt is not None else None,
-    })
-    return result
+    try:
+        # Try with flexible parsing instead of strict validation
+        b = _parse_homgar_payload(raw)
+        
+        if len(b) < 22:
+            raise ValueError(f"Payload too short: {len(b)} bytes (minimum 22 required)")
+        
+        # See Node-RED: function "Flowmeter HCS008FRF"
+        def le_val(parts):
+            return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
+        
+        # Extract data based on available payload length
+        flowcurrentused = None
+        flowcurrenduration = None
+        flowlastused = None
+        flowlastusedduration = None
+        flowtotaltoday = None
+        flowtotal = None
+        flowbatt = None
+        
+        # Try to extract what we can from the available data
+        if len(b) >= 52:
+            flowcurrentused = le_val(b[49:52]) / 10
+        if len(b) >= 62:
+            flowcurrenduration = le_val(b[59:62])
+        if len(b) >= 72:
+            flowlastused = le_val(b[69:72]) / 10
+        if len(b) >= 84:
+            flowlastusedduration = le_val(b[81:84])
+        if len(b) >= 94:
+            flowtotaltoday = le_val(b[91:94]) / 10
+        if len(b) >= 107:
+            flowtotal = le_val(b[103:107]) / 10
+        if len(b) >= 111:
+            flowbatt = le_val(b[107:111]) / 4095 * 100
+        
+        result = _base_decoder_dict("flowmeter", _extract_rssi(b), b)
+        result.update({
+            "flowcurrentused": round(flowcurrentused, 2) if flowcurrentused is not None else None,
+            "flowcurrenduration": flowcurrenduration,
+            "flowlastused": round(flowlastused, 2) if flowlastused is not None else None,
+            "flowlastusedduration": flowlastusedduration,
+            "flowtotaltoday": round(flowtotaltoday, 2) if flowtotaltoday is not None else None,
+            "flowtotal": round(flowtotal, 2) if flowtotal is not None else None,
+            "flowbatt": round(flowbatt, 2) if flowbatt is not None else None,
+            "payload_length": len(b),
+            "decoder": "flowmeter_flexible",
+        })
+        
+        return result
+        
+    except Exception as e:
+        _LOGGER.warning("Flowmeter decoder failed: %s", e)
+        # Return basic info instead of failing completely
+        b = _parse_homgar_payload(raw) if raw else []
+        return _base_decoder_dict("flowmeter", _extract_rssi(b) if b else 0, b)
 
 def decode_co2(raw: str) -> dict:
     """
     Decode HCS0530THO (CO2/temp/humidity) payload.
     """
-    b = _validate_payload(raw, 63)  # Minimum for basic CO2 data
-    # See Node-RED: function "CO2 HCS0530THO"
-    
-    def le_val(parts):
-        return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
-    
-    co2 = le_val(b[7:9]+b[5:7]) if len(b) >= 9 else None
-    co2low = le_val(b[53:55]+b[51:53]) if len(b) >= 55 else None
-    co2high = le_val(b[57:59]+b[55:57]) if len(b) >= 59 else None
-    co2temp = (((le_val(b[35:37]+b[33:35]) / 10) - 32) * (5 / 9)) if len(b) >= 37 else None
-    co2humidity = b[39] if len(b) > 39 else None
-    co2batt = le_val(b[61:63]+b[59:61]) / 4095 * 100 if len(b) >= 63 else None
-    co2rssi = b[67] - 256 if len(b) > 67 and b[67] > 127 else (b[67] if len(b) > 67 else None)
-    
-    result = _base_decoder_dict("co2", co2rssi if co2rssi is not None else _extract_rssi(b), b)
-    result.update({
-        "co2": co2,
-        "co2low": co2low,
-        "co2high": co2high,
-        "co2temp": round(co2temp, 2) if co2temp is not None else None,
-        "co2humidity": co2humidity,
-        "co2batt": round(co2batt, 2) if co2batt is not None else None,
-        "co2rssi": co2rssi,
-    })
-    return result
+    try:
+        # Try with flexible parsing instead of strict validation
+        b = _parse_homgar_payload(raw)
+        
+        if len(b) < 22:
+            raise ValueError(f"Payload too short: {len(b)} bytes (minimum 22 required)")
+        
+        # See Node-RED: function "CO2 HCS0530THO"
+        def le_val(parts):
+            return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
+        
+        # Extract data based on available payload length
+        co2 = None
+        co2low = None
+        co2high = None
+        co2temp = None
+        co2humidity = None
+        co2batt = None
+        co2rssi = None
+        
+        # Try to extract what we can from the available data
+        if len(b) >= 9:
+            co2 = le_val(b[7:9]+b[5:7])
+        if len(b) >= 55:
+            co2low = le_val(b[53:55]+b[51:53])
+        if len(b) >= 59:
+            co2high = le_val(b[57:59]+b[55:57])
+        if len(b) >= 37:
+            co2temp = (((le_val(b[35:37]+b[33:35]) / 10) - 32) * (5 / 9))
+        if len(b) > 39:
+            co2humidity = b[39]
+        if len(b) >= 63:
+            co2batt = le_val(b[61:63]+b[59:61]) / 4095 * 100
+        if len(b) > 67:
+            co2rssi = b[67] - 256 if b[67] > 127 else b[67]
+        
+        result = _base_decoder_dict("co2", co2rssi if co2rssi is not None else _extract_rssi(b), b)
+        result.update({
+            "co2": co2,
+            "co2low": co2low,
+            "co2high": co2high,
+            "co2temp": round(co2temp, 2) if co2temp is not None else None,
+            "co2humidity": co2humidity,
+            "co2batt": round(co2batt, 2) if co2batt is not None else None,
+            "co2rssi": co2rssi,
+            "payload_length": len(b),
+            "decoder": "co2_flexible",
+        })
+        
+        return result
+        
+    except Exception as e:
+        _LOGGER.warning("CO2 decoder failed: %s", e)
+        # Return basic info instead of failing completely
+        b = _parse_homgar_payload(raw) if raw else []
+        return _base_decoder_dict("co2", _extract_rssi(b) if b else 0, b)
 
 def decode_pool(raw: str) -> dict:
     """
@@ -933,34 +995,65 @@ def decode_hcs014arf(raw: str) -> dict:
     Decode HCS014ARF (temperature/humidity sensor).
     Temperature/humidity sensor with complex multi-part data structures.
     """
-    b = _validate_payload(raw, 40)
-    
-    # Temperature/humidity sensors use complex multi-part data structures
-    def le_val(parts):
-        return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
-    
-    rssi = _extract_rssi(b)
-    
-    templow = (((le_val(b[7:9]+b[5:7]) / 10) - 32) * (5 / 9)) if len(b) >= 9 else None
-    temphigh = (((le_val(b[11:13]+b[9:11]) / 10) - 32) * (5 / 9)) if len(b) >= 13 else None
-    tempcurrent = (((le_val(b[25:27]+b[23:25]) / 10) - 32) * (5 / 9)) if len(b) >= 27 else None
-    humiditycurrent = b[29] if len(b) > 29 else None
-    humidityhigh = b[35] if len(b) > 35 else None
-    humiditylow = b[33] if len(b) > 33 else None
-    tempbatt = (le_val(b[39:41]+b[37:39]) / 4095 * 100) if len(b) >= 41 else None
+    try:
+        # Try with flexible parsing instead of strict validation
+        b = _parse_homgar_payload(raw)
+        
+        if len(b) < 22:
+            raise ValueError(f"Payload too short: {len(b)} bytes (minimum 22 required)")
+        
+        # Temperature/humidity sensors use complex multi-part data structures
+        def le_val(parts):
+            return int(''.join(f'{x:02x}' for x in parts[::-1]), 16)
+        
+        rssi = _extract_rssi(b)
+        
+        # Extract data based on available payload length
+        templow = None
+        temphigh = None
+        tempcurrent = None
+        humiditycurrent = None
+        humidityhigh = None
+        humiditylow = None
+        tempbatt = None
+        
+        # Try to extract what we can from the available data
+        if len(b) >= 27:
+            tempcurrent = (((le_val(b[25:27]+b[23:25]) / 10) - 32) * (5 / 9))
+        if len(b) >= 30:
+            humiditycurrent = b[29]
+        if len(b) >= 34:
+            humiditylow = b[33]
+        if len(b) >= 36:
+            humidityhigh = b[35]
+        if len(b) >= 41:
+            tempbatt = (le_val(b[39:41]+b[37:39]) / 4095 * 100)
+        if len(b) >= 13:
+            temphigh = (((le_val(b[11:13]+b[9:11]) / 10) - 32) * (5 / 9))
+        if len(b) >= 9:
+            templow = (((le_val(b[7:9]+b[5:7]) / 10) - 32) * (5 / 9))
 
-    result = _base_decoder_dict("hcs014arf", rssi, b)
-    result.update({
-        "device_model": "HCS014ARF",
-        "templow": round(templow, 2) if templow is not None else None,
-        "temphigh": round(temphigh, 2) if temphigh is not None else None,
-        "tempcurrent": round(tempcurrent, 2) if tempcurrent is not None else None,
-        "humiditycurrent": humiditycurrent,
-        "humidityhigh": humidityhigh,
-        "humiditylow": humiditylow,
-        "tempbatt": round(tempbatt, 2) if tempbatt is not None else None,
-    })
-    return result
+        result = _base_decoder_dict("hcs014arf", rssi, b)
+        result.update({
+            "device_model": "HCS014ARF",
+            "templow": round(templow, 2) if templow is not None else None,
+            "temphigh": round(temphigh, 2) if temphigh is not None else None,
+            "tempcurrent": round(tempcurrent, 2) if tempcurrent is not None else None,
+            "humiditycurrent": humiditycurrent,
+            "humidityhigh": humidityhigh,
+            "humiditylow": humiditylow,
+            "tempbatt": round(tempbatt, 2) if tempbatt is not None else None,
+            "payload_length": len(b),
+            "decoder": "hcs014arf_flexible",
+        })
+        
+        return result
+        
+    except Exception as e:
+        _LOGGER.warning("HCS014ARF decoder failed: %s", e)
+        # Return basic info instead of failing completely
+        b = _parse_homgar_payload(raw) if raw else []
+        return _base_decoder_dict("hcs014arf", _extract_rssi(b) if b else 0, b)
 
 
 def decode_hcs015arf(raw: str) -> dict:
