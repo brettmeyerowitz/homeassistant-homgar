@@ -1,5 +1,9 @@
 # HomGar/RainPoint Cloud integration for Home Assistant
 
+[![Release](https://img.shields.io/github/release/brettmeyerowitz/homeassistant-homgar.svg)](https://github.com/brettmeyerowitz/homeassistant-homgar/releases)
+[![License](https://img.shields.io/github/license/brettmeyerowitz/homeassistant-homgar.svg)](LICENSE)
+[![HACS](https://img.shields.io/badge/HACS-Default-blue.svg)](https://github.com/hacs/integration)
+
 Unofficial Home Assistant component for RainPoint Smart+ devices via HomGar cloud API.
 
 **Important clarification:** HomGar is the mobile app/cloud platform, while RainPoint is the actual hardware manufacturer. All device models (HCS*, HTV*, etc.) are RainPoint hardware that can be accessed via either mobile app.
@@ -249,13 +253,13 @@ The integration automatically tries the optimized `multipleDeviceStatus` API fir
 
 ## Example manifest.json
 
-Below is the manifest file for this integration (as of version 1.0.0):
+Below is the manifest file for this integration (as of version 1.3.11):
 
 ```json
 {
     "domain": "homgar",
     "name": "HomGar/RainPoint Cloud",
-    "version": "1.0.0",
+    "version": "1.3.11",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "requirements": [],
