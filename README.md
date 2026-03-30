@@ -253,13 +253,13 @@ The integration automatically tries the optimized `multipleDeviceStatus` API fir
 
 ## Example manifest.json
 
-Below is the manifest file for this integration (as of version 1.3.14):
+Below is the manifest file for this integration (as of version 1.3.16):
 
 ```json
 {
     "domain": "homgar",
     "name": "HomGar/RainPoint Cloud",
-    "version": "1.3.14",
+    "version": "1.3.16",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "requirements": [],

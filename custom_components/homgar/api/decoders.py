@@ -194,8 +194,13 @@ def _decode_htv213frf_hex(raw: str) -> dict:
             
             zone_data = []
             # Scan through bytes looking for potential zone patterns
+            # The pattern [byte][byte][0x00][byte][byte][0x00] can match non-zone data
+            # Limit to first 2 patterns found, as most valve timers have 2 zones
+            # (HTV213FRF = 2 zones, HTV245FRF = 4-8 zones)
+            max_zones = 2  # Conservative limit to avoid false positives
             i = 4  # Start after the header
-            while i < len(b) - 6:
+            
+            while i < len(b) - 6 and len(zone_data) < max_zones:
                 zone_id = b[i]
                 state = b[i + 1]
                 if b[i + 2] == 0x00 and b[i + 5] == 0x00:  # Pattern match
@@ -206,7 +211,7 @@ def _decode_htv213frf_hex(raw: str) -> dict:
                         'duration': duration,
                         'position': i
                     })
-                    _LOGGER.debug("Found potential zone %d: state=%d, duration=%d", zone_id, state, duration)
+                    _LOGGER.debug("Found zone pattern at position %d: zone_id=%d, state=%d, duration=%d", i, zone_id, state, duration)
                     i += 6
                 else:
                     i += 1
@@ -354,13 +359,15 @@ def _decode_moisture_full_ascii(raw: str) -> dict:
             raise ValueError("Invalid ASCII sensor data format")
         
         # Parse sensor values
-        temp_raw = int(sensor_parts[0])  # Temperature raw value
+        temp_raw = int(sensor_parts[0])  # Temperature raw value (Fahrenheit * 10)
         moisture = int(sensor_parts[1])   # Moisture percentage
         lux_data = sensor_parts[2]        # Lux data (may contain =)
         
-        # Parse temperature - convert from raw to Celsius
-        # Based on hex format: temp_raw_f10, so divide by 10
-        temp_c = temp_raw / 10.0 if temp_raw else 0
+        # Parse temperature - ASCII format provides Fahrenheit * 10
+        # Example: 685 = 68.5°F
+        temp_f = temp_raw / 10.0 if temp_raw else 0
+        # Convert Fahrenheit to Celsius: (F - 32) * 5/9
+        temp_c = (temp_f - 32) * 5 / 9
         
         # Parse lux data if it contains = (e.g., "G=292478")
         if "=" in lux_data:

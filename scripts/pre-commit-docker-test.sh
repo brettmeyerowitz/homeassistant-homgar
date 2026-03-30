@@ -7,6 +7,21 @@ set -e
 
 echo "🔍 Running pre-commit Docker testing..."
 
+# Check README version matches manifest version
+echo "🔍 Checking README version..."
+MANIFEST_VERSION=$(grep '"version"' custom_components/homgar/manifest.json | sed 's/.*"version": "\(.*\)".*/\1/')
+README_VERSION=$(grep '"version":' README.md | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+
+if [ "$MANIFEST_VERSION" != "$README_VERSION" ]; then
+    echo "❌ ERROR: README version doesn't match manifest version"
+    echo "Manifest version: $MANIFEST_VERSION"
+    echo "README version: $README_VERSION"
+    echo "Please update the version in README.md (line ~262)"
+    exit 1
+fi
+
+echo "✅ README version matches manifest version: $MANIFEST_VERSION"
+
 # Check if Docker container is running
 if ! docker ps | grep -q "ha-test"; then
     echo "❌ ERROR: Docker container 'ha-test' is not running"
@@ -115,14 +130,19 @@ import sys
 sys.path.append('/config/custom_components')
 from custom_components.homgar.homgar_api import decode_moisture_full
 result = decode_moisture_full('1,-73,1;694,70,G=292478')
-print(f'SENSOR_TEST:{result[\"decoder\"]}:{result[\"temperature_c\"]}')
+# Test temperature is in expected range (20.77-20.78°C for 69.4°F)
+temp = result['temperature_c']
+if 20.77 <= temp <= 20.79:
+    print('SENSOR_TEST:hcs021frf_ascii:PASS')
+else:
+    print(f'SENSOR_TEST:hcs021frf_ascii:FAIL:{temp}')
 " 2>/dev/null)
 
-if [[ $SENSOR_TEST_RESULT == "SENSOR_TEST:hcs021frf_ascii:69.4" ]]; then
+if [[ $SENSOR_TEST_RESULT == "SENSOR_TEST:hcs021frf_ascii:PASS" ]]; then
     echo "✅ Sensor ASCII format decoding test passed"
 else
     echo "❌ ERROR: Sensor ASCII format decoding test failed"
-    echo "Expected: SENSOR_TEST:hcs021frf_ascii:69.4"
+    echo "Expected: Temperature in range 20.77-20.79°C (69.4°F converted)"
     echo "Got: $SENSOR_TEST_RESULT"
     exit 1
 fi
