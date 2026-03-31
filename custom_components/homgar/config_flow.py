@@ -56,8 +56,9 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             client = HomGarClient(area_code, email, password, session, app_type)
 
             try:
-                await client.ensure_logged_in()
-                homes = await client.list_homes()
+                if not await client.login():
+                    raise HomGarApiError("Login failed")
+                homes = await client.get_homes()
                 _LOGGER.info("Found %d homes for app_type %s", len(homes), app_type)
                 _LOGGER.debug("Homes data: %s", homes)
             except HomGarApiError:
@@ -183,8 +184,9 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             client = HomGarClient(area_code, email, password, session, app_type)
 
             try:
-                await client.ensure_logged_in()
-                homes = await client.list_homes()
+                if not await client.login():
+                    raise HomGarApiError("Login failed")
+                homes = await client.get_homes()
                 _LOGGER.info("Found %d homes for reconfigure", len(homes))
             except HomGarApiError:
                 _LOGGER.exception("Error logging in to HomGar during reconfigure")
