@@ -39,6 +39,14 @@ class HomGarClient:
 
         # region host: you had region3; we can later make this configurable
         self._base_url = "https://region3.homgarus.com"
+        
+        # Generate a random deviceId for this session
+        self._device_id = self._generate_device_id()
+
+    def _generate_device_id(self) -> str:
+        """Generate a deterministic deviceId for authentication."""
+        # Device ID is required; generate deterministic 16 bytes hex from email+areaCode
+        return hashlib.md5(f"{self._email}{self._area_code}".encode("utf-8")).hexdigest()
 
     # --- token state helpers ---
 
@@ -95,26 +103,53 @@ class HomGarClient:
 
     async def login(self) -> bool:
         """Perform login and store tokens."""
-        url = f"{self._base_url}/app/login"
+        url = f"{self._base_url}/auth/basic/app/login"
+        
+        # Hash password with MD5 as required by the API
+        password_md5 = hashlib.md5(self._password.encode()).hexdigest()
+        
         payload = {
             "areaCode": self._area_code,
-            "email": self._email,
-            "password": self._password,
+            "phoneOrEmail": self._email,
+            "password": password_md5,
+            "deviceId": self._device_id,
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "lang": "en",
             "appCode": self._app_code,
         }
-        async with self._session.post(url, json=payload) as resp:
+        
+        _LOGGER.debug("API call: login URL=%s appCode=%s deviceId=%s", url, self._app_code, self._device_id)
+        
+        async with self._session.post(url, json=payload, headers=headers) as resp:
             if resp.status != 200:
                 _LOGGER.error("Login failed: %d %s", resp.status, await resp.text())
                 return False
             data = await resp.json()
+            _LOGGER.debug("API response: login data=%s", data)
+            
             if data.get("code") != 0:
                 _LOGGER.error("Login API error: %s", data.get("msg"))
                 return False
-            self._token = data["data"]["token"]
-            self._refresh_token = data["data"]["refreshToken"]
-            # Set expiry to 7 days from now (typical for JWT)
-            self._token_expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-            _LOGGER.info("Login successful")
+                
+            d = data["data"]
+            self._token = d["token"]
+            self._refresh_token = d.get("refreshToken")
+            
+            # Use server's tokenExpired field instead of hardcoded 7 days
+            token_expired_secs = d.get("tokenExpired", 0)
+            ts_server = data.get("ts")  # ms since epoch
+            
+            if ts_server:
+                base = datetime.fromtimestamp(ts_server / 1000, tz=timezone.utc)
+            else:
+                base = datetime.now(timezone.utc)
+                
+            self._token_expires_at = base + timedelta(seconds=token_expired_secs)
+            
+            _LOGGER.info("HomGar login successful; token expires in %s seconds", token_expired_secs)
             return True
 
     async def refresh_token(self) -> bool:
@@ -147,29 +182,20 @@ class HomGarClient:
 
     # --- API calls ---
 
-    async def get_homes(self) -> list:
+    async def list_homes(self) -> list[dict]:
         """Get list of homes for the user."""
-        await self._ensure_auth()
-        url = f"{self._base_url}/app/home/list"
+        await self.ensure_logged_in()
+        url = f"{self._base_url}/app/member/appHome/list"
+        _LOGGER.debug("API call: list_homes URL=%s", url)
+        
         async with self._session.get(url, headers=self._auth_headers()) as resp:
             if resp.status != 200:
-                raise HomGarApiError(f"Failed to get homes: {resp.status}")
+                raise HomGarApiError(f"list_homes HTTP {resp.status}")
             data = await resp.json()
+            _LOGGER.debug("API response: list_homes data=%s", data)
+            
             if data.get("code") != 0:
-                raise HomGarApiError(f"Homes API error: {data.get('msg')}")
-            return data.get("data", [])
-
-    async def get_devices(self, home_id: int) -> list:
-        """Get devices for a specific home."""
-        await self._ensure_auth()
-        url = f"{self._base_url}/app/device/list"
-        params = {"homeId": home_id}
-        async with self._session.get(url, headers=self._auth_headers(), params=params) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"Failed to get devices: {resp.status}")
-            data = await resp.json()
-            if data.get("code") != 0:
-                raise HomGarApiError(f"Devices API error: {data.get('msg')}")
+                raise HomGarApiError(f"list_homes failed: {data}")
             return data.get("data", [])
 
     async def get_devices_by_hid(self, hid: int) -> list[dict]:

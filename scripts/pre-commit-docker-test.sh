@@ -156,7 +156,7 @@ from custom_components.homgar.api.client import HomGarClient
 import inspect
 
 # Check for critical methods that must exist
-required_methods = ['ensure_logged_in', 'login', 'is_token_valid', 'get_homes', 'get_devices_by_hid']
+required_methods = ['ensure_logged_in', 'login', 'is_token_valid', 'list_homes', 'get_devices_by_hid']
 missing_methods = []
 
 for method in required_methods:
