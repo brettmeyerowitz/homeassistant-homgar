@@ -2,7 +2,7 @@
 DOMAIN = "homgar"
 
 # Integration version
-VERSION = "1.3.20"
+VERSION = "1.3.21"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
@@ -66,6 +66,8 @@ MODEL_POOL = MODEL_HCS0528ARF
 MODEL_POOL_PLUS = MODEL_HCS015ARF_PLUS
 MODEL_DISPLAY_HUB = MODEL_HWS019WRF_V2
 MODEL_VALVE_HUB = "HTV0540FRF"  # Irrigation valve hub (zone count detected from payload)
+MODEL_VALVE_213 = "HTV213FRF"   # 2-zone irrigation valve
+MODEL_VALVE_245 = "HTV245FRF"   # 4-zone irrigation valve
 
 # === HCS Sensor Series (v1.3.0) ===
 
