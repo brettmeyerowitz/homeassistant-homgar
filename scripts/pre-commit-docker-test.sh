@@ -147,5 +147,103 @@ else
     exit 1
 fi
 
+# Test API client critical methods
+echo "🧪 Testing API client critical methods..."
+API_CLIENT_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.append('/config/custom_components')
+from custom_components.homgar.api.client import HomGarClient
+import inspect
+
+# Check for critical methods that must exist
+required_methods = ['ensure_logged_in', 'login', 'is_token_valid', 'get_homes', 'get_devices_by_hid']
+missing_methods = []
+
+for method in required_methods:
+    if not hasattr(HomGarClient, method):
+        missing_methods.append(method)
+
+if missing_methods:
+    print(f'API_CLIENT_TEST:FAIL:Missing methods: {missing_methods}')
+else:
+    # Verify ensure_logged_in is async
+    if not inspect.iscoroutinefunction(HomGarClient.ensure_logged_in):
+        print('API_CLIENT_TEST:FAIL:ensure_logged_in is not async')
+    else:
+        print('API_CLIENT_TEST:PASS')
+" 2>/dev/null)
+
+if [[ $API_CLIENT_TEST == "API_CLIENT_TEST:PASS" ]]; then
+    echo "✅ API client methods test passed"
+else
+    echo "❌ ERROR: API client methods test failed"
+    echo "Result: $API_CLIENT_TEST"
+    exit 1
+fi
+
+# Test Display Hub decoder
+echo "🧪 Testing Display Hub decoder..."
+DISPLAY_HUB_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.append('/config/custom_components')
+from custom_components.homgar.homgar_api import decode_hws019wrf_v2
+
+# Test with real payload format
+result = decode_hws019wrf_v2('1,0,1;707(707/694/1),42(42/39/1),P=9709(9709/9701/1),')
+readings = result.get('readings', {})
+
+# Check that values are extracted correctly (not raw strings with parentheses)
+temp = readings.get('temp', '')
+humidity = readings.get('humidity', '')
+pressure = readings.get('P', '')
+
+if temp == '707' and humidity == '42' and pressure == '9709':
+    print('DISPLAY_HUB_TEST:PASS')
+else:
+    print(f'DISPLAY_HUB_TEST:FAIL:temp={temp},humidity={humidity},pressure={pressure}')
+" 2>/dev/null)
+
+if [[ $DISPLAY_HUB_TEST == "DISPLAY_HUB_TEST:PASS" ]]; then
+    echo "✅ Display Hub decoder test passed"
+else
+    echo "❌ ERROR: Display Hub decoder test failed"
+    echo "Result: $DISPLAY_HUB_TEST"
+    exit 1
+fi
+
+# Test translation files exist and are valid JSON
+echo "🧪 Testing translation files..."
+TRANSLATION_TEST=$(docker exec ha-test python3 -c "
+import sys
+import json
+sys.path.append('/config/custom_components')
+
+try:
+    with open('/config/custom_components/homgar/translations/en.json', 'r') as f:
+        translations = json.load(f)
+    
+    # Check critical keys exist
+    if 'config' not in translations:
+        print('TRANSLATION_TEST:FAIL:Missing config key')
+    elif 'step' not in translations['config']:
+        print('TRANSLATION_TEST:FAIL:Missing step key')
+    elif 'user' not in translations['config']['step']:
+        print('TRANSLATION_TEST:FAIL:Missing user step')
+    else:
+        print('TRANSLATION_TEST:PASS')
+except json.JSONDecodeError as e:
+    print(f'TRANSLATION_TEST:FAIL:Invalid JSON: {e}')
+except Exception as e:
+    print(f'TRANSLATION_TEST:FAIL:{e}')
+" 2>/dev/null)
+
+if [[ $TRANSLATION_TEST == "TRANSLATION_TEST:PASS" ]]; then
+    echo "✅ Translation files test passed"
+else
+    echo "❌ ERROR: Translation files test failed"
+    echo "Result: $TRANSLATION_TEST"
+    exit 1
+fi
+
 echo "🎉 All Docker tests passed! Commit allowed."
 exit 0
