@@ -283,3 +283,62 @@ class HomGarClient:
             if data.get("code") != 0:
                 raise HomGarApiError(f"Set device state API error: {data.get('msg')}")
             return True
+
+    async def control_work_mode(
+        self,
+        mid: int,
+        addr: int,
+        device_name: str,
+        product_key: str,
+        port: int,
+        mode: int,
+        duration: int,
+    ) -> str | None:
+        """
+        Control a valve zone via the controlWorkMode endpoint.
+        
+        Args:
+            mid: Hub mid (device ID)
+            addr: Sub-device address
+            device_name: Hub deviceName field (e.g. "MAC-885721174638")
+            product_key: Hub productKey field (e.g. "a3QrDxYPTM2")
+            port: Zone number (1-based)
+            mode: 1 = open, 0 = close
+            duration: Run time in seconds (ignored when closing)
+            
+        Returns:
+            Updated state payload string from API response, or None
+        """
+        await self.ensure_logged_in()
+        url = f"{self._base_url}/app/device/controlWorkMode"
+        payload = {
+            "deviceName": device_name,
+            "productKey": product_key,
+            "mid": str(mid),
+            "addr": addr,
+            "port": port,
+            "mode": mode,
+            "duration": duration,
+            "param": "",
+        }
+        _LOGGER.debug("API call: control_work_mode URL=%s payload=%s", url, payload)
+        
+        async with self._session.post(url, json=payload, headers=self._auth_headers()) as resp:
+            if resp.status != 200:
+                raise HomGarApiError(f"controlWorkMode HTTP {resp.status}")
+            data = await resp.json()
+            
+        _LOGGER.debug("API response: control_work_mode data=%s", data)
+        
+        code = data.get("code")
+        if code == 4:
+            # Code 4 = device already in requested state or transitioning - not fatal
+            _LOGGER.warning(
+                "controlWorkMode returned code 4 (busy/already in state), treating as non-fatal: %s",
+                data
+            )
+        elif code != 0:
+            raise HomGarApiError(f"controlWorkMode failed: {data}")
+            
+        # Return the updated state payload so caller can apply it immediately
+        return data.get("data", {}).get("state")

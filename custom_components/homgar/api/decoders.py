@@ -569,30 +569,30 @@ def decode_valve_hub(raw: str) -> dict:
             hub_online = hub_state_raw == 0x01
             _LOGGER.info(debug_with_version("Valve hub state: %s (raw: 0x%02X)"), hub_online, hub_state_raw)
 
-        # Extract zone states and durations
-        for zone_num in range(1, 9):  # Support up to 8 zones
-            state_dp = _DP_HUB_STATE + zone_num
-            duration_dp = _DP_BASE_DURATION + zone_num
-
-            zone_state = None
-            zone_duration = 0
-
-            if state_dp in tlv:
-                _, state_raw, _ = tlv[state_dp]
-                zone_state = state_raw == 0x01
-
-            if duration_dp in tlv:
-                _, duration_raw, _ = tlv[duration_dp]
-                # Duration appears to be in seconds (little-endian)
-                zone_duration = duration_raw
-
-            if zone_state is not None:
-                zones[zone_num] = {
-                    "open": zone_state,
-                    "duration_seconds": zone_duration,
-                    "state_raw": state_raw if state_dp in tlv else None,
-                    "duration_raw": duration_raw if duration_dp in tlv else None,
-                }
+        # Dynamically detect zones: any DP of type 0xD8 (state byte) with
+        # dp > _DP_HUB_STATE follows the pattern zone_num = dp - _DP_HUB_STATE
+        for dp, entry in tlv.items():
+            type_byte = entry[0]
+            if type_byte != 0xD8 or dp <= _DP_HUB_STATE:
+                continue
+                
+            zone_num = dp - _DP_HUB_STATE
+            state_val = entry[1]
+            
+            # Get duration for this zone (little-endian 2-byte value)
+            dur_dp = _DP_BASE_DURATION + zone_num
+            duration_s = None
+            if dur_dp in tlv:
+                _, _, dur_bytes = tlv[dur_dp]
+                if len(dur_bytes) == 2:
+                    duration_s = int.from_bytes(dur_bytes, "little")
+            
+            zones[zone_num] = {
+                # Bit 0 = valve physically open. 0x21 = open, 0x20 = closing, 0x00 = closed
+                "open": bool(state_val & 0x01) if state_val is not None else None,
+                "state_raw": state_val,
+                "duration_seconds": duration_s,
+            }
 
         result = {
             "type": "valve_hub",
