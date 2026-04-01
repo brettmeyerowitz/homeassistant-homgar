@@ -21,6 +21,7 @@ from .const import (
     APP_TYPE_HOMGAR,
     APP_TYPE_RAINPOINT,
 )
+from .country_codes import get_default_country_code
 from .homgar_api import HomGarClient, HomGarApiError
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,9 +80,12 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     self._client = client
                     return await self.async_step_select_homes()
 
+        # Get default country code from Home Assistant configuration
+        default_country_code = get_default_country_code(self.hass)
+        
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_AREA_CODE, default="27"): str,
+                vol.Required(CONF_AREA_CODE, default=default_country_code): str,
                 vol.Required(CONF_EMAIL): str,
                 vol.Required(CONF_PASSWORD): str,
                 vol.Required(CONF_APP_TYPE, default=APP_TYPE_HOMGAR): vol.In({
@@ -159,10 +163,13 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         entry = self._get_reconfigure_entry()
         current_data = entry.data
         
+        # Get default country code from Home Assistant configuration
+        default_country_code = get_default_country_code(self.hass)
+        
         # Pre-fill form with current values
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_AREA_CODE, default=current_data.get(CONF_AREA_CODE, "27")): str,
+                vol.Required(CONF_AREA_CODE, default=current_data.get(CONF_AREA_CODE, default_country_code)): str,
                 vol.Required(CONF_EMAIL, default=current_data.get(CONF_EMAIL, "")): str,
                 vol.Required(CONF_PASSWORD, default=current_data.get(CONF_PASSWORD, "")): str,
                 vol.Required(CONF_APP_TYPE, default=current_data.get(CONF_APP_TYPE, APP_TYPE_HOMGAR)): vol.In({
