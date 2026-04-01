@@ -482,7 +482,12 @@ def _decode_moisture_full_hex(raw: str) -> dict:
 def decode_hws019wrf_v2(raw: str) -> dict:
     """
     Decode HWS019WRF-V2 (Display Hub) CSV/semicolon payload.
-    Example: '1,0,1;788(788/777/1),68(68/64/1),P=9685(9684/9684/1),'
+    Example: '1,0,1;707(707/694/1),42(42/39/1),P=9709(9709/9701/1),'
+    
+    Format: current_value(current/min/max/count)
+    - 707 = current temperature (70.7°F)
+    - 42 = current humidity (42%)
+    - P=9709 = current pressure (970.9 mb)
     """
     _LOGGER.debug("decode_hws019wrf_v2 called with raw: %r", raw)
     try:
@@ -495,12 +500,29 @@ def decode_hws019wrf_v2(raw: str) -> dict:
                 item = item.strip()
                 if not item:
                     continue
-                if '(' in item:
-                    key, val = item.split('(', 1)
-                    readings[key.strip()] = val.strip(')')
-                elif '=' in item:
-                    key, val = item.split('=', 1)
-                    readings[key.strip()] = val.strip()
+                
+                # Handle format: value(value/min/max/count) or P=value(value/min/max/count)
+                if '=' in item:
+                    # Pressure format: P=9709(9709/9701/1)
+                    key, rest = item.split('=', 1)
+                    key = key.strip()
+                    # Extract just the current value before the parenthesis
+                    if '(' in rest:
+                        current_value = rest.split('(')[0].strip()
+                    else:
+                        current_value = rest.strip()
+                    readings[key] = current_value
+                elif '(' in item:
+                    # Temperature/Humidity format: 707(707/694/1)
+                    # The value before the parenthesis is the current value
+                    current_value = item.split('(')[0].strip()
+                    # Use a generic key based on position (will be mapped to proper names later)
+                    # First value is temperature, second is humidity
+                    if not readings.get('temp'):
+                        readings['temp'] = current_value
+                    elif not readings.get('humidity'):
+                        readings['humidity'] = current_value
+                        
         result = {
             "type": "hws019wrf_v2",
             "flags": flags,

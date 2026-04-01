@@ -5,7 +5,7 @@
                 "title": "HomGar/RainPoint Cloud",
                 "description": "Log in with your HomGar/RainPoint account.",
                 "data": {
-                    "area_code": "Area code",
+                    "area_code": "Country code",
                     "email": "Email",
                     "password": "Password",
                     "app_type": "Mobile App Type"
@@ -25,7 +25,7 @@
                 "title": "Reconfigure HomGar/RainPoint",
                 "description": "Update your HomGar/RainPoint credentials.",
                 "data": {
-                    "area_code": "Area code",
+                    "area_code": "Country code",
                     "email": "Email",
                     "password": "Password",
                     "app_type": "Mobile App Type"

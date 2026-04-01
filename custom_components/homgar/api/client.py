@@ -86,6 +86,13 @@ class HomGarClient:
 
     # --- authentication ---
 
+    async def ensure_logged_in(self) -> None:
+        """Ensure we have a valid token, logging in if necessary."""
+        if not self.is_token_valid():
+            success = await self.login()
+            if not success:
+                raise HomGarApiError("Failed to login")
+
     async def login(self) -> bool:
         """Perform login and store tokens."""
         url = f"{self._base_url}/app/login"
