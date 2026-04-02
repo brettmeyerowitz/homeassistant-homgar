@@ -124,6 +124,11 @@ class HomGarCoordinator(DataUpdateCoordinator):
         self._entry = entry
         self._hids = entry.data.get(CONF_HIDS, [])
         self._notified_unknown_models: set[str] = set()
+    
+    async def handle_mqtt_update(self, data: dict) -> None:
+        """Handle MQTT message for real-time valve updates."""
+        from .coordinator_mqtt import handle_mqtt_update
+        await handle_mqtt_update(self, data)
 
     async def _async_update_data(self):
         """Fetch and decode data from HomGar/RainPoint."""

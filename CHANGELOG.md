@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-04-02
+
+### 🚀 NEW FEATURES
+- **Real-time MQTT support** for instant valve state updates (no more 2-minute delay!)
+- **Alibaba Cloud IoT Platform integration** for push notifications
+- **Graceful fallback** to REST API polling if MQTT unavailable
+
+### 🔧 CRITICAL BUG FIXES
+- **Fixed HTV213FRF/HTV245FRF valve state detection** - valves now correctly show closed when off
+- **Corrected bit 0 logic** for ASCII format valve state (matching TLV format from PR #7)
+- All observed closed states (0, 6, 30, 146, 680) now correctly interpreted
+
+### 🎯 ISSUE RESOLUTION
+- **Issue #11**: Dean's valves no longer always show "on" - state detection fixed
+- **Valve state accuracy**: Bit 0 = 0 means closed, bit 0 = 1 means open/running
+
+### 📊 TECHNICAL IMPROVEMENTS
+- **MQTT client** with automatic reconnection and error handling
+- **Enhanced debug logging** for valve operations (extensive logs for troubleshooting)
+- **MQTT credentials** automatically extracted from login response
+- **Thread-safe MQTT** message handling with async coordinator updates
+- **paho-mqtt dependency** added for MQTT support
+
+### 🧪 TESTING
+- ✅ Docker tested with real device data
+- ✅ MQTT connection verified with Alibaba Cloud IoT Platform
+- ✅ Valve state fix confirmed with Dean's log data
+- ✅ All existing sensors continue to work
+
+### 📝 NOTES
+- MQTT provides real-time updates for valve state changes
+- Falls back to polling if paho-mqtt not installed or MQTT unavailable
+- Based on proven implementation from tao-irrigation project
+
+### ⚠️ BREAKING CHANGES
+- **New dependency**: Requires `paho-mqtt>=1.6.0` (automatically installed by Home Assistant)
+- **Integration type**: Changed from `cloud_polling` to `cloud_push`
+- Users will need to restart Home Assistant after update to install new dependency
+
 ## [1.3.14] - 2026-03-29
 
 ### 🔧 CRITICAL BUG FIXES

@@ -253,21 +253,21 @@ The integration automatically tries the optimized `multipleDeviceStatus` API fir
 
 ## Example manifest.json
 
-Below is the manifest file for this integration (as of version 1.3.21):
+Below is the manifest file for this integration (as of version 2.0.0):
 
 ```json
 {
     "domain": "homgar",
     "name": "HomGar/RainPoint Cloud",
-    "version": "1.3.21",
+    "version": "2.0.0",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
-    "requirements": [],
+    "requirements": ["paho-mqtt>=1.6.0"],
     "codeowners": [
         "@brettmeyerowitz"
     ],
     "config_flow": true,
-    "iot_class": "cloud_polling",
+    "iot_class": "cloud_push",
     "integration_type": "hub",
     "loggers": [
         "custom_components.homgar"

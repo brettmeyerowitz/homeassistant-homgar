@@ -42,10 +42,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
 
+    # Initialize MQTT for real-time valve updates (optional, graceful fallback)
+    mqtt_client = None
+    try:
+        from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
+        
+        if PAHO_AVAILABLE:
+            mqtt_creds = client.get_mqtt_credentials()
+            if mqtt_creds.get("product_key") and mqtt_creds.get("device_name"):
+                _LOGGER.info("HomGar: Initializing MQTT for real-time valve updates")
+                
+                def on_mqtt_message(data: dict):
+                    """Handle MQTT message in async context."""
+                    hass.async_create_task(coordinator.handle_mqtt_update(data))
+                
+                mqtt_client = HomGarMQTTClient(
+                    product_key=mqtt_creds["product_key"],
+                    device_name=mqtt_creds["device_name"],
+                    device_secret=mqtt_creds["device_secret"],
+                    mqtt_host=mqtt_creds["mqtt_host"],
+                    on_message_callback=on_mqtt_message,
+                    mqtt_port=mqtt_creds.get("mqtt_port", 1883),
+                )
+                
+                # Connect MQTT in background
+                await hass.async_add_executor_job(mqtt_client.connect)
+                _LOGGER.info("HomGar: MQTT client connected successfully")
+            else:
+                _LOGGER.warning("HomGar: MQTT credentials not available, using polling only")
+        else:
+            _LOGGER.info("HomGar: paho-mqtt not installed, using polling only")
+    except Exception as e:
+        _LOGGER.warning("HomGar: MQTT initialization failed, using polling only: %s", e)
+        mqtt_client = None
+
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
         "client": client,
         "coordinator": coordinator,
+        "mqtt_client": mqtt_client,
     }
 
     # Set up services
@@ -60,6 +95,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
+        # Disconnect MQTT client if present
+        entry_data = hass.data[DOMAIN].get(entry.entry_id, {})
+        mqtt_client = entry_data.get("mqtt_client")
+        if mqtt_client:
+            _LOGGER.info("HomGar: Disconnecting MQTT client")
+            await hass.async_add_executor_job(mqtt_client.disconnect)
+        
         hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok
 

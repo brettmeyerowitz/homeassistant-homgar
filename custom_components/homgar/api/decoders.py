@@ -103,9 +103,12 @@ def _decode_htv213frf_ascii(raw: str) -> dict:
             duration = int(zone_parts[2]) if len(zone_parts) > 2 else 0
             
             # Map to sequential zone number
+            # Use bit 0 to determine valve state (same as TLV format from PR #7)
+            # Observed closed states all have bit 0 = 0: state=0,6,30,146,680
+            # Bit 0 = 1 should indicate valve actively running/open
             zone_mapping[sequential_zone] = {
                 'raw_zone_id': zone_id_raw,
-                'open': state != 0x00,
+                'open': bool(state & 0x01),
                 'duration_seconds': duration,
                 'raw_ascii_data': zone_data
             }

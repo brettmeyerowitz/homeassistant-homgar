@@ -36,6 +36,7 @@ class HomGarClient:
         self._token: str | None = None
         self._refresh_token: str | None = None
         self._token_expires_at: datetime | None = None
+        self._mqtt_credentials: dict = {}
 
         # region host: you had region3; we can later make this configurable
         self._base_url = "https://region3.homgarus.com"
@@ -73,6 +74,10 @@ class HomGarClient:
             self._token_expires_at = datetime.fromisoformat(ts) if ts else None
         except (ValueError, TypeError):
             self._token_expires_at = None
+
+    def get_mqtt_credentials(self) -> dict:
+        """Get MQTT credentials for real-time updates."""
+        return self._mqtt_credentials.copy()
 
     def export_tokens(self) -> dict:
         """Export tokens for config entry storage."""
@@ -137,6 +142,28 @@ class HomGarClient:
             d = data["data"]
             self._token = d["token"]
             self._refresh_token = d.get("refreshToken")
+            
+            # Extract MQTT credentials from user data (only if present)
+            user_data = d.get("user", {})
+            mqtt_host = d.get("mqttHostUrl", "")
+            
+            if user_data.get("productKey") and user_data.get("deviceName") and mqtt_host:
+                self._mqtt_credentials = {
+                    "product_key": user_data.get("productKey"),
+                    "device_name": user_data.get("deviceName"),
+                    "device_secret": user_data.get("deviceSecret", ""),
+                    "mqtt_host": mqtt_host.replace(":1883", ""),  # Remove port if present
+                    "mqtt_port": 1883,
+                }
+                
+                _LOGGER.info(
+                    "HomGar MQTT credentials extracted: product_key=%s device_name=%s mqtt_host=%s",
+                    self._mqtt_credentials.get("product_key"),
+                    self._mqtt_credentials.get("device_name"),
+                    self._mqtt_credentials.get("mqtt_host"),
+                )
+            else:
+                _LOGGER.debug("HomGar MQTT credentials not present in login response")
             
             # Use server's tokenExpired field instead of hardcoded 7 days
             token_expired_secs = d.get("tokenExpired", 0)
