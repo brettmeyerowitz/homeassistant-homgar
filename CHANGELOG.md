@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.8] - 2026-04-06
+
+### 🐛 CRITICAL BUG FIX
+
+- **Fixed Flow Meter decoder key names**
+  - Decoder was using wrong key names (flow_current_used, flow_total, etc.)
+  - Sensor entities expect different keys (flowcurrentused, flowtotal, etc.)
+  - Flow Meter sensors now display values correctly
+
+### 📝 TECHNICAL DETAILS
+
+- Changed decoder output keys to match sensor entity expectations
+- `flow_current_used` → `flowcurrentused`
+- `flow_current_duration` → `flowcurrenduration`
+- `flow_last_used` → `flowlastused`
+- `flow_last_duration` → `flowlastusedduration`
+- `flow_total_today` → `flowtotaltoday`
+- `flow_total` → `flowtotal`
+- `battery_percent` → `flowbatt`
+
 ## [2.0.7] - 2026-04-06
 
 ### 🐛 CRITICAL BUG FIX

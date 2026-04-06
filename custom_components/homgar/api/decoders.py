@@ -728,13 +728,13 @@ def decode_flow_meter(raw: str) -> dict:
     result = {
         "type": "flowmeter",
         "device_model": "HCS008FRF",
-        "flow_current_used": None,
-        "flow_current_duration": None,
-        "flow_last_used": None,
-        "flow_last_duration": None,
-        "flow_total_today": None,
-        "flow_total": None,
-        "battery_percent": None,
+        "flowcurrentused": None,
+        "flowcurrenduration": None,
+        "flowlastused": None,
+        "flowlastusedduration": None,
+        "flowtotaltoday": None,
+        "flowtotal": None,
+        "flowbatt": None,
         "rssi_dbm": None,
         "decoder": "rainpoint_tlv",
     }
@@ -799,10 +799,10 @@ def decode_flow_meter(raw: str) -> dict:
         # Common pattern: DP 255 often contains flow data
         if 255 in dp_entries:
             # Could be current flow or other measurement
-            result["flow_current_used"] = dp_entries[255] / 1000.0  # Convert to liters
+            result["flowcurrentused"] = dp_entries[255] / 1000.0  # Convert to liters
         
         # Battery typically 100% for mains-powered devices
-        result["battery_percent"] = 100
+        result["flowbatt"] = 100
         
         _LOGGER.info(debug_with_version("HCS008FRF DP entries: %s"), dp_entries)
         
