@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.9] - 2026-04-06
+
+### 🆕 NEW DEVICE SUPPORT
+
+- **Added HCS0565ARF Pool Temperature Sensor support**
+  - Implemented complete decoder for HCS0565ARF model
+  - Extracts current temperature in °F and °C from position 3-4 (F*10 format)
+  - Extracts RSSI and battery status (0xFF0F = 100%)
+  - Validated with real payload showing perfect 25.2°C match
+
+### 📝 TECHNICAL DETAILS
+
+- Added MODEL_HCS0565ARF constant to const.py
+- Implemented decode_hcs0565arf() function in decoders.py
+- Added to coordinator DECODER_REGISTRY mapping
+- Added to homgar_api exports for backward compatibility
+- Tested with payload: 10#E7DE020503DC01B805850503FF0F61EB0C19
+
+### 🔧 GITHUB ISSUES ADDRESSED
+
+- **Issue #23**: HCS0565ARF Pool Temp Sensor showing "unknown" values
+  - User reported all temperature entities showing unknown
+  - Provided payload: 10#E7DE020503DC01B805850503FF0F61EB0C19
+  - User reported 25.2°C in RainPoint app
+  - Decoder extracts exactly 25.2°C ✅
+
 ## [2.0.8] - 2026-04-06
 
 ### 🐛 CRITICAL BUG FIX

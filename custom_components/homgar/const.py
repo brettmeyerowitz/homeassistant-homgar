@@ -1,7 +1,7 @@
 # Display Hub model constant
 DOMAIN = "homgar"
 NAME = "HomGar/RainPoint Cloud"
-VERSION = "2.0.8"
+VERSION = "2.0.9"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
@@ -51,6 +51,7 @@ MODEL_HCS014ARF = "HCS014ARF"     # Temperature/Humidity
 MODEL_HCS008FRF = "HCS008FRF"     # Flowmeter
 MODEL_HCS0530THO = "HCS0530THO"   # CO2/Temp/Humidity
 MODEL_HCS0528ARF = "HCS0528ARF"   # Pool/Temperature
+MODEL_HCS0565ARF = "HCS0565ARF"   # Pool/Temperature (newer model)
 MODEL_HCS015ARF_PLUS = "HCS015ARF+"  # Pool + Ambient temp/humidity
 MODEL_HWS019WRF_V2 = "HWS019WRF-V2"  # Smart+ Irrigation Display Hub
 MODEL_HWG023WRF = "HWG023WRF"  # Main hub V1 (modelCode: 273)
