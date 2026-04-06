@@ -165,20 +165,25 @@ class HomGarDebugSwitchEntity(SwitchEntity):
             
             # Extract sensor values
             sensor_values = {}
-            sensor_mappings = {
-                "co2": "co2",
-                "temperature": "temperature",
-                "humidity": "humidity", 
-                "moisture": "moisture_percent",
-                "illuminance": "illuminance_lux",
-                "flow": "flowcurrentused",
-                "pressure": "pressure",
-                "rain": "rain_last_24h_mm",
+            
+            # Map decoder field names to worker field names
+            # Handle multiple possible field names for the same value
+            field_mappings = {
+                "co2": ["co2_ppm", "co2"],
+                "temperature": ["temperature_c", "temperature"],
+                "humidity": ["humidity_percent", "humidity"],
+                "moisture": ["moisture_percent", "moisture"],
+                "illuminance": ["illuminance_lux", "illuminance"],
+                "flow": ["flowcurrentused", "flow"],
+                "pressure": ["pressure_mb", "pressure"],
+                "rain": ["rain_last_24h_mm", "rain_total_mm", "rain"],
             }
             
-            for key, value in device_data.items():
-                if key in sensor_mappings and value is not None:
-                    sensor_values[sensor_mappings[key]] = value
+            for output_key, possible_fields in field_mappings.items():
+                for field in possible_fields:
+                    if field in device_data and device_data[field] is not None:
+                        sensor_values[output_key] = device_data[field]
+                        break  # Use first match
             
             # Get raw payload from raw_status
             raw_payload = None

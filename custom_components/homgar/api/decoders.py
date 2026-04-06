@@ -226,14 +226,18 @@ def _decode_htv213frf_hex(raw: str) -> dict:
             
             for zone in zone_data:
                 zone_num = sequential_zone  # Use sequential numbering
+                # Use bit 0 to determine valve state (same as TLV format from PR #7)
+                # Observed closed states all have bit 0 = 0: state=0,6,30,146,680
+                # Bit 0 = 1 indicates valve actively running/open
                 zone_mapping[sequential_zone] = {
                     'raw_zone_id': zone['zone_id'],
-                    'open': zone['state'] != 0x00,
+                    'open': bool(zone['state'] & 0x01),
                     'duration_seconds': zone['duration'],
                     'raw_position': zone['position']
                 }
-                _LOGGER.info("HTV213FRF Zone %d (raw ID %d): state=%d, duration=%d, position=%d", 
-                           sequential_zone, zone['zone_id'], zone['state'], zone['duration'], zone['position'])
+                _LOGGER.info("HTV213FRF Zone %d (raw ID %d): state=0x%02X (bit0=%d, open=%s), duration=%d, position=%d", 
+                           sequential_zone, zone['zone_id'], zone['state'], zone['state'] & 0x01, 
+                           bool(zone['state'] & 0x01), zone['duration'], zone['position'])
                 sequential_zone += 1
             
             zones = zone_mapping
@@ -927,27 +931,75 @@ def decode_unknown(raw: str) -> dict:
 
 # Additional HCS decoders - basic implementations
 def decode_temphum(raw: str) -> dict:
-    """Decode HCS014ARF (temperature/humidity) payload."""
+    """
+    Decode HCS014ARF (temperature/humidity) payload.
+    
+    Format: 10#E74A022603DC01B8058560028843E92561FF0F0F7C0B19
+    
+    Temperature: Bytes 10-11 (little-endian) in tenths of °F
+    Formula: ((b11 * 256 + b10) / 10 - 32) * 5 / 9
+    Example: 0x60 0x02 → LE = 608 → 60.8°F → 16.0°C
+    
+    Humidity: Byte 13 as direct integer percentage
+    Example: 0x43 = 67%
+    
+    RSSI: Byte 1 as positive integer (negate for dBm)
+    Example: 0x4A = 74 → -74 dBm
+    
+    Based on user reverse engineering from Issue #21.
+    """
     from ..const import debug_with_version
     
     _LOGGER.debug(debug_with_version("Decoding HCS014ARF: %s"), raw)
     
-    result = {
-        "type": "temphum",
-        "rssi": None,
-        "decoder": "basic",
-    }
-    
     try:
         b = _parse_homgar_payload(raw)
-        if b and len(b) > 1:
-            result["rssi"] = _extract_rssi(b)
-            result["raw_bytes"] = b
+        
+        if not b or len(b) < 14:
+            raise ValueError(f"HCS014ARF payload too short: {len(b) if b else 0} bytes")
+        
+        # Extract RSSI from byte 1 (positive value, negate for dBm)
+        rssi_raw = b[1]
+        rssi_dbm = -rssi_raw if rssi_raw > 0 else 0
+        
+        # Extract temperature from bytes 10-11 (little-endian, tenths of °F)
+        temp_raw_f10 = _le16(b, 10)
+        temp_f = temp_raw_f10 / 10.0
+        temp_c = (temp_f - 32.0) * 5.0 / 9.0
+        
+        # Extract humidity from byte 13 (direct percentage)
+        humidity = b[13]
+        
+        # Extract battery status if available (bytes 14-15)
+        status_code = 0
+        if len(b) >= 16:
+            status_code = _extract_status_code(b, 14, 15)
+        
+        result = _base_decoder_dict("temphum", rssi_dbm, b)
+        result.update({
+            "temperature_c": round(temp_c, 1),
+            "temperature_f": round(temp_f, 1),
+            "temperature_f10": temp_raw_f10,
+            "humidity_percent": humidity,
+            "battery_status_code": status_code,
+            "battery_percent": _battery_status_to_percent(status_code),
+            "decoder": "hcs014arf",
+        })
+        
+        _LOGGER.info(debug_with_version("HCS014ARF decoded: temp=%.1f°C (%.1f°F), humidity=%d%%, rssi=%d dBm"), 
+                     temp_c, temp_f, humidity, rssi_dbm)
+        
+        return result
         
     except Exception as e:
-        _LOGGER.error(debug_with_version("Error in HCS014ARF decoder: %s"), e)
-    
-    return result
+        _LOGGER.error(debug_with_version("Error in HCS014ARF decoder: %s"), e, exc_info=True)
+        return {
+            "type": "temphum",
+            "rssi_dbm": 0,
+            "raw_bytes": b if 'b' in locals() else [],
+            "decoder": "hcs014arf_error",
+            "error": str(e)
+        }
 
 
 def decode_pool(raw: str) -> dict:

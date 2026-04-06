@@ -2,6 +2,58 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2026-04-06
+
+### 🔧 CRITICAL BUG FIXES
+
+- **Fixed HTV213FRF/HTV245FRF hex decoder valve state** - Applied bit 0 logic to custom hex decoder (Issue #11)
+- **Implemented HCS014ARF temperature/humidity decoder** - Full decoder with user-provided formula (Issue #21)
+- **Fixed Cloudflare Worker data submission** - Updated field mappings in debug.py for new decoder field names
+
+### 🎯 ISSUE RESOLUTION
+
+- **Issue #11**: HTV213FRF hex custom decoder now correctly uses bit 0 logic for valve state
+  - Zone with state=216 (0xD8) now correctly shows CLOSED (bit 0 = 0)
+  - Zone with state=183 (0xB7) correctly shows OPEN (bit 0 = 1)
+- **Issue #21**: HCS014ARF now extracts temperature and humidity values
+  - Temperature: Bytes 10-11 (little-endian) in tenths of °F, converted to °C
+  - Humidity: Byte 13 as direct percentage
+  - RSSI: Byte 1 (negated for dBm)
+
+### 📊 TECHNICAL IMPROVEMENTS
+
+- Enhanced debug logging for HTV213FRF valve state with bit details
+- Updated debug.py field mappings to support multiple decoder field name variants
+- Added support for: `temperature_c`, `humidity_percent`, `moisture_percent`, `illuminance_lux`, etc.
+- Cloudflare Worker will now receive properly formatted decoded values
+
+### 📝 DOCUMENTATION
+
+- Added `docs/cloudflare_worker.md` - Complete Cloudflare Worker documentation
+- Added `docs/project_reference.md` - Comprehensive project reference guide
+- Updated troubleshooting guides for common issues
+
+### 🐛 BUG DETAILS
+
+**HTV213FRF Hex Decoder (Line 234):**
+```python
+# Before (v2.0.0):
+'open': zone['state'] != 0x00  # Wrong - treats all non-zero as open
+
+# After (v2.0.1):
+'open': bool(zone['state'] & 0x01)  # Correct - bit 0 indicates open state
+```
+
+**Debug Field Mappings:**
+```python
+# Now handles multiple possible field names per value
+field_mappings = {
+    "temperature": ["temperature_c", "temperature"],
+    "humidity": ["humidity_percent", "humidity"],
+    # ... etc
+}
+```
+
 ## [2.0.0] - 2026-04-02
 
 ### 🚀 NEW FEATURES

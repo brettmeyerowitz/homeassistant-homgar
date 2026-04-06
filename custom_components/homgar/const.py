@@ -2,7 +2,7 @@
 DOMAIN = "homgar"
 
 # Integration version
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
