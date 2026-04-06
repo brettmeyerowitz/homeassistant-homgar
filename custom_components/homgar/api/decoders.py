@@ -1488,7 +1488,7 @@ def decode_htv113frf(raw: str) -> dict:
     Returns:
         Dictionary containing decoded timer data
     """
-    from .utils import debug_with_version
+    from ..const import debug_with_version
     
     result = {
         "type": "timer",
