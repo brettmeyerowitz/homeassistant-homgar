@@ -1053,6 +1053,7 @@ def decode_co2(raw: str) -> dict:
                     continue
             
             # Look for temperature/humidity in exact parsed entries
+            humidity_found = False
             for entry in dp_entries:
                 dp_id = entry["dp_id"]
                 type_byte = entry["type"]
@@ -1070,6 +1071,7 @@ def decode_co2(raw: str) -> dict:
                     humidity_raw = (value >> 8) & 0xFF
                     if 20 <= humidity_raw <= 80 and result.get("co2humidity") is None:
                         result["co2humidity"] = humidity_raw
+                        humidity_found = True
                         _LOGGER.debug(debug_with_version("Humidity: %d%% (DP 196, exact parsing)"), humidity_raw)
                 
                 # Humidity candidate (DP 195: high byte of 2-byte value - new payload format)
@@ -1077,7 +1079,22 @@ def decode_co2(raw: str) -> dict:
                     humidity_raw = (value >> 8) & 0xFF
                     if 20 <= humidity_raw <= 80 and result.get("co2humidity") is None:
                         result["co2humidity"] = humidity_raw
+                        humidity_found = True
                         _LOGGER.debug(debug_with_version("Humidity: %d%% (DP 195, exact parsing)"), humidity_raw)
+                
+                # Humidity candidate (DP 191: high byte of 2-byte value - another payload format)
+                elif dp_id == 191 and type_byte == 0x02:
+                    humidity_raw = (value >> 8) & 0xFF
+                    if 20 <= humidity_raw <= 80 and result.get("co2humidity") is None:
+                        result["co2humidity"] = humidity_raw
+                        humidity_found = True
+                        _LOGGER.debug(debug_with_version("Humidity: %d%% (DP 191, exact parsing)"), humidity_raw)
+            
+            # Handle missing humidity gracefully
+            if not humidity_found:
+                _LOGGER.debug(debug_with_version("Humidity: Not available in this payload (device may not report humidity consistently)"))
+                result["co2humidity"] = None
+                
         except Exception as e:
             _LOGGER.debug(debug_with_version("Exact parsing failed, using TLV only: %s"), e)
         
