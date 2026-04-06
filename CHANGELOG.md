@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.7] - 2026-04-06
+
+### 🐛 CRITICAL BUG FIX
+
+- **Fixed CO2 sensor decoder key names**
+  - Decoder was using wrong key names (co2_ppm, temperature_c, humidity_percent)
+  - Sensor entities expect different keys (co2, co2temp, co2humidity)
+  - CO2 sensor now displays values correctly
+
+### 📝 TECHNICAL DETAILS
+
+- Changed decoder output keys to match sensor entity expectations
+- `co2_ppm` → `co2`
+- `temperature_c` → `co2temp`
+- `humidity_percent` → `co2humidity`
+
 ## [2.0.6] - 2026-04-06
 
 ### 🔧 DECODER IMPLEMENTATIONS

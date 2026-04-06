@@ -929,9 +929,9 @@ def decode_co2(raw: str) -> dict:
     result = {
         "type": "co2",
         "device_model": "HCS0530THO",
-        "co2_ppm": None,
-        "temperature_c": None,
-        "humidity_percent": None,
+        "co2": None,
+        "co2temp": None,
+        "co2humidity": None,
         "rssi_dbm": None,
         "battery_percent": None,
         "decoder": "rainpoint_tlv",
@@ -961,7 +961,7 @@ def decode_co2(raw: str) -> dict:
             # DP 207: CO2 (expect 2-byte value)
             if dp_id == 207 and i + 3 < len(b):
                 co2_raw = int.from_bytes(b[i+2:i+4], 'little')
-                result["co2_ppm"] = co2_raw
+                result["co2"] = co2_raw
                 _LOGGER.debug(debug_with_version("CO2: %d PPM (DP 207)"), co2_raw)
                 i += 4
                 continue
@@ -972,12 +972,12 @@ def decode_co2(raw: str) -> dict:
                 humidity_raw = b[i + 3]
                 
                 # Temperature: byte / 6.75 = °C
-                result["temperature_c"] = round(temp_raw / 6.75, 1)
+                result["co2temp"] = round(temp_raw / 6.75, 1)
                 # Humidity: byte / 4.63 = %
-                result["humidity_percent"] = round(humidity_raw / 4.63, 0)
+                result["co2humidity"] = round(humidity_raw / 4.63, 0)
                 
                 _LOGGER.debug(debug_with_version("Temp: %.1f°C, Humidity: %.0f%% (DP 175)"), 
-                            result["temperature_c"], result["humidity_percent"])
+                            result["co2temp"], result["co2humidity"])
                 i += 4
                 continue
             
