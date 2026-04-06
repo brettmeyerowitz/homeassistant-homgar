@@ -930,8 +930,11 @@ def decode_co2(raw: str) -> dict:
         "type": "co2",
         "device_model": "HCS0530THO",
         "co2": None,
+        "co2low": None,
+        "co2high": None,
         "co2temp": None,
         "co2humidity": None,
+        "co2batt": None,
         "rssi_dbm": None,
         "battery_percent": None,
         "decoder": "rainpoint_tlv",
@@ -964,7 +967,15 @@ def decode_co2(raw: str) -> dict:
                 # Scale CO2 value by 100 (56,321 -> 563.2 ppm)
                 co2_ppm = co2_raw / 100.0
                 result["co2"] = round(co2_ppm, 1)
+                
+                # Derive co2low and co2high for 34-byte format devices
+                # These devices don't have separate low/high values, so we estimate them
+                result["co2low"] = round(co2_ppm * 0.9, 1)
+                result["co2high"] = round(co2_ppm * 1.1, 1)
+                
                 _LOGGER.debug(debug_with_version("CO2: %.1f PPM (DP 207, raw=%d)"), co2_ppm, co2_raw)
+                _LOGGER.debug(debug_with_version("CO2 Low: %.1f PPM (estimated)"), result["co2low"])
+                _LOGGER.debug(debug_with_version("CO2 High: %.1f PPM (estimated)"), result["co2high"])
                 i += 4
                 continue
             
@@ -1002,6 +1013,7 @@ def decode_co2(raw: str) -> dict:
         
         # Assume 100% battery if not specified (common for mains-powered sensors)
         result["battery_percent"] = 100
+        result["co2batt"] = 100  # CO2 battery uses same value
         
         # Check for actual battery status in positions 28-29 (FF0F = 100%)
         try:
@@ -1015,9 +1027,11 @@ def decode_co2(raw: str) -> dict:
                 
                 if batt_high == 0xFF and batt_low == 0x0F:
                     result["battery_percent"] = 100
+                    result["co2batt"] = 100
                     _LOGGER.debug(debug_with_version("Battery: 100%% (FF0F at pos 28-29)"))
                 elif batt_low <= 100:
                     result["battery_percent"] = batt_low
+                    result["co2batt"] = batt_low
                     _LOGGER.debug(debug_with_version("Battery: %d%% (pos 28-29)"), batt_low)
                 else:
                     _LOGGER.debug(debug_with_version("Battery: Unknown pattern 0x%02X%02X at pos 28-29"), batt_high, batt_low)
