@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.10] - 2026-04-06
+
+### 🔧 VALVE CONTROLLER FIXES
+
+- **Fixed HTV0542FRF valve controller support** - Complete Issue #22 implementation
+- **Added MODEL_HTV0542FRF to valve.py and number.py** - Entities now appear correctly
+- **Fixed API control command errors** - Extract device_name/product_key from hub data instead of sensor_info
+- **Fixed entity crashes after toggle** - Replaced _apply_response_state with async_request_refresh
+- **Added optimistic state updates** - Prevents UI desync "bouncing toggle" issue
+
+### 🆕 NEW MQTT DIAGNOSTIC SENSORS
+
+- **Added MQTT connectivity monitoring** - Connection status sensor for hubs with MQTT
+- **Message statistics tracking** - Messages received/sent counters with total increasing state class
+- **Last message age monitoring** - Time since last MQTT message with timestamp attributes
+- **Real-time diagnostics** - Connection attempts, uptime, and MQTT host information
+- **Graceful fallback** - Only created for hubs with MQTT credentials, handles missing MQTT client
+
+### 📝 TECHNICAL DETAILS
+
+**Valve Controller Fixes:**
+- Added MODEL_HTV0542FRF to imports and allowed model lists
+- Fixed device_name/product_key extraction in async_open_valve and async_close_valve
+- Replaced crash-prone _apply_response_state with async_request_refresh
+- Added optimistic coordinator data updates to prevent UI desync
+
+**MQTT Diagnostics:**
+- Enhanced HomGarMQTTClient with message counters and connection tracking
+- Added get_diagnostics() method returning comprehensive MQTT status
+- Created 4 diagnostic sensor types: connection, messages received, messages sent, last message age
+- Integrated diagnostics collection into HomGarCoordinator data flow
+
+### 🐛 GitHub Issues Addressed
+
+- **Issue #22**: HTV0542FRF Valve Controller Support
+  - User reported entities not appearing, API control failures, crashes after toggle, UI desync
+  - All 5 issues resolved with comprehensive fixes
+  - MQTT diagnostics added for better troubleshooting
+
+### 🔧 Debug Worker Updates
+
+- **Updated model validation** - Accept any alphanumeric model instead of restrictive pattern
+- **Fixed worker deployment** - Now accepts HTV0542FRF and other new model formats
+
 ## [2.0.9] - 2026-04-06
 
 ### 🆕 NEW DEVICE SUPPORT

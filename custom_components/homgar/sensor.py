@@ -330,6 +330,42 @@ async def async_setup_entry(
         # Add raw payload sensor for all devices (disabled by default)
         entities.append(HomGarRawPayloadSensor(coordinator, key, info, base_slug))
 
+    # Add MQTT diagnostic sensors for hubs with MQTT credentials
+    from .mqtt_diagnostics import (
+        HomGarMQTTConnectionSensor,
+        HomGarMQTTMessagesReceivedSensor,
+        HomGarMQTTMessagesSentSensor,
+        HomGarMQTTLastMessageSensor,
+    )
+    
+    # Check if MQTT client is available and has diagnostics
+    mqtt_client = None
+    if hasattr(coordinator.hass, 'data') and DOMAIN in coordinator.hass.data:
+        entry_data = coordinator.hass.data[DOMAIN].get(coordinator._entry.entry_id, {})
+        mqtt_client = entry_data.get("mqtt_client")
+    
+    if mqtt_client and hasattr(mqtt_client, 'get_diagnostics'):
+        # Create diagnostic sensors for each hub with MQTT
+        hubs = coordinator.data.get("hubs", [])
+        for hub in hubs:
+            hub_key = f"{hub.get('hid')}_{hub.get('mid')}"
+            
+            # Only create if hub has MQTT credentials
+            if hub.get("productKey") and hub.get("deviceName"):
+                device_info = {
+                    "hid": hub.get("hid"),
+                    "mid": hub.get("mid"),
+                    "sub_name": f"MQTT {hub.get('name', 'Hub')}",
+                    "model": "MQTT Diagnostics",
+                }
+
+                entities.extend([
+                    HomGarMQTTConnectionSensor(coordinator, hub_key, device_info),
+                    HomGarMQTTMessagesReceivedSensor(coordinator, hub_key, device_info),
+                    HomGarMQTTMessagesSentSensor(coordinator, hub_key, device_info),
+                    HomGarMQTTLastMessageSensor(coordinator, hub_key, device_info),
+                ])
+
     if entities:
         async_add_entities(entities)
 

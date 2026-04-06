@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245
+from .const import DOMAIN, MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF
 from .coordinator import HomGarCoordinator
 from .api.decoders import decode_valve_hub
 # build_valve_open_command / build_valve_close_command retained in homgar_api for reference
@@ -37,7 +37,7 @@ async def async_setup_entry(
 
     for key, info in sensors_cfg.items():
         model = info.get("model")
-        if model not in [MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245]:
+        if model not in [MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF]:
             continue
 
         decoded = info.get("data") or {}
@@ -226,8 +226,12 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
             duration = self._get_configured_duration_seconds()
         mid = self._sensor_info["mid"]
         addr = self._sensor_info["addr"]
-        device_name = self._sensor_info.get("device_name") or ""
-        product_key = self._sensor_info.get("product_key") or ""
+        
+        # Extract device_name and product_key from hub data instead of sensor_info
+        hubs = self.coordinator.data.get("hubs", [])
+        hub = next((h for h in hubs if h.get("mid") == mid), {})
+        device_name = hub.get("deviceName", "")
+        product_key = hub.get("productKey", "")
 
         _LOGGER.debug(
             "Opening valve mid=%s addr=%s zone=%s duration=%ss",
@@ -244,13 +248,28 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
             mode=1,
             duration=duration,
         )
-        self._apply_response_state(response_state)
+        # Bypass _apply_response_state to avoid crash - use refresh instead
+        await self.coordinator.async_request_refresh()
+        
+        # OPTIMISTIC LOCAL UPDATE to prevent UI desync
+        current = dict(self.coordinator.data)
+        try:
+            current["sensors"][self._sensor_key]["data"]["zones"][self._zone_num]["open"] = True
+            current["sensors"][self._sensor_key]["data"]["zones"][self._zone_num]["duration_seconds"] = duration
+        except KeyError:
+            pass
+        self.coordinator.async_set_updated_data(current)
+        return
 
     async def async_close_valve(self, **kwargs: Any) -> None:
         mid = self._sensor_info["mid"]
         addr = self._sensor_info["addr"]
-        device_name = self._sensor_info.get("device_name") or ""
-        product_key = self._sensor_info.get("product_key") or ""
+        
+        # Extract device_name and product_key from hub data instead of sensor_info
+        hubs = self.coordinator.data.get("hubs", [])
+        hub = next((h for h in hubs if h.get("mid") == mid), {})
+        device_name = hub.get("deviceName", "")
+        product_key = hub.get("productKey", "")
 
         _LOGGER.debug(
             "Closing valve mid=%s addr=%s zone=%s",
@@ -267,4 +286,15 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
             mode=0,
             duration=0,
         )
-        self._apply_response_state(response_state)
+        # Bypass _apply_response_state to avoid crash - use refresh instead
+        await self.coordinator.async_request_refresh()
+        
+        # OPTIMISTIC LOCAL UPDATE to prevent UI desync
+        current = dict(self.coordinator.data)
+        try:
+            current["sensors"][self._sensor_key]["data"]["zones"][self._zone_num]["open"] = False
+            current["sensors"][self._sensor_key]["data"]["zones"][self._zone_num]["duration_seconds"] = 0
+        except KeyError:
+            pass
+        self.coordinator.async_set_updated_data(current)
+        return

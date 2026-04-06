@@ -132,6 +132,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
         self._entry = entry
         self._hids = entry.data.get(CONF_HIDS, [])
         self._notified_unknown_models: set[str] = set()
+        self._mqtt_diagnostics: dict[str, dict] = {}
     
     async def handle_mqtt_update(self, data: dict) -> None:
         """Handle MQTT message for real-time valve updates."""
@@ -318,12 +319,46 @@ class HomGarCoordinator(DataUpdateCoordinator):
             _LOGGER.info("Coordinator update complete: %d hubs, %d sensors", len(hubs), len(decoded_sensors))
             _LOGGER.debug(debug_with_version("Final data: hubs=%s, sensors=%s"), hubs, list(decoded_sensors.keys()))
             
+            # Update MQTT diagnostics
+            self._update_mqtt_diagnostics()
+            
             return {
                 "hubs": hubs,
                 "status": status_by_mid,
                 "sensors": decoded_sensors,
+                "mqtt_diagnostics": self._mqtt_diagnostics,
             }
         except HomGarApiError as err:
             raise UpdateFailed(f"HomGar API error: {err}") from err
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(f"Unexpected HomGar error: {err}") from err
+
+    def _update_mqtt_diagnostics(self):
+        """Update MQTT diagnostics from MQTT client."""
+        try:
+            # Get MQTT client from hass data
+            mqtt_client = None
+            if hasattr(self.hass, 'data') and DOMAIN in self.hass.data:
+                entry_data = self.hass.data[DOMAIN].get(self._entry.entry_id, {})
+                mqtt_client = entry_data.get("mqtt_client")
+            
+            if not mqtt_client or not hasattr(mqtt_client, 'get_diagnostics'):
+                # Clear diagnostics if MQTT client not available
+                self._mqtt_diagnostics.clear()
+                return
+            
+            # Get diagnostics for each hub with MQTT credentials
+            hubs = self.data.get("hubs", []) if self.data else []
+            for hub in hubs:
+                hub_key = f"{hub.get('hid')}_{hub.get('mid')}"
+                
+                # Only collect diagnostics for hubs with MQTT credentials
+                if hub.get("productKey") and hub.get("deviceName"):
+                    diagnostics = mqtt_client.get_diagnostics()
+                    self._mqtt_diagnostics[hub_key] = diagnostics
+                else:
+                    # Remove diagnostics for hubs without MQTT
+                    self._mqtt_diagnostics.pop(hub_key, None)
+                    
+        except Exception as e:
+            _LOGGER.warning("Failed to update MQTT diagnostics: %s", e)

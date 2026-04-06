@@ -71,6 +71,13 @@ class HomGarMQTTClient:
         self._shutdown_requested = False
         self._reconnect_thread = None
         
+        # MQTT diagnostics
+        self._messages_received = 0
+        self._messages_sent = 0
+        self._connection_attempts = 0
+        self._last_connect_time = None
+        self._last_message_time = None
+        
         # Build authentication
         self._client_id, self._username, self._password = _build_aliyun_auth(
             product_key, device_name, device_secret
@@ -91,6 +98,7 @@ class HomGarMQTTClient:
         """Connect to MQTT broker."""
         try:
             self._shutdown_requested = False
+            self._connection_attempts += 1
             self._connect_client()
             return self._wait_for_connection()
         except Exception as e:
@@ -154,6 +162,7 @@ class HomGarMQTTClient:
         """Handle MQTT connection event."""
         if rc == 0:
             self._connected = True
+            self._last_connect_time = time.time()
             client.subscribe(self._topic, qos=0)
             _LOGGER.info("HomGar MQTT connected successfully, subscribed to: %s", self._topic)
         else:
@@ -207,10 +216,14 @@ class HomGarMQTTClient:
     def _on_message(self, client, userdata, msg):
         """Handle incoming MQTT message."""
         try:
+            self._messages_received += 1
+            self._last_message_time = time.time()
+            
             _LOGGER.debug(
-                "HomGar MQTT message received: topic=%s payload_len=%d",
+                "HomGar MQTT message received: topic=%s payload_len=%d total=%d",
                 msg.topic,
                 len(msg.payload),
+                self._messages_received,
             )
             
             payload = json.loads(msg.payload.decode("utf-8", errors="replace"))
@@ -272,3 +285,42 @@ class HomGarMQTTClient:
         
         except Exception as e:
             _LOGGER.error("HomGar MQTT message processing error: %s", e, exc_info=True)
+
+    def get_diagnostics(self) -> dict:
+        """Get MQTT diagnostic information."""
+        uptime = time.time() - (self._last_connect_time or time.time())
+        last_message_age = time.time() - (self._last_message_time or time.time())
+        
+        return {
+            "connected": self._connected,
+            "connection_attempts": self._connection_attempts,
+            "messages_received": self._messages_received,
+            "messages_sent": self._messages_sent,
+            "last_connect_time": self._last_connect_time,
+            "last_message_time": self._last_message_time,
+            "uptime_seconds": max(0, uptime),
+            "last_message_age_seconds": last_message_age if self._last_message_time else None,
+            "mqtt_host": self._mqtt_host,
+            "mqtt_port": self._mqtt_port,
+            "topic": self._topic,
+        }
+
+    def send_message(self, payload: dict) -> bool:
+        """Send MQTT message and track diagnostics."""
+        if not self._connected or not self._client:
+            _LOGGER.warning("HomGar MQTT not connected, cannot send message")
+            return False
+        
+        try:
+            message = json.dumps(payload)
+            result = self._client.publish(self._topic, message, qos=0)
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                self._messages_sent += 1
+                _LOGGER.debug("HomGar MQTT message sent successfully (total: %d)", self._messages_sent)
+                return True
+            else:
+                _LOGGER.error("HomGar MQTT send failed with rc=%s", result.rc)
+                return False
+        except Exception as e:
+            _LOGGER.error("HomGar MQTT send error: %s", e, exc_info=True)
+            return False
