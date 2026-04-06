@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.2] - 2026-04-06
+
+### 🆕 NEW DEVICE SUPPORT
+
+- **Implemented HCS0528ARF pool temperature sensor decoder** (Issue #18)
+  - Current temperature: Bytes 10-11 (little-endian, tenths of °F)
+  - High temperature: Bytes 3-4 (little-endian, tenths of °F)
+  - Low temperature: Bytes 1-2 (little-endian, tenths of °F)
+  - RSSI: Byte 0 (negated for dBm)
+  - Creates sensor entities for current, high, and low temperature readings
+
+### 🎯 ISSUE RESOLUTION
+
+- **Issue #18**: HCS0528ARF pool sensors now display temperature values correctly
+  - Validated with real user payloads showing 78.2°F current, 78.6°F/78.9°F high, 74.4°F/74.6°F low
+  - All temperature sensors support both °C and °F based on Home Assistant system settings
+
+### 📝 TECHNICAL DETAILS
+
+- Decoder extracts current, high, and low temperature from pool sensor payloads
+- Temperature values stored in both Celsius and Fahrenheit for flexibility
+- Battery status extraction from bytes 12-13
+- Enhanced logging for HCS0528ARF decoding process
+
 ## [2.0.1] - 2026-04-06
 
 ### 🔧 CRITICAL BUG FIXES

@@ -1003,27 +1003,80 @@ def decode_temphum(raw: str) -> dict:
 
 
 def decode_pool(raw: str) -> dict:
-    """Decode HCS0528ARF (pool/temperature) payload."""
+    """
+    Decode HCS0528ARF (pool temperature sensor) payload.
+    
+    Format: 10#E7E8021203DC01B805850E03FF0FAA1A0319
+    
+    Current Temperature: Bytes 10-11 (little-endian) in tenths of °F
+    High Temperature: Bytes 3-4 (little-endian) in tenths of °F
+    Low Temperature: Bytes 1-2 (little-endian) in tenths of °F
+    
+    Example: Pool at 78.2°F, High=78.6°F, Low=74.4°F
+    
+    Based on user data from Issue #18.
+    """
     from ..const import debug_with_version
     
     _LOGGER.debug(debug_with_version("Decoding HCS0528ARF: %s"), raw)
     
-    result = {
-        "type": "pool",
-        "rssi": None,
-        "decoder": "basic",
-    }
-    
     try:
         b = _parse_homgar_payload(raw)
-        if b and len(b) > 1:
-            result["rssi"] = _extract_rssi(b)
-            result["raw_bytes"] = b
+        
+        if not b or len(b) < 12:
+            raise ValueError(f"HCS0528ARF payload too short: {len(b) if b else 0} bytes")
+        
+        # Extract current temperature from bytes 10-11 (little-endian, tenths of °F)
+        temp_current_raw_f10 = _le16(b, 10)
+        temp_current_f = temp_current_raw_f10 / 10.0
+        temp_current_c = (temp_current_f - 32.0) * 5.0 / 9.0
+        
+        # Extract high temperature from bytes 3-4 (little-endian, tenths of °F)
+        temp_high_raw_f10 = _le16(b, 3)
+        temp_high_f = temp_high_raw_f10 / 10.0
+        temp_high_c = (temp_high_f - 32.0) * 5.0 / 9.0
+        
+        # Extract low temperature from bytes 1-2 (little-endian, tenths of °F)
+        temp_low_raw_f10 = _le16(b, 1)
+        temp_low_f = temp_low_raw_f10 / 10.0
+        temp_low_c = (temp_low_f - 32.0) * 5.0 / 9.0
+        
+        # Extract battery status if available (bytes 12-13)
+        status_code = 0
+        if len(b) >= 14:
+            status_code = _extract_status_code(b, 12, 13)
+        
+        # RSSI from byte 0
+        rssi_dbm = -b[0] if b[0] > 0 else 0
+        
+        result = _base_decoder_dict("pool", rssi_dbm, b)
+        result.update({
+            "temperature_c": round(temp_current_c, 1),
+            "temperature_f": round(temp_current_f, 1),
+            "temperature_f10": temp_current_raw_f10,
+            "temperature_high_c": round(temp_high_c, 1),
+            "temperature_high_f": round(temp_high_f, 1),
+            "temperature_low_c": round(temp_low_c, 1),
+            "temperature_low_f": round(temp_low_f, 1),
+            "battery_status_code": status_code,
+            "battery_percent": _battery_status_to_percent(status_code),
+            "decoder": "hcs0528arf",
+        })
+        
+        _LOGGER.info(debug_with_version("HCS0528ARF decoded: current=%.1f°C (%.1f°F), high=%.1f°C, low=%.1f°C, rssi=%d dBm"), 
+                     temp_current_c, temp_current_f, temp_high_c, temp_low_c, rssi_dbm)
+        
+        return result
         
     except Exception as e:
-        _LOGGER.error(debug_with_version("Error in HCS0528ARF decoder: %s"), e)
-    
-    return result
+        _LOGGER.error(debug_with_version("Error in HCS0528ARF decoder: %s"), e, exc_info=True)
+        return {
+            "type": "pool",
+            "rssi_dbm": 0,
+            "raw_bytes": b if 'b' in locals() else [],
+            "decoder": "hcs0528arf_error",
+            "error": str(e)
+        }
 
 
 # HCS variant decoders - basic implementations
