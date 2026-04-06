@@ -28,6 +28,8 @@ from .const import (
     MODEL_POOL,
     MODEL_POOL_PLUS,
     MODEL_DISPLAY_HUB,
+    MODEL_HWG023WRF,  # Main hub V1
+    MODEL_HWG023WBRF_V2,  # Main hub V2
     MODEL_VALVE_HUB,
     MODEL_VALVE_213,  # HTV213FRF support
     MODEL_VALVE_245,  # HTV245FRF support
@@ -83,6 +85,8 @@ DECODER_REGISTRY = {
     MODEL_CO2: decode_co2,
     MODEL_POOL: decode_pool,
     MODEL_POOL_PLUS: decode_pool_plus,
+    MODEL_HWG023WRF: decode_valve_hub,  # V1 hub uses valve_hub decoder
+    MODEL_HWG023WBRF_V2: decode_valve_hub,  # V2 hub uses valve_hub decoder
     MODEL_VALVE_HUB: decode_valve_hub,
     MODEL_VALVE_213: decode_htv213frf_valve,  # HTV213FRF uses custom decoder
     MODEL_VALVE_245: decode_htv213frf_valve,  # HTV245FRF uses custom decoder

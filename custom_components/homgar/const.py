@@ -1,7 +1,7 @@
 # Display Hub model constant
 DOMAIN = "homgar"
 NAME = "HomGar/RainPoint Cloud"
-VERSION = "2.0.3"
+VERSION = "2.0.4"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
@@ -53,6 +53,8 @@ MODEL_HCS0530THO = "HCS0530THO"   # CO2/Temp/Humidity
 MODEL_HCS0528ARF = "HCS0528ARF"   # Pool/Temperature
 MODEL_HCS015ARF_PLUS = "HCS015ARF+"  # Pool + Ambient temp/humidity
 MODEL_HWS019WRF_V2 = "HWS019WRF-V2"  # Smart+ Irrigation Display Hub
+MODEL_HWG023WRF = "HWG023WRF"  # Main hub V1 (modelCode: 273)
+MODEL_HWG023WBRF_V2 = "HWG023WBRF-V2"  # Main hub V2 (modelCode: 289)
 
 # Legacy aliases for backward compatibility
 MODEL_MOISTURE_SIMPLE = MODEL_HCS026FRF
@@ -64,6 +66,8 @@ MODEL_CO2 = MODEL_HCS0530THO
 MODEL_POOL = MODEL_HCS0528ARF
 MODEL_POOL_PLUS = MODEL_HCS015ARF_PLUS
 MODEL_DISPLAY_HUB = MODEL_HWS019WRF_V2
+MODEL_MAIN_HUB_V1 = MODEL_HWG023WRF  # Legacy V1 hub
+MODEL_MAIN_HUB_V2 = MODEL_HWG023WBRF_V2  # Current V2 hub
 MODEL_VALVE_HUB = "HTV0540FRF"  # Irrigation valve hub (zone count detected from payload)
 MODEL_VALVE_213 = "HTV213FRF"   # 2-zone irrigation valve
 MODEL_VALVE_245 = "HTV245FRF"   # 4-zone irrigation valve

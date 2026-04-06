@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.4] - 2026-04-06
+
+### 🔧 HUB COMPATIBILITY
+
+- **Added support for HWG023WRF V1 hub** (modelCode: 273)
+  - V1 hub users can now connect and decode device payloads
+  - Both V1 (HWG023WRF) and V2 (HWG023WBRF-V2) hubs now supported
+  - Uses same decoder as V2 hub (identical payload format)
+
+### 🐛 BUG FIXES
+
+- **Fixed V1 hub recognition issue**
+  - V1 hub devices were not being recognized by integration
+  - Added model constants and decoder mappings for HWG023WRF
+  - Resolves decoding errors for users with V1 hubs
+
+### 📝 TECHNICAL DETAILS
+
+- Added `MODEL_HWG023WRF` and `MODEL_HWG023WBRF_V2` constants
+- Both hub versions mapped to `decode_valve_hub` decoder
+- V1 and V2 hubs have identical payload structure (pCode: 1, portNum: 0)
+- Only modelCode differs: 273 (V1) vs 289 (V2)
+
 ## [2.0.3] - 2026-04-06
 
 ### 🆕 NEW DEVICE SUPPORT
