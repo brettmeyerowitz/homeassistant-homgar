@@ -34,6 +34,7 @@ from .const import (
     MODEL_VALVE_213,  # HTV213FRF support
     MODEL_VALVE_245,  # HTV245FRF support
     MODEL_HTV0542FRF,  # HTV0542FRF 4-zone valve support (v2.0.3)
+    MODEL_VALVE_113,  # HTV113FRF 1-zone timer
     # New HCS sensor models
     MODEL_HCS005FRF,
     MODEL_HCS003FRF,
@@ -64,7 +65,7 @@ from .homgar_api import (
     HomGarClient, HomGarApiError,
     decode_moisture_simple, decode_moisture_full, decode_rain,
     decode_temphum, decode_flowmeter, decode_co2, decode_pool, decode_pool_plus,
-    decode_valve_hub, decode_htv213frf_valve, decode_htv0542frf,
+    decode_valve_hub, decode_htv213frf_valve, decode_htv0542frf, decode_htv113frf,
     # New HCS decoder functions
     decode_hcs005frf, decode_hcs003frf, decode_hcs024frf_v1,
     decode_hcs015arf, decode_hcs0528arf, decode_hcs0565arf, decode_hcs027arf, decode_hcs016arf,
@@ -92,6 +93,7 @@ DECODER_REGISTRY = {
     MODEL_VALVE_213: decode_htv213frf_valve,  # HTV213FRF uses custom decoder
     MODEL_VALVE_245: decode_htv213frf_valve,  # HTV245FRF uses custom decoder
     MODEL_HTV0542FRF: decode_htv0542frf,  # HTV0542FRF 4-zone valve (v2.0.3)
+    MODEL_VALVE_113: decode_htv113frf,  # HTV113FRF 1-zone timer
     # HCS sensor models (v1.3.0)
     MODEL_HCS005FRF: decode_hcs005frf,
     MODEL_HCS003FRF: decode_hcs003frf,

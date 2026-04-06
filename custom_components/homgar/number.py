@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF
+from .const import DOMAIN, MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113
 from .coordinator import HomGarCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ async def async_setup_entry(
 
     for key, info in sensors_cfg.items():
         model = info.get("model")
-        if model not in [MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF]:
+        if model not in [MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113]:
             continue
 
         decoded = info.get("data") or {}

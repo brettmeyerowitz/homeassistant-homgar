@@ -1474,3 +1474,102 @@ def decode_hcs0565arf(raw: str) -> dict:
         result["error"] = str(e)
     
     return result
+
+
+def decode_htv113frf(raw: str) -> dict:
+    """Decode HTV113FRF 1-zone timer payload.
+    
+    Fixed-position payload format for HTV113FRF 1-zone timer devices.
+    Based on analysis of real device payload from Shaun's setup.
+    
+    Args:
+        raw: Raw payload string (e.g., "10#E1D500DC01D80020B700000000AD00009F00000000FF0FB1440D19")
+        
+    Returns:
+        Dictionary containing decoded timer data
+    """
+    from .utils import debug_with_version
+    
+    result = {
+        "type": "timer",
+        "model": "HTV113FRF",
+        "zones": {},
+    }
+    
+    try:
+        # Extract hex part after "10#" prefix
+        if raw.startswith("10#"):
+            hex_part = raw[3:]
+        else:
+            hex_part = raw
+        
+        # Convert to bytes
+        bytes_list = [int(hex_part[i:i+2], 16) for i in range(0, len(hex_part), 2)]
+        
+        # Need at least 27 bytes for complete data
+        if len(bytes_list) < 27:
+            result.update({
+                "type": "unknown",
+                "error": f"Insufficient data: {len(bytes_list)} bytes"
+            })
+            return result
+        
+        # RSSI (position 0) - signed byte
+        rssi_raw = bytes_list[0]
+        rssi = rssi_raw - 256 if rssi_raw > 127 else rssi_raw
+        result["rssi_dbm"] = rssi
+        
+        # Battery status (positions 21-22) - FF0F = 100%
+        battery_high = bytes_list[21]
+        battery_low = bytes_list[22]
+        if battery_high == 0xFF and battery_low == 0x0F:
+            result["battery_percent"] = 100
+        elif battery_low <= 100:
+            result["battery_percent"] = battery_low
+        else:
+            result["battery_percent"] = None
+        
+        # Zone 1 state (position 8) - bit analysis
+        zone_state_byte = bytes_list[8]
+        zone_open = bool(zone_state_byte & 0x01)  # LSB indicates open/closed
+        result["zones"][1] = {
+            "open": zone_open,
+            "duration_seconds": 0,  # Default duration
+        }
+        
+        # Duration (position 13) - if non-zero, use as duration
+        duration_raw = bytes_list[13]
+        if duration_raw > 0 and duration_raw <= 255:
+            result["zones"][1]["duration_seconds"] = duration_raw
+        
+        # Additional timer-specific data
+        result.update({
+            "timer_mode": None,  # Could be derived from other bytes
+            "countdown_active": False,  # Could be derived from other bytes
+            "raw_bytes": bytes_list,  # For debugging
+        })
+        
+        # Try to extract timer mode from other positions
+        # Position 4 might indicate mode
+        mode_byte = bytes_list[4]
+        if mode_byte == 1:
+            result["timer_mode"] = "auto"
+        elif mode_byte == 2:
+            result["timer_mode"] = "manual"
+        
+        # Position 7 might indicate countdown status
+        status_byte = bytes_list[7]
+        if status_byte & 0x20:  # Check bit 5
+            result["countdown_active"] = True
+        
+        _LOGGER.debug(debug_with_version("HTV113FRF decoded: zones=%s, rssi=%d, battery=%s%%"), 
+                     result["zones"], result["rssi_dbm"], result["battery_percent"])
+        
+    except Exception as e:
+        _LOGGER.error(debug_with_version("Error in HTV113FRF decoder: %s"), e)
+        result.update({
+            "type": "unknown",
+            "error": str(e)
+        })
+    
+    return result

@@ -1,7 +1,7 @@
 # Display Hub model constant
 DOMAIN = "homgar"
 NAME = "HomGar/RainPoint Cloud"
-VERSION = "2.0.10"
+VERSION = "2.0.11"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
@@ -72,6 +72,7 @@ MODEL_MAIN_HUB_V2 = MODEL_HWG023WBRF_V2  # Current V2 hub
 MODEL_VALVE_HUB = "HTV0540FRF"  # Irrigation valve hub (zone count detected from payload)
 MODEL_VALVE_213 = "HTV213FRF"   # 2-zone irrigation valve
 MODEL_VALVE_245 = "HTV245FRF"   # 4-zone irrigation valve
+MODEL_VALVE_113 = "HTV113FRF"   # 1-zone irrigation valve/timer
 
 # === HCS Sensor Series (v1.3.0) ===
 
