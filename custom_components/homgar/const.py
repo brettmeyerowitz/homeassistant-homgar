@@ -1,8 +1,7 @@
 # Display Hub model constant
 DOMAIN = "homgar"
-
-# Integration version
-VERSION = "2.0.2"
+NAME = "HomGar/RainPoint Cloud"
+VERSION = "2.0.3"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
@@ -104,6 +103,7 @@ MODEL_HCS015ARF = "HCS015ARF"        # Pool temperature sensor
 MODEL_HTV213FRF = "HTV213FRF"        # Single-zone RF irrigation timer (similar to HTV0540FRF)
 MODEL_HTV245FRF = "HTV245FRF"        # Irrigation valve (similar to HTV0540FRF)
 MODEL_HTV0540FRF = "HTV0540FRF"      # Multi-zone valve hub (fully supported)
+MODEL_HTV0542FRF = "HTV0542FRF"      # 4-zone RF irrigation timer (v2.0.3)
 
 # Legacy valve aliases
 MODEL_VALVE_213 = MODEL_HTV213FRF

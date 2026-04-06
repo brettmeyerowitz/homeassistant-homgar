@@ -1,0 +1,42 @@
+Add HTV0542FRF 4-zone valve controller support (v2.0.3)
+
+Implements decoder for HTV0542FRF 4-zone RF irrigation timer based on
+payload analysis and device specifications.
+
+NEW DEVICE SUPPORT:
+- HTV0542FRF 4-zone valve controller decoder (Issue #22)
+- Fixed-record format decoder (01# prefix, not TLV)
+- Zone IDs: 0x19 (zone 1), 0x1A (zone 2), 0x1B (zone 3), 0x1C (zone 4)
+- State byte bit 0: 0=closed, 1=open (consistent with other valves)
+- Hub state detection: 0x18 marker with 0x01 or 0xDC = online
+- Creates valve entities for all 4 zones with open/closed state
+
+TECHNICAL IMPLEMENTATION:
+- Decoder extracts zone states from fixed-record format payload
+- RSSI extraction from byte 1 (negated for dBm)
+- Hub online status detection from 0x18 pattern
+- Enhanced logging with zone details for debugging
+- Supports 4-zone configuration based on device specifications
+
+FILES MODIFIED:
+- custom_components/homgar/api/decoders.py - Added decode_htv0542frf()
+- custom_components/homgar/api/__init__.py - Exported new decoder
+- custom_components/homgar/homgar_api.py - Added backward compatibility
+- custom_components/homgar/const.py - Added MODEL_HTV0542FRF constant
+- custom_components/homgar/coordinator.py - Added decoder mapping
+- custom_components/homgar/manifest.json - Version bump to 2.0.3
+- CHANGELOG.md - Added v2.0.3 release notes
+- README.md - Updated version reference
+
+TESTING:
+- Validated with user-provided payload from Issue #22
+- All 4 zones detected correctly (all showing CLOSED state)
+- Hub online status detected correctly
+- Docker integration test passed with no errors
+- Version v2.0.3 confirmed in logs
+
+ISSUE RESOLUTION:
+- Resolves Issue #22 - HTV0542FRF 4-zone irrigation timer support
+
+This implementation provides basic zone state detection. Duration encoding
+and additional features can be refined with more payload samples from users.

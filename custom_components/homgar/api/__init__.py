@@ -7,6 +7,7 @@ This module provides a clean, organized interface to the HomGar API functionalit
 from .client import HomGarClient
 from .decoders import (
     decode_htv213frf_valve,
+    decode_htv0542frf,
     decode_moisture_full,
     decode_moisture_simple,
     decode_hws019wrf_v2,
@@ -66,6 +67,7 @@ __all__ = [
     "HomGarClient",
     # Decoders
     "decode_htv213frf_valve",
+    "decode_htv0542frf",
     "decode_moisture_full",
     "decode_moisture_simple",
     "decode_hws019wrf_v2",

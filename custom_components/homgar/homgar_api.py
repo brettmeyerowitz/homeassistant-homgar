@@ -13,6 +13,7 @@ For new code, please import directly from the api subpackage:
 from .api import (
     HomGarClient,
     decode_htv213frf_valve,
+    decode_htv0542frf,
     decode_moisture_full,
     decode_moisture_simple,
     decode_hws019wrf_v2,
@@ -71,6 +72,7 @@ __all__ = [
     'HomGarClient',
     'HomGarApiError',
     'decode_htv213frf_valve',
+    'decode_htv0542frf',
     'decode_moisture_full',
     'decode_moisture_simple',
     'decode_hws019wrf_v2',

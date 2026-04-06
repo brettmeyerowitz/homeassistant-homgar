@@ -1,0 +1,106 @@
+## Need Multiple Payloads to Decode HTV0542FRF
+
+Thank you for reporting this! The HTV0542FRF is a **4-zone RF irrigation timer**, and I'd like to add support for it.
+
+I've analyzed your payload and found that it uses a **fixed-record format** (different from the HTV213FRF/HTV245FRF TLV structure). However, with only one payload sample showing all zones closed, I can't reliably determine the complete data structure.
+
+### 📊 What I Found
+
+**Your Payload:** `01#17E1CA0019D8111AD8001BD8001CD8001D201E201F20202018DC0121B75BBADC1622B70000000023B70000000024B70000000025AD840326AD000027AD000028AD0000FEFF0FD4B6DC16`
+
+**Initial Analysis:**
+- Format: `01#` prefix (fixed-record format, not TLV)
+- 4 zones detected with IDs: 0x19, 0x1A, 0x1B, 0x1C
+- All zones show state `0xD8` (bit0=0) → **All CLOSED**
+- Pattern appears to be: `[zone_id][state][duration/data]` repeating
+
+### ❓ What I Need
+
+To create an accurate decoder, please provide payloads for these scenarios:
+
+1. **All zones OFF** (you may have already provided this)
+2. **Zone 1 ON** (with duration if possible)
+3. **Zone 2 ON** (different zone)
+4. **Zone 3 ON**
+5. **Zone 4 ON**
+6. **Multiple zones ON** (e.g., zones 1 and 3 together)
+
+### 🔍 How to Collect Payloads
+
+#### Option 1: Enable Debug Data Submission (Easiest)
+
+Starting with **v2.0.2** (just released), the integration includes a debug switch:
+
+1. **Update to v2.0.2**
+2. **Enable the debug switch:**
+   - Go to **Settings** → **Devices & Services** → **HomGar/RainPoint**
+   - Find the **"Submit Debug Data"** switch (it's a diagnostic entity, may be hidden)
+   - Turn it **ON**
+3. **Trigger different zone states:**
+   - Turn zones on/off in different combinations
+   - Wait a few minutes between changes for the integration to poll
+4. **Data will automatically be submitted** to our debug worker
+
+I can then view your payloads at: https://homgar-debug-worker.funkypeople.workers.dev/view
+
+#### Option 2: Manual Log Collection
+
+If you prefer not to use the debug switch:
+
+1. **Enable debug logging** in Home Assistant:
+   ```yaml
+   logger:
+     default: info
+     logs:
+       custom_components.homgar: debug
+   ```
+2. **Restart Home Assistant**
+3. **Trigger different zone states** (turn zones on/off)
+4. **Check logs** for lines containing:
+   ```
+   Decoding payload for model=HTV0542FRF
+   ```
+5. **Copy the payloads** and paste them here
+
+### 📝 What to Include
+
+For each payload, please note:
+- Which zones were ON/OFF
+- Duration (if applicable)
+
+**Example:**
+```
+Payload: 01#XXXXXXXX...
+State: Zone 1 ON (10 minutes), Zones 2-4 OFF
+
+Payload: 01#XXXXXXXX...
+State: All zones OFF
+```
+
+### 🎯 Why Multiple Payloads?
+
+Different valve controllers use different encoding:
+- **HTV213FRF/HTV245FRF** use TLV format with `11#` prefix
+- **HTV0540FRF** uses TLV format with zone detection
+- **HTV0542FRF** appears to use fixed-record format with `01#` prefix
+
+With multiple samples, I can identify:
+- How zone states are encoded
+- How durations are stored
+- Whether bit 0 determines open/closed state
+- Any additional status fields
+
+### 🚀 Next Steps
+
+Once I have multiple payloads:
+1. Reverse-engineer the complete data structure
+2. Implement the decoder
+3. Add valve entities for all 4 zones
+4. Test with your device
+5. Release in the next version
+
+Thank you for your patience! This will help all HTV0542FRF users. 🙏
+
+---
+
+**Note:** All debug data is anonymous - no personal information, device IDs, or credentials are collected. Only the hex payload and basic metadata are submitted.

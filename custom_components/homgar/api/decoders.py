@@ -1189,3 +1189,104 @@ def decode_hcs888arf_v1(raw: str) -> dict:
 def decode_hcs0600arf(raw: str) -> dict:
     """Decode HCS0600ARF (unknown sensor type)."""
     return decode_unknown(raw)
+
+
+def decode_htv0542frf(raw: str) -> dict:
+    """
+    Decode HTV0542FRF 4-zone valve controller payload.
+    
+    Format: 01#17E1CA0019D8111AD8001BD8001CD8001D201E201F20202018DC0121B75BBADC1622B70000000023B70000000024B70000000025AD840326AD000027AD000028AD0000FEFF0FD4B6DC16
+    
+    Structure: Fixed-record format (not TLV)
+    - Header: bytes 0-3
+    - Zone records: [zone_id][state][data] for zones 1-4
+    - Zone IDs: 0x19 (zone 1), 0x1A (zone 2), 0x1B (zone 3), 0x1C (zone 4)
+    - State byte bit 0: 0=closed, 1=open (consistent with other valve controllers)
+    - Hub state: 0x18 marker followed by status byte (0x01 or 0xDC = online)
+    
+    Implemented based on payload analysis from Issue #22.
+    """
+    from ..const import debug_with_version
+    
+    _LOGGER.debug(debug_with_version("Decoding HTV0542FRF: %s"), raw)
+    
+    try:
+        b = _parse_homgar_payload(raw)
+        
+        if not b or len(b) < 20:
+            raise ValueError(f"HTV0542FRF payload too short: {len(b) if b else 0} bytes")
+        
+        # Extract RSSI from byte 1 (similar to other devices)
+        rssi_dbm = -b[1] if b[1] > 0 else 0
+        
+        # Parse zones - looking for zone IDs 0x19-0x1C
+        zones = {}
+        i = 4  # Skip header (bytes 0-3)
+        
+        while i + 2 < len(b):
+            zone_id = b[i]
+            
+            # Check if this is a zone ID (0x19-0x1C for zones 1-4)
+            if 0x19 <= zone_id <= 0x1C:
+                zone_num = zone_id - 0x18  # Zone 1 = 0x19 - 0x18 = 1
+                state = b[i + 1]
+                
+                # Next byte might be duration or separator
+                duration_byte = b[i + 2] if i + 2 < len(b) else 0
+                
+                # Determine if valve is open based on bit 0 (same as other valves)
+                is_open = bool(state & 0x01)
+                
+                zones[zone_num] = {
+                    "open": is_open,
+                    "state_raw": state,
+                    "duration_raw": duration_byte,
+                    "zone_id": zone_id,
+                }
+                
+                _LOGGER.info(debug_with_version("HTV0542FRF Zone %d (ID 0x%02X): state=0x%02X (bit0=%d, open=%s), duration_raw=0x%02X"),
+                           zone_num, zone_id, state, state & 0x01, is_open, duration_byte)
+                
+                i += 3  # Move to next zone record
+            else:
+                # Not a zone pattern, skip
+                i += 1
+            
+            if len(zones) >= 4:  # HTV0542FRF has 4 zones max
+                break
+        
+        # Try to determine hub online status
+        # Look for 0x18 pattern (hub state marker in other valves)
+        hub_online = False
+        for i in range(len(b) - 1):
+            if b[i] == 0x18:
+                hub_state_byte = b[i + 1] if i + 1 < len(b) else 0
+                # Common online indicators: 0x01, 0xDC
+                if hub_state_byte in [0x01, 0xDC]:
+                    hub_online = True
+                _LOGGER.info(debug_with_version("HTV0542FRF hub state: 0x18 0x%02X = %s"), hub_state_byte, "online" if hub_online else "offline")
+                break
+        
+        result = _base_decoder_dict("valve_hub", rssi_dbm, b)
+        result.update({
+            "hub_online": hub_online,
+            "zones": zones,
+            "decoder": "htv0542frf",
+            "device_model": "HTV0542FRF",
+        })
+        
+        _LOGGER.info(debug_with_version("HTV0542FRF decoded: %d zones, hub_online=%s, rssi=%d dBm"),
+                   len(zones), hub_online, rssi_dbm)
+        
+        return result
+        
+    except Exception as e:
+        _LOGGER.error(debug_with_version("Error in HTV0542FRF decoder: %s"), e, exc_info=True)
+        return {
+            "type": "valve_hub",
+            "rssi_dbm": 0,
+            "raw_bytes": b if 'b' in locals() else [],
+            "zones": {},
+            "decoder": "htv0542frf_error",
+            "error": str(e)
+        }

@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.3] - 2026-04-06
+
+### 🆕 NEW DEVICE SUPPORT
+
+- **Implemented HTV0542FRF 4-zone valve controller decoder** (Issue #22)
+  - Fixed-record format decoder (01# prefix, not TLV)
+  - Zone IDs: 0x19 (zone 1), 0x1A (zone 2), 0x1B (zone 3), 0x1C (zone 4)
+  - State byte bit 0: 0=closed, 1=open (consistent with other valve controllers)
+  - Hub state detection: 0x18 marker with 0x01 or 0xDC = online
+  - Creates valve entities for all 4 zones with open/closed state
+
+### 🎯 ISSUE RESOLUTION
+
+- **Issue #22**: HTV0542FRF 4-zone irrigation timers now fully supported
+  - Implemented based on payload analysis and device specifications
+  - Validated with user-provided payload showing all 4 zones detected
+  - Zone state detection uses bit 0 logic matching other valve controllers
+
+### 📝 TECHNICAL DETAILS
+
+- Decoder extracts zone states from fixed-record format payload
+- RSSI extraction from byte 1 (negated for dBm)
+- Hub online status detection from 0x18 pattern
+- Enhanced logging for HTV0542FRF decoding process with zone details
+- Supports 4-zone configuration based on device specifications
+
 ## [2.0.2] - 2026-04-06
 
 ### 🆕 NEW DEVICE SUPPORT
