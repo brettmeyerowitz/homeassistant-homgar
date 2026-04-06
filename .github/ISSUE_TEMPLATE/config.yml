@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/brettmeyerowitz/homeassistant-homgar/blob/main/README.md
+    about: Check the documentation for setup instructions and supported devices
+  - name: 💬 Discussions
+    url: https://github.com/brettmeyerowitz/homeassistant-homgar/discussions
+    about: Ask questions, share ideas, or discuss features
+  - name: 📋 Supported Devices
+    url: https://github.com/brettmeyerowitz/homeassistant-homgar/blob/main/CHANGELOG.md
+    about: Check the changelog to see if your device is already supported

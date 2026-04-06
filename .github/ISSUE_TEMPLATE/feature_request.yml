@@ -1,0 +1,72 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Thanks for suggesting a feature!
+        
+        Please describe the feature you'd like to see added to the integration.
+  
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: Feature Description
+      description: A clear and concise description of the feature you'd like
+      placeholder: "Add support for scheduling valve operations directly from Home Assistant"
+    validations:
+      required: true
+  
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case
+      description: Why would this feature be useful? What problem does it solve?
+      placeholder: |
+        Currently, I have to use the mobile app to schedule watering times.
+        It would be great to manage schedules directly in Home Assistant automations.
+    validations:
+      required: true
+  
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: How do you envision this feature working?
+      placeholder: |
+        - Add a service call to set valve schedules
+        - Create schedule entities that can be configured
+        - Integrate with Home Assistant's built-in scheduler
+    validations:
+      required: false
+  
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or workarounds?
+    validations:
+      required: false
+  
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Nice to have
+        - Would be helpful
+        - Important
+        - Critical
+    validations:
+      required: true
+  
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other information, screenshots, or examples
+    validations:
+      required: false

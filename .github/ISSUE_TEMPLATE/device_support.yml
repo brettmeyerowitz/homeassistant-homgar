@@ -1,0 +1,162 @@
+name: New Device Support Request
+description: Request support for a new RainPoint/HomGar device
+title: "[Device Support]: "
+labels: ["enhancement", "new-device"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Thanks for requesting support for a new device!
+        
+        To help us implement the decoder as quickly as possible, please provide the following information.
+        
+        **Important:** The more payload samples you provide (especially in different states), the faster and more accurate the implementation will be.
+  
+  - type: input
+    id: device_model
+    attributes:
+      label: Device Model Number
+      description: What is the exact model number printed on your device?
+      placeholder: "e.g., HTV0542FRF, HCS0528ARF, HCS014ARF"
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: device_category
+    attributes:
+      label: Device Category
+      description: What type of device is this?
+      options:
+        - Valve/Irrigation Controller
+        - Moisture Sensor
+        - Temperature/Humidity Sensor
+        - Rain Gauge
+        - Flow Meter
+        - Pool Sensor
+        - Other (please specify in description)
+    validations:
+      required: true
+  
+  - type: textarea
+    id: device_description
+    attributes:
+      label: Device Description
+      description: Brief description of the device and its features
+      placeholder: "4-zone RF irrigation timer with individual zone control and scheduling"
+    validations:
+      required: true
+  
+  - type: textarea
+    id: payload_samples
+    attributes:
+      label: Payload Samples (CRITICAL - Required)
+      description: |
+        **This is the most important section!** Please provide at least 3-5 payload samples from your device in DIFFERENT states.
+        
+        **How to get payloads:**
+        1. Enable debug logging in Home Assistant (Configuration > Logs > Set custom_components.homgar to DEBUG)
+        2. Trigger different states on your device (open/close valves, change temperature, etc.)
+        3. Copy the payload values from the logs
+        
+        **For valve controllers:** Provide samples with different zones open/closed
+        **For sensors:** Provide samples at different readings (temperature, moisture, etc.)
+      placeholder: |
+        Sample 1 (describe state - e.g., all zones closed):
+        01#17E1CA0019D8111AD8001BD8001CD8001D201E201F20202018DC0121B75BBADC16...
+        
+        Sample 2 (describe state - e.g., zone 1 open):
+        01#17E1CA0019D9111AD8001BD8001CD8001D201E201F20202018DC0121B75BBADC16...
+        
+        Sample 3 (describe state - e.g., zones 1 and 2 open):
+        01#17E1CA0019D9111AD9001BD8001CD8001D201E201F20202018DC0121B75BBADC16...
+        
+        Sample 4 (describe state):
+        ...
+        
+        Sample 5 (describe state):
+        ...
+      render: shell
+    validations:
+      required: true
+  
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: What should this device display in Home Assistant? What entities should be created?
+      placeholder: |
+        - Zone 1 valve entity (open/closed state)
+        - Zone 2 valve entity (open/closed state)
+        - Zone 3 valve entity (open/closed state)
+        - Zone 4 valve entity (open/closed state)
+        - Hub online status
+        - Signal strength (RSSI)
+    validations:
+      required: true
+  
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current Behavior
+      description: What is currently happening with this device in Home Assistant?
+      placeholder: |
+        - Device shows as "Unknown device model"
+        - No entities are created
+        - Error in logs: "No decoder found for model HTV0542FRF"
+    validations:
+      required: true
+  
+  - type: textarea
+    id: logs
+    attributes:
+      label: Home Assistant Debug Logs
+      description: |
+        Please paste relevant logs with debug logging enabled.
+        Include any errors or warnings related to this device.
+      placeholder: |
+        2026-04-06 10:00:00 DEBUG (MainThread) [custom_components.homgar.coordinator] Decoding payload for model=HTV0542FRF...
+        2026-04-06 10:00:00 ERROR (MainThread) [custom_components.homgar] No decoder found for model: HTV0542FRF
+      render: shell
+    validations:
+      required: false
+  
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration Version
+      description: What version of the HomGar/RainPoint integration are you using?
+      placeholder: "2.0.3"
+    validations:
+      required: true
+  
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant Version
+      description: What version of Home Assistant are you running?
+      placeholder: "2024.4.0"
+    validations:
+      required: true
+  
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other information that might be helpful (screenshots, app behavior, etc.)
+    validations:
+      required: false
+  
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      description: Please confirm you have completed the following
+      options:
+        - label: I have provided at least 3-5 payload samples in different states
+          required: true
+        - label: I have included the exact device model number
+          required: true
+        - label: I have described what the device should display in Home Assistant
+          required: true
+        - label: I have checked that this device is not already supported
+          required: true

@@ -1,0 +1,139 @@
+name: Bug Report
+description: Report a bug or issue with the integration
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Thanks for reporting a bug!
+        
+        Please provide as much detail as possible to help us identify and fix the issue.
+  
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: "The valve shows as 'open' in Home Assistant but is actually closed"
+    validations:
+      required: true
+  
+  - type: input
+    id: device_model
+    attributes:
+      label: Affected Device Model
+      description: Which device model is experiencing the issue?
+      placeholder: "e.g., HTV213FRF, HCS0528ARF"
+    validations:
+      required: true
+  
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Open valve zone 1 using the app
+        2. Check Home Assistant entity state
+        3. Entity shows 'closed' instead of 'open'
+    validations:
+      required: true
+  
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+      placeholder: "Valve entity should show 'open' state when zone is activated"
+    validations:
+      required: true
+  
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happens?
+      placeholder: "Valve entity shows 'closed' state even when zone is running"
+    validations:
+      required: true
+  
+  - type: textarea
+    id: payload_samples
+    attributes:
+      label: Payload Samples (if applicable)
+      description: |
+        If the issue involves incorrect decoding, please provide payload samples.
+        Include samples that demonstrate the bug (e.g., valve open but showing closed).
+      placeholder: |
+        Payload when bug occurs:
+        01#17E1CA0019D8111AD8001BD8001CD8001D201E201F20202018DC0121B75BBADC16...
+        
+        Expected state: Zone 1 open
+        Actual state shown: Zone 1 closed
+      render: shell
+    validations:
+      required: false
+  
+  - type: textarea
+    id: logs
+    attributes:
+      label: Home Assistant Logs
+      description: |
+        Please paste relevant logs with debug logging enabled if possible.
+        Configuration > Logs > Set custom_components.homgar to DEBUG
+      placeholder: |
+        2026-04-06 10:00:00 DEBUG (MainThread) [custom_components.homgar] ...
+        2026-04-06 10:00:00 ERROR (MainThread) [custom_components.homgar] ...
+      render: shell
+    validations:
+      required: false
+  
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration Version
+      description: What version of the HomGar/RainPoint integration are you using?
+      placeholder: "2.0.3"
+    validations:
+      required: true
+  
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant Version
+      description: What version of Home Assistant are you running?
+      placeholder: "2024.4.0"
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: installation_method
+    attributes:
+      label: Installation Method
+      description: How did you install the integration?
+      options:
+        - HACS
+        - Manual
+    validations:
+      required: true
+  
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other information that might be helpful (screenshots, workarounds, etc.)
+    validations:
+      required: false
+  
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have provided steps to reproduce the issue
+          required: true
+        - label: I have included the integration version
+          required: true
