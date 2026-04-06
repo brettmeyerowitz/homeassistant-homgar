@@ -10,6 +10,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_APP_TYPE
 from .homgar_api import HomGarClient
+from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,8 +46,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Initialize MQTT for real-time valve updates (optional, graceful fallback)
     mqtt_client = None
     try:
-        from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
-        
         if PAHO_AVAILABLE:
             mqtt_creds = client.get_mqtt_credentials()
             if mqtt_creds.get("product_key") and mqtt_creds.get("device_name"):

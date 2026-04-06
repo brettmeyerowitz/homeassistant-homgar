@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.5] - 2026-04-06
+
+### 🐛 BUG FIXES
+
+- **Fixed blocking I/O warning in async context**
+  - Moved MQTT client import to module level
+  - Prevents blocking file operations during integration setup
+  - Resolves Home Assistant async loop warnings
+
+### 📝 TECHNICAL DETAILS
+
+- Moved `from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE` to top of `__init__.py`
+- Import now happens at module load time instead of inside `async_setup_entry()`
+- Eliminates blocking calls to `listdir()`, `read_text()`, and `open()` in event loop
+- Follows Home Assistant best practices for async operations
+
 ## [2.0.4] - 2026-04-06
 
 ### 🔧 HUB COMPATIBILITY
