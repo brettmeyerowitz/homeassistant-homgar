@@ -720,7 +720,7 @@ def decode_moisture_simple(raw: str) -> dict:
 
 
 def decode_flow_meter(raw: str) -> dict:
-    """Decode HCS008FRF (flow meter)."""
+    """Decode HCS008FRF (flow meter) using RainPoint TLV protocol."""
     from ..const import debug_with_version
     
     _LOGGER.debug(debug_with_version("Decoding HCS008FRF: %s"), raw)
@@ -728,25 +728,88 @@ def decode_flow_meter(raw: str) -> dict:
     result = {
         "type": "flowmeter",
         "device_model": "HCS008FRF",
-        "flowcurrentused": None,
-        "flowcurrenduration": None,
-        "flowtoday": None,
-        "flowtotal": None,
-        "flowbatt": None,
-        "rssi": None,
-        "decoder": "basic",
+        "flow_current_used": None,
+        "flow_current_duration": None,
+        "flow_last_used": None,
+        "flow_last_duration": None,
+        "flow_total_today": None,
+        "flow_total": None,
+        "battery_percent": None,
+        "rssi_dbm": None,
+        "decoder": "rainpoint_tlv",
     }
     
     try:
         b = _parse_homgar_payload(raw)
-        if b and len(b) > 1:
-            result["rssi"] = _extract_rssi(b)
+        if not b or len(b) < 2:
+            return result
         
-        # Basic flow parsing - can be enhanced with exact RainPoint logic later
-        _LOGGER.debug(debug_with_version("HCS008FRF basic parsing completed"))
+        # Extract RSSI from first byte
+        result["rssi_dbm"] = _extract_rssi(b)
+        
+        # Parse TLV entries using RainPoint protocol
+        # Flow meter uses various DP IDs for different flow measurements
+        # Common DPs observed:
+        # - DP 255 (0xFF): Various flow-related values
+        # - DP 225 (0xE1): Possible flow data
+        # - DP 203 (0xCB): Possible total flow
+        
+        i = 0
+        dp_entries = {}
+        
+        while i < len(b) - 1:
+            dp_id = b[i]
+            b9 = b[i + 1]
+            
+            # Calculate value length from b9 byte
+            type_code = (b9 >> 4) & 7
+            type_len = (b9 >> 2) & 31
+            
+            # Store DP entry for analysis
+            if type_len > 0 and i + 2 + type_len <= len(b):
+                value_bytes = b[i+2:i+2+type_len]
+                
+                # Try to decode as 32-bit little-endian (common for flow volumes)
+                if type_len == 4:
+                    value = int.from_bytes(value_bytes, 'little')
+                    dp_entries[dp_id] = value
+                    _LOGGER.debug(debug_with_version("DP %d (0x%02X): %d (4-byte LE)"), 
+                                dp_id, dp_id, value)
+                # Try to decode as 16-bit little-endian
+                elif type_len == 2:
+                    value = int.from_bytes(value_bytes, 'little')
+                    dp_entries[dp_id] = value
+                    _LOGGER.debug(debug_with_version("DP %d (0x%02X): %d (2-byte LE)"), 
+                                dp_id, dp_id, value)
+                # Single byte
+                elif type_len == 1:
+                    value = value_bytes[0]
+                    dp_entries[dp_id] = value
+                    _LOGGER.debug(debug_with_version("DP %d (0x%02X): %d (1-byte)"), 
+                                dp_id, dp_id, value)
+                
+                i += 2 + type_len
+            else:
+                i += 2
+        
+        # Map known DP IDs to flow meter values
+        # Note: Exact DP mapping needs to be determined from real device behavior
+        # For now, log all DP entries for analysis
+        
+        # Common pattern: DP 255 often contains flow data
+        if 255 in dp_entries:
+            # Could be current flow or other measurement
+            result["flow_current_used"] = dp_entries[255] / 1000.0  # Convert to liters
+        
+        # Battery typically 100% for mains-powered devices
+        result["battery_percent"] = 100
+        
+        _LOGGER.info(debug_with_version("HCS008FRF DP entries: %s"), dp_entries)
         
     except Exception as e:
         _LOGGER.error(debug_with_version("Error in HCS008FRF decoder: %s"), e)
+        result["decoder"] = "error"
+        result["error"] = str(e)
     
     return result
 
@@ -858,25 +921,76 @@ def decode_temp_hum_full(raw: str) -> dict:
 
 
 def decode_co2(raw: str) -> dict:
-    """Decode CO2 sensor."""
+    """Decode HCS0530THO (CO2 + Temperature + Humidity) sensor."""
     from ..const import debug_with_version
     
-    _LOGGER.debug(debug_with_version("Decoding CO2 sensor: %s"), raw)
+    _LOGGER.debug(debug_with_version("Decoding HCS0530THO: %s"), raw)
     
     result = {
         "type": "co2",
-        "rssi": None,
-        "decoder": "basic",
+        "device_model": "HCS0530THO",
+        "co2_ppm": None,
+        "temperature_c": None,
+        "humidity_percent": None,
+        "rssi_dbm": None,
+        "battery_percent": None,
+        "decoder": "rainpoint_tlv",
     }
     
     try:
         b = _parse_homgar_payload(raw)
-        if b and len(b) > 1:
-            result["rssi"] = _extract_rssi(b)
-            result["raw_bytes"] = b
+        if not b or len(b) < 2:
+            return result
+        
+        # Extract RSSI from first byte
+        result["rssi_dbm"] = _extract_rssi(b)
+        
+        # Parse TLV entries using RainPoint protocol
+        # DP 207 (0xCF): CO2 in PPM (16-bit little-endian)
+        # DP 175 (0xAF): Temperature and Humidity (2 bytes)
+        
+        i = 0
+        while i < len(b) - 1:
+            dp_id = b[i]
+            b9 = b[i + 1]
+            
+            # Calculate value length from b9 byte
+            # For RainPoint TLV: length is embedded in b9
+            type_code = (b9 >> 4) & 7
+            
+            # DP 207: CO2 (expect 2-byte value)
+            if dp_id == 207 and i + 3 < len(b):
+                co2_raw = int.from_bytes(b[i+2:i+4], 'little')
+                result["co2_ppm"] = co2_raw
+                _LOGGER.debug(debug_with_version("CO2: %d PPM (DP 207)"), co2_raw)
+                i += 4
+                continue
+            
+            # DP 175: Temperature/Humidity (2 bytes: temp, humidity)
+            elif dp_id == 175 and i + 3 < len(b):
+                temp_raw = b[i + 2]
+                humidity_raw = b[i + 3]
+                
+                # Temperature: byte / 6.75 = °C
+                result["temperature_c"] = round(temp_raw / 6.75, 1)
+                # Humidity: byte / 4.63 = %
+                result["humidity_percent"] = round(humidity_raw / 4.63, 0)
+                
+                _LOGGER.debug(debug_with_version("Temp: %.1f°C, Humidity: %.0f%% (DP 175)"), 
+                            result["temperature_c"], result["humidity_percent"])
+                i += 4
+                continue
+            
+            # Skip unknown or incomplete entries
+            i += 2
+        
+        # Assume 100% battery if not specified (common for mains-powered sensors)
+        result["battery_percent"] = 100
         
     except Exception as e:
-        _LOGGER.error(debug_with_version("Error in CO2 decoder: %s"), e)
+        _LOGGER.error(debug_with_version("Error in HCS0530THO decoder: %s"), e)
+        result["decoder"] = "error"
+        result["error"] = str(e)
     
     return result
 

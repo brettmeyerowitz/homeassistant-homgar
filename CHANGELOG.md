@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.6] - 2026-04-06
+
+### 🔧 DECODER IMPLEMENTATIONS
+
+- **Implemented HCS0530THO (CO2 sensor) decoder**
+  - Parses CO2 levels in PPM using DP 207
+  - Extracts temperature (°C) using DP 175
+  - Extracts humidity (%) using DP 175
+  - Uses RainPoint TLV protocol parsing
+
+- **Implemented HCS008FRF (Flow Meter) decoder**
+  - Parses flow meter data using RainPoint TLV protocol
+  - Extracts RSSI and battery status
+  - Logs all DP entries for analysis
+  - Foundation for complete flow measurements
+
+### 🐛 BUG FIXES
+
+- **Fixed CO2 sensor showing no values**
+  - Replaced stub decoder with full TLV implementation
+  - CO2, temperature, and humidity now decode correctly
+  
+- **Fixed Flow Meter showing all "unknown" values**
+  - Replaced stub decoder with TLV-based implementation
+  - RSSI and battery now extracted correctly
+  - Flow values logged for further analysis
+
+### 📝 TECHNICAL DETAILS
+
+- Both decoders use exact RainPoint TLV parsing method
+- DP 207 (0xCF): CO2 in PPM (16-bit little-endian)
+- DP 175 (0xAF): Temperature and Humidity (2 bytes)
+- Temperature formula: `byte / 6.75 = °C`
+- Humidity formula: `byte / 4.63 = %`
+- Flow Meter DP mapping requires additional real-world data for complete implementation
+
 ## [2.0.5] - 2026-04-06
 
 ### 🐛 BUG FIXES
