@@ -1562,6 +1562,9 @@ def decode_htv113frf(raw: str) -> dict:
         if status_byte & 0x20:  # Check bit 5
             result["countdown_active"] = True
         
+        # Add hub_online status for valve availability
+        result["hub_online"] = True
+        
         _LOGGER.debug(debug_with_version("HTV113FRF decoded: zones=%s, rssi=%d, battery=%s%%"), 
                      result["zones"], result["rssi_dbm"], result["battery_percent"])
         
