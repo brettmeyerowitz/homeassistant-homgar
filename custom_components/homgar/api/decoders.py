@@ -969,17 +969,10 @@ def decode_co2(raw: str) -> dict:
                 continue
             
             # DP 175: Temperature/Humidity (2 bytes: temp, humidity)
+            # NOTE: DP 175 uses wrong scaling for HCS0530THO, ignore it
+            # Let exact parsing handle temperature/humidity from DP 185/220/196
             elif dp_id == 175 and i + 3 < len(b):
-                temp_raw = b[i + 2]
-                humidity_raw = b[i + 3]
-                
-                # Temperature: byte / 6.75 = °C
-                result["co2temp"] = round(temp_raw / 6.75, 1)
-                # Humidity: byte / 4.63 = %
-                result["co2humidity"] = round(humidity_raw / 4.63, 0)
-                
-                _LOGGER.debug(debug_with_version("Temp: %.1f°C, Humidity: %.0f%% (DP 175)"), 
-                            result["co2temp"], result["co2humidity"])
+                _LOGGER.debug(debug_with_version("Ignoring DP 175 for HCS0530THO (wrong scaling)"))
                 i += 4
                 continue
             
@@ -1078,6 +1071,13 @@ def decode_co2(raw: str) -> dict:
                     if 20 <= humidity_raw <= 80 and result.get("co2humidity") is None:
                         result["co2humidity"] = humidity_raw
                         _LOGGER.debug(debug_with_version("Humidity: %d%% (DP 196, exact parsing)"), humidity_raw)
+                
+                # Humidity candidate (DP 195: high byte of 2-byte value - new payload format)
+                elif dp_id == 195 and type_byte == 0x02:
+                    humidity_raw = (value >> 8) & 0xFF
+                    if 20 <= humidity_raw <= 80 and result.get("co2humidity") is None:
+                        result["co2humidity"] = humidity_raw
+                        _LOGGER.debug(debug_with_version("Humidity: %d%% (DP 195, exact parsing)"), humidity_raw)
         except Exception as e:
             _LOGGER.debug(debug_with_version("Exact parsing failed, using TLV only: %s"), e)
         
