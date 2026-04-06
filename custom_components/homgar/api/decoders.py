@@ -1220,8 +1220,83 @@ def decode_hcs015arf(raw: str) -> dict:
 
 
 def decode_hcs0528arf(raw: str) -> dict:
-    """Decode HCS0528ARF (pool temperature sensor)."""
-    return decode_pool(raw)
+    """
+    Decode HCS0528ARF pool temperature sensor.
+    
+    Fixed-position payload format based on real device analysis.
+    Temperature is at position 10, scaled by 10 (245 = 24.5°C).
+    
+    Args:
+        raw: Raw payload string (e.g., "10#E7DE020703DC01B80585F502FF0F26680D19")
+        
+    Returns:
+        Dictionary containing decoded pool temperature data
+    """
+    from ..const import debug_with_version
+    
+    result = {
+        "type": "pool_temperature",
+        "model": "HCS0528ARF",
+    }
+    
+    try:
+        # Extract hex part after "10#" prefix
+        if raw.startswith("10#"):
+            hex_part = raw[3:]
+        else:
+            hex_part = raw
+        
+        # Convert to bytes
+        bytes_list = [int(hex_part[i:i+2], 16) for i in range(0, len(hex_part), 2)]
+        
+        # Need at least 18 bytes for complete data
+        if len(bytes_list) < 18:
+            result.update({
+                "type": "unknown",
+                "error": f"Insufficient data: {len(bytes_list)} bytes"
+            })
+            return result
+        
+        # RSSI (position 0) - signed byte
+        rssi_raw = bytes_list[0]
+        rssi = rssi_raw - 256 if rssi_raw > 127 else rssi_raw
+        result["rssi_dbm"] = rssi
+        
+        # Temperature (position 10) - single byte, scale by 10
+        # Real payload analysis shows: 245 = 24.5°C, 247 = 24.7°C
+        temp_raw = bytes_list[10]
+        temperature_c = temp_raw / 10.0
+        result["temperature_c"] = temperature_c
+        
+        # Battery status (positions 12-13) - FF0F = 100%
+        battery_high = bytes_list[12]
+        battery_low = bytes_list[13]
+        if battery_high == 0xFF and battery_low == 0x0F:
+            result["battery_percent"] = 100
+        elif battery_low <= 100:
+            result["battery_percent"] = battery_low
+        else:
+            result["battery_percent"] = None
+        
+        # Device info
+        result.update({
+            "device_type": bytes_list[3],
+            "sub_device": bytes_list[4],
+            "firmware_version": str(bytes_list[7]),
+            "raw_bytes": bytes_list,
+        })
+        
+        _LOGGER.debug(debug_with_version("HCS0528ARF decoded: temp=%.1f°C, rssi=%d, battery=%s%%"), 
+                     temperature_c, rssi, result["battery_percent"])
+        
+    except Exception as e:
+        _LOGGER.error(debug_with_version("Error in HCS0528ARF decoder: %s"), e)
+        result.update({
+            "type": "unknown",
+            "error": str(e)
+        })
+    
+    return result
 
 
 # Additional HCS variant decoders - placeholder implementations
