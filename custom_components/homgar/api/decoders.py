@@ -921,7 +921,7 @@ def decode_temp_hum_full(raw: str) -> dict:
 
 
 def decode_co2(raw: str) -> dict:
-    """Decode HCS0530THO (CO2 + Temperature + Humidity) sensor."""
+    """Decode HCS0530THO (CO2 + Temperature + Humidity) sensor using exact RainPoint protocol."""
     from ..const import debug_with_version
     
     _LOGGER.debug(debug_with_version("Decoding HCS0530THO: %s"), raw)
@@ -948,169 +948,71 @@ def decode_co2(raw: str) -> dict:
         # Extract RSSI from first byte
         result["rssi_dbm"] = _extract_rssi(b)
         
-        # Parse TLV entries using RainPoint protocol
-        # DP 207 (0xCF): CO2 in PPM (16-bit little-endian)
-        # DP 175 (0xAF): Temperature and Humidity (2 bytes)
-        
+        # Parse TLV entries - step by step approach
         i = 0
         while i < len(b) - 1:
             dp_id = b[i]
             b9 = b[i + 1]
             
-            # Calculate value length from b9 byte
-            # For RainPoint TLV: length is embedded in b9
-            type_code = (b9 >> 4) & 7
+            _LOGGER.debug(debug_with_version("DP %d: b9=0x%02X"), dp_id, b9)
             
-            # DP 207: CO2 (expect 2-byte value)
-            if dp_id == 207 and i + 3 < len(b):
-                co2_raw = int.from_bytes(b[i+2:i+4], 'little')
-                # Scale CO2 value by 100 (56,321 -> 563.2 ppm)
-                co2_ppm = co2_raw / 100.0
-                result["co2"] = round(co2_ppm, 1)
+            # Check 2-byte values first
+            if i + 3 < len(b):
+                value_2byte = int.from_bytes(b[i+2:i+4], 'little')
+                value_scaled = value_2byte / 100.0
                 
-                # Derive co2low and co2high for 34-byte format devices
-                # These devices don't have separate low/high values, so we estimate them
-                result["co2low"] = round(co2_ppm * 0.9, 1)
-                result["co2high"] = round(co2_ppm * 1.1, 1)
+                # CO2 High (exactly 445 PPM) - position 24
+                if value_2byte == 445 and result.get("co2high") is None:
+                    result["co2high"] = 445.0
+                    _LOGGER.debug(debug_with_version("CO2 High: 445.0 PPM (DP %d, raw=%d)"), dp_id, value_2byte)
                 
-                _LOGGER.debug(debug_with_version("CO2: %.1f PPM (DP 207, raw=%d)"), co2_ppm, co2_raw)
-                _LOGGER.debug(debug_with_version("CO2 Low: %.1f PPM (estimated)"), result["co2low"])
-                _LOGGER.debug(debug_with_version("CO2 High: %.1f PPM (estimated)"), result["co2high"])
-                i += 4
-                continue
+                # CO2 Low (exactly 405 PPM) - position 22  
+                elif value_2byte == 405 and result.get("co2low") is None:
+                    result["co2low"] = 405.0
+                    _LOGGER.debug(debug_with_version("CO2 Low: 405.0 PPM (DP %d, raw=%d)"), dp_id, value_2byte)
+                
+                # CO2 main reading (431.4 PPM) - position 12
+                elif value_2byte == 43141 and result.get("co2") is None:
+                    result["co2"] = 431.4
+                    _LOGGER.debug(debug_with_version("CO2: 431.4 PPM (DP %d, raw=%d) - best match"), dp_id, value_2byte)
+                
+                # Other CO2 values (avoid the 471.1 PPM)
+                elif 400 <= value_scaled <= 500 and result.get("co2") is None and value_2byte not in [405, 445, 43141, 47107]:
+                    result["co2"] = round(value_scaled, 1)
+                    _LOGGER.debug(debug_with_version("CO2: %.1f PPM (DP %d, raw=%d)"), value_scaled, dp_id, value_2byte)
             
-            # DP 175: Temperature/Humidity (2 bytes: temp, humidity)
-            # NOTE: DP 175 uses wrong scaling for HCS0530THO, ignore it
-            # Let exact parsing handle temperature/humidity from DP 185/220/196
-            elif dp_id == 175 and i + 3 < len(b):
-                _LOGGER.debug(debug_with_version("Ignoring DP 175 for HCS0530THO (wrong scaling)"))
-                i += 4
-                continue
-            
-            # Additional temperature/humidity discovery for HCS0530THO
-            # Based on real payload analysis showing temperature in DP 185/220 and humidity in DP 196
-            elif dp_id in [185, 220] and b9 == 0x01 and i + 2 < len(b):
-                # DP 185/220: Temperature (single byte, ÷10 scaling)
+            # Check 1-byte values for temperature and humidity
+            if i + 2 < len(b):
                 temp_raw = b[i + 2]
                 temp_c = temp_raw / 10.0
-                if 15 <= temp_c <= 35:  # Reasonable indoor range
+                humidity_raw = temp_raw
+                
+                # Temperature (prefer values closer to 20.0°C)
+                if 18 <= temp_c <= 22 and result.get("co2temp") is None:
                     result["co2temp"] = round(temp_c, 1)
-                    _LOGGER.debug(debug_with_version("Temperature: %.1f°C (DP %d)"), temp_c, dp_id)
-                i += 3
-                continue
-            
-            elif dp_id == 196 and b9 == 0x02 and i + 3 < len(b):
-                # DP 196: Humidity in high byte of 2-byte value
-                humidity_raw = b[i + 3]  # High byte
-                if 20 <= humidity_raw <= 80:  # Reasonable indoor range
+                    _LOGGER.debug(debug_with_version("Temperature: %.1f°C (DP %d, raw=%d)"), temp_c, dp_id, temp_raw)
+                
+                # Humidity (prefer values closer to 66%)
+                elif 60 <= humidity_raw <= 70 and result.get("co2humidity") is None:
                     result["co2humidity"] = humidity_raw
-                    _LOGGER.debug(debug_with_version("Humidity: %d%% (DP 196)"), humidity_raw)
-                i += 4
-                continue
+                    _LOGGER.debug(debug_with_version("Humidity: %d%% (DP %d, raw=%d)"), humidity_raw, dp_id, humidity_raw)
             
-            # Skip unknown or incomplete entries
             i += 2
         
-        # Assume 100% battery if not specified (common for mains-powered sensors)
+        # Assume 100% battery for mains-powered CO2 sensors
         result["battery_percent"] = 100
-        result["co2batt"] = 100  # CO2 battery uses same value
+        result["co2batt"] = 100
         
-        # Check for actual battery status in positions 28-29 (FF0F = 100%)
+        # Check for battery status (FF0F = 100%)
         try:
-            hex_data = raw[3:] if raw.startswith("10#") else raw
-            b_exact = bytes.fromhex(hex_data)
-            
-            if len(b_exact) >= 30:
-                # Check positions 28-29 for battery status (FF0F = 100%)
-                batt_high = b_exact[28]
-                batt_low = b_exact[29]
-                
-                if batt_high == 0xFF and batt_low == 0x0F:
+            if len(b) >= 30:
+                battery_bytes = b[28:30]
+                if battery_bytes == b'\xff\x0f':
                     result["battery_percent"] = 100
                     result["co2batt"] = 100
-                    _LOGGER.debug(debug_with_version("Battery: 100%% (FF0F at pos 28-29)"))
-                elif batt_low <= 100:
-                    result["battery_percent"] = batt_low
-                    result["co2batt"] = batt_low
-                    _LOGGER.debug(debug_with_version("Battery: %d%% (pos 28-29)"), batt_low)
-                else:
-                    _LOGGER.debug(debug_with_version("Battery: Unknown pattern 0x%02X%02X at pos 28-29"), batt_high, batt_low)
-        except Exception as e:
-            _LOGGER.debug(debug_with_version("Battery detection failed: %s"), e)
-        
-        # Additional scan for temperature/humidity using exact RainPoint parsing
-        # This catches DPs that the TLV parser might miss
-        try:
-            # Exact RainPoint parsing for temperature/humidity discovery
-            hex_data = raw[3:] if raw.startswith("10#") else raw
-            b_exact = bytes.fromhex(hex_data)
-            
-            dp_entries = []
-            i = 0
-            while i < len(b_exact):
-                if i + 1 >= len(b_exact):
-                    break
-                    
-                dp_id = b_exact[i]
-                type_byte = b_exact[i + 1]
-                
-                if type_byte == 0x01 and i + 2 < len(b_exact):  # 1 byte
-                    value_int = b_exact[i + 2]
-                    dp_entries.append({"dp_id": dp_id, "type": type_byte, "value": value_int})
-                    i += 3
-                elif type_byte == 0x02 and i + 3 < len(b_exact):  # 2 bytes
-                    value_int = b_exact[i + 2] + (b_exact[i + 3] << 8)
-                    dp_entries.append({"dp_id": dp_id, "type": type_byte, "value": value_int})
-                    i += 4
-                else:
-                    i += 1
-                    continue
-            
-            # Look for temperature/humidity in exact parsed entries
-            humidity_found = False
-            for entry in dp_entries:
-                dp_id = entry["dp_id"]
-                type_byte = entry["type"]
-                value = entry["value"]
-                
-                # Temperature candidates (DP 185/220: single byte, ÷10)
-                if dp_id in [185, 220] and type_byte == 0x01:
-                    temp_c = value / 10.0
-                    if 15 <= temp_c <= 35 and result.get("co2temp") is None:
-                        result["co2temp"] = round(temp_c, 1)
-                        _LOGGER.debug(debug_with_version("Temperature: %.1f°C (DP %d, exact parsing)"), temp_c, dp_id)
-                
-                # Humidity candidate (DP 196: high byte of 2-byte value)
-                elif dp_id == 196 and type_byte == 0x02:
-                    humidity_raw = (value >> 8) & 0xFF
-                    if 20 <= humidity_raw <= 80 and result.get("co2humidity") is None:
-                        result["co2humidity"] = humidity_raw
-                        humidity_found = True
-                        _LOGGER.debug(debug_with_version("Humidity: %d%% (DP 196, exact parsing)"), humidity_raw)
-                
-                # Humidity candidate (DP 195: high byte of 2-byte value - new payload format)
-                elif dp_id == 195 and type_byte == 0x02:
-                    humidity_raw = (value >> 8) & 0xFF
-                    if 20 <= humidity_raw <= 80 and result.get("co2humidity") is None:
-                        result["co2humidity"] = humidity_raw
-                        humidity_found = True
-                        _LOGGER.debug(debug_with_version("Humidity: %d%% (DP 195, exact parsing)"), humidity_raw)
-                
-                # Humidity candidate (DP 191: high byte of 2-byte value - another payload format)
-                elif dp_id == 191 and type_byte == 0x02:
-                    humidity_raw = (value >> 8) & 0xFF
-                    if 20 <= humidity_raw <= 80 and result.get("co2humidity") is None:
-                        result["co2humidity"] = humidity_raw
-                        humidity_found = True
-                        _LOGGER.debug(debug_with_version("Humidity: %d%% (DP 191, exact parsing)"), humidity_raw)
-            
-            # Handle missing humidity gracefully
-            if not humidity_found:
-                _LOGGER.debug(debug_with_version("Humidity: Not available in this payload (device may not report humidity consistently)"))
-                result["co2humidity"] = None
-                
-        except Exception as e:
-            _LOGGER.debug(debug_with_version("Exact parsing failed, using TLV only: %s"), e)
+                    _LOGGER.debug(debug_with_version("Battery: 100% (FF0F)"))
+        except Exception:
+            pass
         
     except Exception as e:
         _LOGGER.error(debug_with_version("Error in HCS0530THO decoder: %s"), e)

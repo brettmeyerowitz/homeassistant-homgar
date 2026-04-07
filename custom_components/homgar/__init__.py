@@ -188,13 +188,119 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             )
             raise ValueError("Failed to reload HomGar integration")
     
-    # Register the service with optional entry_id
+    async def reauthenticate_service(call) -> None:
+        """Service to force re-authentication after mobile app login."""
+        from homeassistant.components import persistent_notification
+        
+        entry_id = call.data.get("entry_id")
+        
+        if not entry_id:
+            _LOGGER.error("No entry_id provided for re-authentication")
+            persistent_notification.async_create(
+                hass,
+                "Please provide an entry_id for re-authentication",
+                title="HomGar Re-authentication Failed",
+                notification_id="homgar_reauth_error"
+            )
+            raise ValueError("entry_id is required for re-authentication")
+        
+        # Get the config entry
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if not entry or entry.domain != DOMAIN:
+            _LOGGER.error("Invalid entry for re-authentication: %s", entry_id)
+            persistent_notification.async_create(
+                hass,
+                f"Invalid HomGar entry: {entry_id}",
+                title="HomGar Re-authentication Failed",
+                notification_id="homgar_reauth_error"
+            )
+            raise ValueError(f"Invalid entry_id: {entry_id}")
+        
+        # Get the entry data and client
+        entry_data = hass.data[DOMAIN].get(entry_id, {})
+        client = entry_data.get("client")
+        coordinator = entry_data.get("coordinator")
+        
+        if not client:
+            _LOGGER.error("No client found for entry: %s", entry_id)
+            persistent_notification.async_create(
+                hass,
+                "No client found for this integration",
+                title="HomGar Re-authentication Failed",
+                notification_id="homgar_reauth_error"
+            )
+            raise ValueError("No client available")
+        
+        try:
+            # Force re-authentication by clearing tokens and logging in again
+            _LOGGER.info("Forcing re-authentication for HomGar entry: %s", entry_id)
+            
+            # Clear current tokens
+            client._token = None
+            client._refresh_token = None
+            client._token_expires_at = None
+            
+            # Force login to get new tokens
+            success = await client.login()
+            if success:
+                # Update the config entry with new tokens
+                new_tokens = client.export_tokens()
+                new_data = dict(entry.data)
+                new_data.update(new_tokens)
+                
+                # Update the entry data
+                hass.config_entries.async_update_entry(entry, data=new_data)
+                
+                # Force coordinator refresh to test new tokens
+                if coordinator:
+                    await coordinator.async_request_refresh()
+                
+                _LOGGER.info("HomGar re-authentication successful for entry: %s", entry_id)
+                persistent_notification.async_create(
+                    hass,
+                    "HomGar integration re-authenticated successfully. You can now use your mobile app login.",
+                    title="HomGar Re-authentication Complete",
+                    notification_id="homgar_reauth_success"
+                )
+                return {"message": "Re-authentication successful"}
+            else:
+                _LOGGER.error("HomGar re-authentication failed for entry: %s", entry_id)
+                persistent_notification.async_create(
+                    hass,
+                    "Failed to re-authenticate HomGar. Please check your credentials.",
+                    title="HomGar Re-authentication Failed",
+                    notification_id="homgar_reauth_error"
+                )
+                raise ValueError("Re-authentication failed")
+                
+        except Exception as ex:
+            _LOGGER.error("Error during HomGar re-authentication: %s", ex)
+            persistent_notification.async_create(
+                hass,
+                f"Re-authentication error: {str(ex)}",
+                title="HomGar Re-authentication Failed",
+                notification_id="homgar_reauth_error"
+            )
+            raise ValueError(f"Re-authentication error: {str(ex)}")
+    
+    # Register the reload service
     hass.services.async_register(
         DOMAIN, 
         "reload", 
         reload_service, 
         schema=vol.Schema({
             vol.Optional("entry_id"): str,
+        }),
+        supports_response=True,
+    )
+    
+    # Register the re-authentication service
+    hass.services.async_register(
+        DOMAIN, 
+        "reauthenticate", 
+        reauthenticate_service, 
+        schema=vol.Schema({
+            vol.Required("entry_id"): str,
         }),
         supports_response=True,
     )
