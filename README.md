@@ -20,16 +20,43 @@ This integration supports RainPoint Smart+ devices via HomGar cloud API. **Impor
 
 **All device models (HCS*, HTV*, etc.) are RainPoint hardware** that can be accessed via either the HomGar or RainPoint mobile app.
 
-### RainPoint Smart+ Devices:
+### Supported RainPoint Smart+ Devices
 
-| Device | Model | Capabilities |
-|--------|-------|-------------|
-| **Irrigation Display Hub** | HWS019WRF-V2 | Hub/controller |
-| **Soil & Moisture Sensor** | HCS021FRF | Moisture + Temperature + Light |
-| **High Precision Rain Sensor** | HCS012ARF | Rain (hourly/daily/weekly/total) |
-| **Outdoor Air Humidity Sensor** | HCS014ARF | Temperature + Humidity |
-| **2-Zone Water Timer** | HTV213FRF | Flow control |
-| **Soil Moisture Probe (Simple)** | HCS026FRF | Moisture only |
+#### 🌡️ Environmental Sensors
+
+| Device | Model(s) | Entities |
+|--------|----------|---------|
+| Soil Moisture + Temp + Light | HCS021FRF, HCS024FRF-V1, HCS044FRF, HCS666FRF, HCS666RFR-P, HCS999FRF, HCS999FRF-P, HCS666FRF-X | Moisture %, Temperature, Illuminance |
+| Soil Moisture (simple) | HCS026FRF, HCS005FRF, HCS003FRF | Moisture % |
+| Temperature + Humidity | HCS014ARF, HCS027ARF, HCS016ARF, HCS701B, HCS596WB, HCS596WB-V4, HCS706ARF, HCS802ARF, HCS048B, HCS888ARF-V1, HCS0600ARF | Temperature °C, Humidity % |
+| Rain Gauge | HCS012ARF | Rain last hour/24h/7d/total (mm) |
+| CO₂ + Temp + Humidity | HCS0530THO | CO₂ ppm (current/low/high), Temperature, Humidity, Battery |
+| Pool Temperature | HCS0528ARF, HCS015ARF | Temp current/daily high/daily low |
+| Pool Temperature (simple) | HCS0565ARF | Temperature current |
+| Pool Temp + Ambient | HCS015ARF+ | Pool temp (current/hi/lo), Ambient temp (current/hi/lo), Humidity (current/hi/lo) |
+| Flow Meter | HCS008FRF | Current flow, last used, total today, total lifetime, duration, battery |
+
+#### ☁️ Weather Station / Display Hub
+
+| Device | Model | Entities |
+|--------|-------|---------|
+| Irrigation Display Hub / Weather Station | HWS019WRF-V2 | Temperature °C (current/daily high/low), Humidity % (current/daily high/low), Pressure hPa (current/daily high/low) |
+
+#### 💧 Irrigation Valves & Timers
+
+| Device | Model(s) | Entities |
+|--------|----------|---------|
+| Multi-zone Valve Hub | HTV0540FRF | Per-zone open/close valve control |
+| 2-zone Valve / Timer | HTV213FRF, HTV245FRF | Per-zone open/close valve control |
+| 4-zone RF Timer | HTV0542FRF | Per-zone open/close valve control |
+| 1-zone Timer | HTV113FRF | Open/close valve control |
+
+#### 🔌 Hubs (Gateway devices — no direct sensor entities)
+
+| Device | Model(s) |
+|--------|----------|
+| Main WiFi Hub V1 | HWG023WRF |
+| Main WiFi Hub V2 | HWG023WBRF-V2 |
 
 All devices communicate via the HomGar cloud backend (`region3.homgarus.com`).
 
