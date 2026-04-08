@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.23] - 2026-04-08
+
+### ✨ NEW FEATURES
+
+- **HWS019WRF-V2 (Display Hub / Weather Station) now fully supported**
+  - Correctly decodes temperature (current, daily high/low), humidity (current, daily high/low), and atmospheric pressure (current, daily high/low)
+  - All values exposed as properly typed Home Assistant sensor entities with correct device classes and units (°C, %, hPa)
+
 ## [2.0.22] - 2026-04-08
 
 ### 🐛 BUG FIXES

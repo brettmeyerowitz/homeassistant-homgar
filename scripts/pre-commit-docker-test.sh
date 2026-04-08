@@ -181,25 +181,28 @@ fi
 
 # Test Display Hub decoder
 echo "🧪 Testing Display Hub decoder..."
-DISPLAY_HUB_TEST=$(docker exec ha-test python3 -c "
+cat > /tmp/test_display_hub.py << 'PYEOF'
 import sys
-sys.path.append('/config/custom_components')
+sys.path.insert(0, '/config')
 from custom_components.homgar.homgar_api import decode_hws019wrf_v2
 
-# Test with real payload format
-result = decode_hws019wrf_v2('1,0,1;707(707/694/1),42(42/39/1),P=9709(9709/9701/1),')
-readings = result.get('readings', {})
+result = decode_hws019wrf_v2('1,136;781(781/723/1),52(64/50/1),P=10213(10222/10205/1),')
+temp = result.get('temp_current_c')
+hum = result.get('humidity_current')
+press = result.get('pressure_current_hpa')
+temp_high = result.get('temp_high_c')
+hum_low = result.get('humidity_low')
 
-# Check that values are extracted correctly (not raw strings with parentheses)
-temp = readings.get('temp', '')
-humidity = readings.get('humidity', '')
-pressure = readings.get('P', '')
+expected_temp = round((781/10.0 - 32.0)*5.0/9.0, 1)
+expected_press = round(10213/100.0, 1)
 
-if temp == '707' and humidity == '42' and pressure == '9709':
+if temp == expected_temp and hum == 52 and press == expected_press and temp_high is not None and hum_low is not None:
     print('DISPLAY_HUB_TEST:PASS')
 else:
-    print(f'DISPLAY_HUB_TEST:FAIL:temp={temp},humidity={humidity},pressure={pressure}')
-" 2>/dev/null)
+    print(f'DISPLAY_HUB_TEST:FAIL:temp={temp}(exp {expected_temp}),hum={hum},press={press}(exp {expected_press}),temp_high={temp_high},hum_low={hum_low}')
+PYEOF
+docker cp /tmp/test_display_hub.py ha-test:/tmp/test_display_hub.py
+DISPLAY_HUB_TEST=$(docker exec ha-test python3 /tmp/test_display_hub.py 2>/dev/null)
 
 if [[ $DISPLAY_HUB_TEST == "DISPLAY_HUB_TEST:PASS" ]]; then
     echo "✅ Display Hub decoder test passed"

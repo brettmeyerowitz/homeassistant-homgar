@@ -119,10 +119,15 @@ async def async_setup_entry(
         _LOGGER.debug("Creating sensor entity: key=%s, model=%s, sub_name=%s, home_name=%s, base_slug=%s, info=%s", key, model, sub_name, home_name, base_slug, info)
 
         if model == MODEL_DISPLAY_HUB:
-            data = info.get("data", {})
-            readings = data.get("readings", {}) if data else {}
-            for reading_key, reading_val in readings.items():
-                entities.append(DisplayHubReadingSensor(coordinator, key, info, base_slug, reading_key))
+            entities.append(DisplayHubTempCurrentSensor(coordinator, key, info, base_slug))
+            entities.append(DisplayHubTempHighSensor(coordinator, key, info, base_slug))
+            entities.append(DisplayHubTempLowSensor(coordinator, key, info, base_slug))
+            entities.append(DisplayHubHumidityCurrentSensor(coordinator, key, info, base_slug))
+            entities.append(DisplayHubHumidityHighSensor(coordinator, key, info, base_slug))
+            entities.append(DisplayHubHumidityLowSensor(coordinator, key, info, base_slug))
+            entities.append(DisplayHubPressureCurrentSensor(coordinator, key, info, base_slug))
+            entities.append(DisplayHubPressureHighSensor(coordinator, key, info, base_slug))
+            entities.append(DisplayHubPressureLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_MOISTURE_SIMPLE:
             entities.append(HomGarMoisturePercentSensor(coordinator, key, info, base_slug, simple=True))
         elif model == MODEL_MOISTURE_FULL:
@@ -541,29 +546,148 @@ class HomGarRainSensor(HomGarSensorBase):
 
 
 # HWS019WRF-V2 (Display Hub)
-class DisplayHubReadingSensor(HomGarSensorBase):
-    """Sensor for each Display Hub reading."""
-
+class DisplayHubTempCurrentSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, coordinator, sensor_key, sensor_info, base_slug, reading_key):
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._reading_key = reading_key
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_{reading_key}"
-        sub_name = sensor_info.get("sub_name") or "Display Hub"
-        self._attr_name = f"{sub_name} {reading_key}"
+        self._attr_unique_id = f"homgar_{base_slug}_displayhub_temp_current"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Temperature"
 
     @property
     def native_value(self):
         data = self._sensor_data
-        if not data:
-            return None
-        readings = data.get("readings", {})
-        value = readings.get(self._reading_key)
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return value
+        return data.get("temp_current_c") if data else None
+
+
+class DisplayHubTempHighSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_displayhub_temp_high"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Temperature Daily High"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("temp_high_c") if data else None
+
+
+class DisplayHubTempLowSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_native_unit_of_measurement = "°C"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_displayhub_temp_low"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Temperature Daily Low"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("temp_low_c") if data else None
+
+
+class DisplayHubHumidityCurrentSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.HUMIDITY
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_displayhub_hum_current"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Humidity"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("humidity_current") if data else None
+
+
+class DisplayHubHumidityHighSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.HUMIDITY
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_displayhub_hum_high"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Humidity Daily High"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("humidity_high") if data else None
+
+
+class DisplayHubHumidityLowSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.HUMIDITY
+    _attr_native_unit_of_measurement = "%"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_displayhub_hum_low"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Humidity Daily Low"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("humidity_low") if data else None
+
+
+class DisplayHubPressureCurrentSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.ATMOSPHERIC_PRESSURE
+    _attr_native_unit_of_measurement = "hPa"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_displayhub_press_current"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Pressure"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("pressure_current_hpa") if data else None
+
+
+class DisplayHubPressureHighSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.ATMOSPHERIC_PRESSURE
+    _attr_native_unit_of_measurement = "hPa"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_displayhub_press_high"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Pressure Daily High"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("pressure_high_hpa") if data else None
+
+
+class DisplayHubPressureLowSensor(HomGarSensorBase):
+    _attr_device_class = SensorDeviceClass.ATMOSPHERIC_PRESSURE
+    _attr_native_unit_of_measurement = "hPa"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        self._attr_unique_id = f"homgar_{base_slug}_displayhub_press_low"
+        self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Pressure Daily Low"
+
+    @property
+    def native_value(self):
+        data = self._sensor_data
+        return data.get("pressure_low_hpa") if data else None
 
 
 # HCS014ARF (Temperature/Humidity)

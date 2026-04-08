@@ -75,6 +75,7 @@ from .homgar_api import (
     decode_hcs999frf_p, decode_hcs666frf_x, decode_hcs701b, decode_hcs596wb,
     decode_hcs596wb_v4, decode_hcs706arf, decode_hcs802arf, decode_hcs048b,
     decode_hcs888arf_v1, decode_hcs0600arf,
+    decode_hws019wrf_v2,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -120,6 +121,7 @@ DECODER_REGISTRY = {
     MODEL_HCS048B: decode_hcs048b,
     MODEL_HCS888ARF_V1: decode_hcs888arf_v1,
     MODEL_HCS0600ARF: decode_hcs0600arf,
+    MODEL_DISPLAY_HUB: decode_hws019wrf_v2,
 }
 
 
@@ -241,12 +243,8 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         try:
                             _LOGGER.debug(debug_with_version("Decoding payload for model=%s mid=%s addr=%s: %s"), model, mid, addr, raw_value)
                             
-                            # Special case: Display Hub uses different decoder
-                            if model == MODEL_DISPLAY_HUB:
-                                from .homgar_api import decode_hws019wrf_v2
-                                decoded = decode_hws019wrf_v2(raw_value)
-                            else:
-                                # Use decoder registry for all other models
+                            # Use decoder registry for all models
+                            if True:
                                 decoder_func = DECODER_REGISTRY.get(model)
                                 if decoder_func:
                                     decoded = decoder_func(raw_value)
