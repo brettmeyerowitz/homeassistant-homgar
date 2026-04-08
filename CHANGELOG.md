@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.22] - 2026-04-08
+
+### 🐛 BUG FIXES
+
+- **Removed spurious "unknown" pool battery sensor** from HCS0528ARF, HCS015ARF, and MODEL_POOL devices — the sensor was reading a non-existent `tempbatt` key; battery level is correctly shown in diagnostics as `battery_percent`
+
 ## [2.0.21] - 2026-04-08
 
 ### 🐛 BUG FIXES

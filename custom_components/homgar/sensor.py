@@ -156,7 +156,6 @@ async def async_setup_entry(
             entities.append(HomGarPoolCurrentTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolHighTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolLowTempSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarPoolBatterySensor(coordinator, key, info, base_slug))
         elif model == MODEL_POOL_PLUS:
             entities.append(HomGarPoolPlusPoolCurrentTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolPlusPoolHighTempSensor(coordinator, key, info, base_slug))
@@ -185,13 +184,11 @@ async def async_setup_entry(
             entities.append(HomGarPoolCurrentTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolHighTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolLowTempSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarPoolBatterySensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS0528ARF:
             # Pool temperature sensor - same as MODEL_POOL
             entities.append(HomGarPoolCurrentTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolHighTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolLowTempSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarPoolBatterySensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS0565ARF:
             # Pool temperature sensor - current temp only (no high/low in payload)
             entities.append(HomGarPoolCurrentTempSensor(coordinator, key, info, base_slug))
