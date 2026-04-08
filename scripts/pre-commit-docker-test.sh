@@ -243,6 +243,31 @@ else
     exit 1
 fi
 
+# Test cold import of api module (catches missing imports that module cache can hide)
+echo "🧪 Testing cold import of api module..."
+COLD_IMPORT_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.insert(0, '/config/custom_components')
+# Force fresh import with no cache
+import importlib
+import custom_components.homgar.api as api_mod
+importlib.reload(api_mod)
+# Verify every name in __all__ is actually importable
+missing = [name for name in api_mod.__all__ if not hasattr(api_mod, name)]
+if missing:
+    print(f'COLD_IMPORT_TEST:FAIL:Missing from __all__: {missing}')
+else:
+    print('COLD_IMPORT_TEST:PASS')
+" 2>/dev/null)
+
+if [[ $COLD_IMPORT_TEST == "COLD_IMPORT_TEST:PASS" ]]; then
+    echo "✅ Cold import test passed"
+else
+    echo "❌ ERROR: Cold import test failed"
+    echo "Result: $COLD_IMPORT_TEST"
+    exit 1
+fi
+
 # Test coordinator data structure
 echo "🧪 Testing coordinator data structure..."
 COORDINATOR_TEST=$(docker exec ha-test python3 -c "
