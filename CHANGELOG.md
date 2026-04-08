@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.21] - 2026-04-08
+
+### 🐛 BUG FIXES
+
+- **Fixed valve open/close returning `code: 9999, illegal param`** (fixes #17, #24)
+  - `controlWorkMode` API requires a `hid` (home ID) field — it was missing from our payload
+  - `hid` is now passed from the sensor info through to the API call
+
 ## [2.0.20] - 2026-04-08
 
 ### 🐛 BUG FIXES

@@ -320,6 +320,7 @@ class HomGarClient:
         port: int,
         mode: int,
         duration: int,
+        hid: int | None = None,
     ) -> str | None:
         """
         Control a valve zone via the controlWorkMode endpoint.
@@ -348,6 +349,8 @@ class HomGarClient:
             "duration": duration,
             "param": "",
         }
+        if hid is not None:
+            payload["hid"] = str(hid)
         _LOGGER.debug("API call: control_work_mode URL=%s payload=%s", url, payload)
         
         async with self._session.post(url, json=payload, headers=self._auth_headers()) as resp:

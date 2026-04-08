@@ -238,6 +238,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
             mid, addr, self._zone_num, duration,
         )
 
+        hid = self._sensor_info.get("hid")
         client = self.coordinator._client
         response_state = await client.control_work_mode(
             mid=mid,
@@ -247,6 +248,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
             port=self._zone_num,
             mode=1,
             duration=duration,
+            hid=hid,
         )
         # Bypass _apply_response_state to avoid crash - use refresh instead
         await self.coordinator.async_request_refresh()
@@ -276,6 +278,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
             mid, addr, self._zone_num,
         )
 
+        hid = self._sensor_info.get("hid")
         client = self.coordinator._client
         response_state = await client.control_work_mode(
             mid=mid,
@@ -285,6 +288,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
             port=self._zone_num,
             mode=0,
             duration=0,
+            hid=hid,
         )
         # Bypass _apply_response_state to avoid crash - use refresh instead
         await self.coordinator.async_request_refresh()
