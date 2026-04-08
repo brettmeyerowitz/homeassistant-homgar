@@ -39,7 +39,11 @@ jobs:
         
         if [ -n "$CHANGED" ]; then
           echo "changed=true" >> $GITHUB_OUTPUT
-          echo "files=$CHANGED" >> $GITHUB_OUTPUT
+          {
+            echo "files<<EOF"
+            echo "$CHANGED"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
         else
           echo "changed=false" >> $GITHUB_OUTPUT
         fi

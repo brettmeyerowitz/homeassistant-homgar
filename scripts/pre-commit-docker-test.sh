@@ -109,10 +109,9 @@ echo "🧪 Testing ASCII format decoding..."
 ASCII_TEST_RESULT=$(docker exec ha-test python3 -c "
 import sys
 sys.path.append('/config/custom_components')
-from custom_components.homgar.homgar_api import decode_htv213frf_valve
-result = decode_htv213frf_valve('1,-84,1;0,149,0,0,0,0|0,6,0,0,0,0')
-print(f'ASCII_TEST:{result[\"decoder\"]}:{len(result[\"zones\"])}')
-" 2>/dev/null)
+from custom_components.homgar.homgar_api import decode_htv213frf
+result = decode_htv213frf('1,-84,1;0,149,0,0,0,0|0,6,0,0,0,0')
+print(f'ASCII_TEST:{result[\"decoder\"]}:{len(result[\"zones\"])}')" 2>/dev/null)
 
 if [[ $ASCII_TEST_RESULT == "ASCII_TEST:htv213frf_ascii:2" ]]; then
     echo "✅ ASCII format decoding test passed"
@@ -128,15 +127,14 @@ echo "🧪 Testing sensor ASCII format decoding..."
 SENSOR_TEST_RESULT=$(docker exec ha-test python3 -c "
 import sys
 sys.path.append('/config/custom_components')
-from custom_components.homgar.homgar_api import decode_moisture_full
-result = decode_moisture_full('1,-73,1;694,70,G=292478')
+from custom_components.homgar.homgar_api import decode_hcs021frf
+result = decode_hcs021frf('1,-73,1;694,70,G=292478')
 # Test temperature is in expected range (20.77-20.78°C for 69.4°F)
 temp = result['temperature_c']
 if 20.77 <= temp <= 20.79:
     print('SENSOR_TEST:hcs021frf_ascii:PASS')
 else:
-    print(f'SENSOR_TEST:hcs021frf_ascii:FAIL:{temp}')
-" 2>/dev/null)
+    print(f'SENSOR_TEST:hcs021frf_ascii:FAIL:{temp}')" 2>/dev/null)
 
 if [[ $SENSOR_TEST_RESULT == "SENSOR_TEST:hcs021frf_ascii:PASS" ]]; then
     echo "✅ Sensor ASCII format decoding test passed"
@@ -242,6 +240,62 @@ if [[ $TRANSLATION_TEST == "TRANSLATION_TEST:PASS" ]]; then
 else
     echo "❌ ERROR: Translation files test failed"
     echo "Result: $TRANSLATION_TEST"
+    exit 1
+fi
+
+# Test coordinator data structure
+echo "🧪 Testing coordinator data structure..."
+COORDINATOR_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.append('/config/custom_components')
+from custom_components.homgar.coordinator import HomGarCoordinator, DECODER_REGISTRY
+from custom_components.homgar.const import (
+    MODEL_MOISTURE_SIMPLE, MODEL_MOISTURE_FULL, MODEL_RAIN,
+    MODEL_TEMPHUM, MODEL_FLOWMETER, MODEL_CO2, MODEL_POOL,
+    MODEL_VALVE_213, MODEL_HCS0528ARF, MODEL_HCS0565ARF,
+)
+
+# Verify critical models are registered
+required = [
+    MODEL_MOISTURE_SIMPLE, MODEL_MOISTURE_FULL, MODEL_RAIN,
+    MODEL_TEMPHUM, MODEL_FLOWMETER, MODEL_CO2, MODEL_POOL,
+    MODEL_VALVE_213, MODEL_HCS0528ARF, MODEL_HCS0565ARF,
+]
+missing = [m for m in required if m not in DECODER_REGISTRY]
+if missing:
+    print(f'COORDINATOR_TEST:FAIL:Missing decoders: {missing}')
+else:
+    print('COORDINATOR_TEST:PASS')" 2>/dev/null)
+
+if [[ $COORDINATOR_TEST == "COORDINATOR_TEST:PASS" ]]; then
+    echo "✅ Coordinator decoder registry test passed"
+else
+    echo "❌ ERROR: Coordinator decoder registry test failed"
+    echo "Result: $COORDINATOR_TEST"
+    exit 1
+fi
+
+# Test pool sensor decoder produces correct output keys
+echo "🧪 Testing HCS0528ARF pool decoder output keys..."
+POOL_DECODER_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.append('/config/custom_components')
+from custom_components.homgar.homgar_api import decode_hcs0528arf
+result = decode_hcs0528arf('10#E74A03B403DC01B805859003FF0F99620F19')
+temp = result.get('tempcurrent')
+high = result.get('temphigh')
+low = result.get('templow')
+# App shows: current=32.9, high=34.9, low=29.0
+if temp is not None and abs(temp - 32.9) < 0.15 and high is not None and low is not None:
+    print(f'POOL_TEST:PASS:{temp}')
+else:
+    print(f'POOL_TEST:FAIL:tempcurrent={temp},temphigh={high},templow={low}')" 2>/dev/null)
+
+if [[ $POOL_DECODER_TEST == POOL_TEST:PASS* ]]; then
+    echo "✅ Pool decoder test passed: $POOL_DECODER_TEST"
+else
+    echo "❌ ERROR: Pool decoder test failed"
+    echo "Result: $POOL_DECODER_TEST"
     exit 1
 fi
 

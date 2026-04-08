@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.19] - 2026-04-08
+
+### 🐛 BUG FIXES
+
+- **Fixed HCS0528ARF / HCS0565ARF pool temperature sensor showing Unknown** (fixes #23)
+  - Corrected byte parsing: current temperature is LE16 at bytes 10-11, not single byte at 10
+  - Decoder now correctly extracts current, high, and low temperatures matching app values
+  - Verified against real payload: current=32.9°C, high=34.9°C, low=29.0°C
+
+### 🔧 REFACTORING
+
+- **Modularised decoder structure** — each device model now has its own file in `api/decoders/`
+- All decoder functions renamed to canonical `decode_<modelname>` convention (e.g. `decode_hcs008frf` instead of `decode_flow_meter`)
+- Removed all backward-compatibility aliases — callers updated to use canonical names
+- Shared conversion utilities (`_f10_to_c`) extracted to `utils.py` and used consistently
+
+### 📋 ISSUE TEMPLATES
+
+- Updated bug report and device support templates to require app screenshots alongside payloads
+- Raw payloads alone cannot identify correct sensor values without app-confirmed readings
+
 ## [2.0.11] - 2026-04-06
 
 ### 🆕 NEW DEVICE SUPPORT

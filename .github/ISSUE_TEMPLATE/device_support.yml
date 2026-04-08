@@ -10,7 +10,9 @@ body:
         
         To help us implement the decoder as quickly as possible, please provide the following information.
         
-        **Important:** The more payload samples you provide (especially in different states), the faster and more accurate the implementation will be.
+        **Important:** Screenshots from the RainPoint or HomGar app showing actual readings are essential. Raw payloads alone cannot tell us what values the bytes represent — we need to see what the app displays alongside the payload to map the byte offsets to the correct sensor values.
+        
+        The more payload+screenshot pairs you provide (in different states), the faster and more accurate the implementation will be.
   
   - type: input
     id: device_model
@@ -47,33 +49,50 @@ body:
       required: true
   
   - type: textarea
+    id: app_screenshots
+    attributes:
+      label: App Screenshots (REQUIRED)
+      description: |
+        **Screenshots from the RainPoint or HomGar app are required.** Without them we cannot decode the payload.
+        
+        Please attach screenshots showing:
+        - The device detail screen with all current readings (temperature, moisture %, min/max values, etc.)
+        - Screenshots in different states (e.g., different temperatures, valve open vs closed)
+        - The device name and model as shown in the app
+        
+        **For each app screenshot, also include the corresponding HA debug log payload from that same moment.**
+      placeholder: |
+        Screenshot 1: App showing Pool Temp = 32.9°C, Max = 34.9°C, Min = 29.0°C
+        (attach image)
+        
+        Screenshot 2: App showing Soil Moisture = 45%
+        (attach image)
+    validations:
+      required: true
+
+  - type: textarea
     id: payload_samples
     attributes:
-      label: Payload Samples (CRITICAL - Required)
+      label: Payload Samples (REQUIRED)
       description: |
-        **This is the most important section!** Please provide at least 3-5 payload samples from your device in DIFFERENT states.
+        **Provide payloads from HA debug logs that match your app screenshots above.**
         
         **How to get payloads:**
         1. Enable debug logging in Home Assistant (Configuration > Logs > Set custom_components.homgar to DEBUG)
-        2. Trigger different states on your device (open/close valves, change temperature, etc.)
-        3. Copy the payload values from the logs
+        2. Look for lines like: `Decoding payload for model=... value='10#...'`
+        3. Copy the full payload value
+        4. Note what the app showed at that same time
         
         **For valve controllers:** Provide samples with different zones open/closed
-        **For sensors:** Provide samples at different readings (temperature, moisture, etc.)
+        **For sensors:** Provide samples at different readings alongside app screenshots
       placeholder: |
-        Sample 1 (describe state - e.g., all zones closed):
-        01#17E1CA0019D8111AD8001BD8001CD8001D201E201F20202018DC0121B75BBADC16...
+        Sample 1 (app shows Pool Temp = 32.9°C, Max = 34.9°C, Min = 29.0°C):
+        10#E74A03B403DC01B805859003FF0F99620F19
         
-        Sample 2 (describe state - e.g., zone 1 open):
-        01#17E1CA0019D9111AD8001BD8001CD8001D201E201F20202018DC0121B75BBADC16...
+        Sample 2 (app shows Pool Temp = 31.2°C):
+        10#...
         
-        Sample 3 (describe state - e.g., zones 1 and 2 open):
-        01#17E1CA0019D9111AD9001BD8001CD8001D201E201F20202018DC0121B75BBADC16...
-        
-        Sample 4 (describe state):
-        ...
-        
-        Sample 5 (describe state):
+        Sample 3 (describe what app shows):
         ...
       render: shell
     validations:
@@ -152,7 +171,9 @@ body:
       label: Pre-submission Checklist
       description: Please confirm you have completed the following
       options:
-        - label: I have provided at least 3-5 payload samples in different states
+        - label: I have attached screenshots from the RainPoint/HomGar app showing actual readings
+          required: true
+        - label: I have provided payloads from HA debug logs that match my app screenshots
           required: true
         - label: I have included the exact device model number
           required: true

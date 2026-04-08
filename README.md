@@ -259,7 +259,7 @@ Below is the manifest file for this integration (as of version 2.0.18):
 {
     "domain": "homgar",
     "name": "HomGar/RainPoint Cloud",
-    "version": "2.0.18",
+    "version": "2.0.19",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "requirements": ["paho-mqtt>=1.6.0"],
