@@ -27,6 +27,7 @@ from .decoders import (
     decode_hcs014arf,
     decode_hcs015arf,
     decode_hcs0528arf,
+    decode_hcs0565arf,
     decode_hcs027arf,
     decode_hcs016arf,
     decode_hcs044frf,

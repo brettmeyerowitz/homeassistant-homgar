@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.20] - 2026-04-08
+
+### 🐛 BUG FIXES
+
+- **Fixed `ImportError: cannot import name 'decode_hcs0565arf'`** — missing import in `api/__init__.py` caused integration setup failure on 2.0.19
+
 ## [2.0.19] - 2026-04-08
 
 ### 🐛 BUG FIXES
