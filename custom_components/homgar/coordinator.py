@@ -39,6 +39,7 @@ from .const import (
     MODEL_HCS005FRF,
     MODEL_HCS003FRF,
     MODEL_HCS024FRF_V1,
+    MODEL_HCS014ARF,
     MODEL_HCS0530THO,
     MODEL_HCS0565ARF,
     MODEL_HCS0528ARF,
@@ -64,12 +65,12 @@ from .const import (
 )
 from .homgar_api import (
     HomGarClient, HomGarApiError,
-    decode_moisture_simple, decode_moisture_full, decode_rain,
-    decode_temphum, decode_flowmeter, decode_co2, decode_pool, decode_pool_plus,
-    decode_valve_hub, decode_htv213frf_valve, decode_htv0542frf, decode_htv113frf,
+    decode_hcs026frf, decode_hcs021frf, decode_hcs012arf,
+    decode_hcs008frf, decode_hcs0530tho, decode_pool_plus,
+    decode_valve_hub, decode_htv213frf, decode_htv0542frf, decode_htv113frf,
     # New HCS decoder functions
     decode_hcs005frf, decode_hcs003frf, decode_hcs024frf_v1,
-    decode_hcs015arf, decode_hcs0528arf, decode_hcs0565arf, decode_hcs027arf, decode_hcs016arf,
+    decode_hcs014arf, decode_hcs015arf, decode_hcs0528arf, decode_hcs0565arf, decode_hcs027arf, decode_hcs016arf,
     decode_hcs044frf, decode_hcs666frf, decode_hcs666rfr_p, decode_hcs999frf,
     decode_hcs999frf_p, decode_hcs666frf_x, decode_hcs701b, decode_hcs596wb,
     decode_hcs596wb_v4, decode_hcs706arf, decode_hcs802arf, decode_hcs048b,
@@ -80,25 +81,26 @@ _LOGGER = logging.getLogger(__name__)
 
 # Decoder registry - maps device models to their decoder functions
 DECODER_REGISTRY = {
-    MODEL_MOISTURE_SIMPLE: decode_moisture_simple,
-    MODEL_MOISTURE_FULL: decode_moisture_full,
-    MODEL_RAIN: decode_rain,
-    MODEL_TEMPHUM: decode_temphum,
-    MODEL_FLOWMETER: decode_flowmeter,
-    MODEL_CO2: decode_co2,
-    MODEL_POOL: decode_pool,
+    MODEL_MOISTURE_SIMPLE: decode_hcs026frf,
+    MODEL_MOISTURE_FULL: decode_hcs021frf,
+    MODEL_RAIN: decode_hcs012arf,
+    MODEL_TEMPHUM: decode_hcs014arf,
+    MODEL_FLOWMETER: decode_hcs008frf,
+    MODEL_CO2: decode_hcs0530tho,
+    MODEL_POOL: decode_hcs0528arf,
     MODEL_POOL_PLUS: decode_pool_plus,
     MODEL_HWG023WRF: decode_valve_hub,  # V1 hub uses valve_hub decoder
     MODEL_HWG023WBRF_V2: decode_valve_hub,  # V2 hub uses valve_hub decoder
     MODEL_VALVE_HUB: decode_valve_hub,
-    MODEL_VALVE_213: decode_htv213frf_valve,  # HTV213FRF uses custom decoder
-    MODEL_VALVE_245: decode_htv213frf_valve,  # HTV245FRF uses custom decoder
+    MODEL_VALVE_213: decode_htv213frf,
+    MODEL_VALVE_245: decode_htv213frf,
     MODEL_HTV0542FRF: decode_htv0542frf,  # HTV0542FRF 4-zone valve (v2.0.3)
     MODEL_VALVE_113: decode_htv113frf,  # HTV113FRF 1-zone timer
     # HCS sensor models (v1.3.0)
     MODEL_HCS005FRF: decode_hcs005frf,
     MODEL_HCS003FRF: decode_hcs003frf,
     MODEL_HCS024FRF_V1: decode_hcs024frf_v1,
+    MODEL_HCS014ARF: decode_hcs014arf,
     MODEL_HCS015ARF: decode_hcs015arf,
     MODEL_HCS0528ARF: decode_hcs0528arf,
     MODEL_HCS0565ARF: decode_hcs0565arf,

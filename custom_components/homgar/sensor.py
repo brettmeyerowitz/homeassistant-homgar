@@ -34,6 +34,7 @@ from .const import (
     MODEL_HCS024FRF_V1,
     MODEL_HCS015ARF,
     MODEL_HCS0528ARF,
+    MODEL_HCS0565ARF,
     MODEL_HCS027ARF,
     MODEL_HCS016ARF,
     MODEL_HCS044FRF,
@@ -114,13 +115,7 @@ async def async_setup_entry(
         sub_name = info.get("sub_name") or f"Sensor {info['addr']}"
         home_name = info.get("home_name") or ""
         brand = info.get("brand", "HomGar")
-        base_slug_parts = []
-        if home_name:
-            base_slug_parts.append(_slugify(home_name))
-        base_slug_parts.append(_slugify(sub_name))
-        if brand != "HomGar":
-            base_slug_parts.append(_slugify(brand.lower()))
-        base_slug = "_".join(base_slug_parts)
+        base_slug = key
         _LOGGER.debug("Creating sensor entity: key=%s, model=%s, sub_name=%s, home_name=%s, base_slug=%s, info=%s", key, model, sub_name, home_name, base_slug, info)
 
         if model == MODEL_DISPLAY_HUB:
@@ -130,20 +125,10 @@ async def async_setup_entry(
                 entities.append(DisplayHubReadingSensor(coordinator, key, info, base_slug, reading_key))
         elif model == MODEL_MOISTURE_SIMPLE:
             entities.append(HomGarMoisturePercentSensor(coordinator, key, info, base_slug, simple=True))
-            # Add diagnostic sensors
-            entities.append(HomGarRSSISensor(coordinator, key, info, base_slug))
-            entities.append(HomGarBatterySensor(coordinator, key, info, base_slug))
-            entities.append(HomGarFirmwareVersionSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarLastUpdatedSensor(coordinator, key, info, base_slug))
         elif model == MODEL_MOISTURE_FULL:
             entities.append(HomGarMoisturePercentSensor(coordinator, key, info, base_slug, simple=False))
             entities.append(HomGarTemperatureSensor(coordinator, key, info, base_slug))
             entities.append(HomGarIlluminanceSensor(coordinator, key, info, base_slug))
-            # Add diagnostic sensors
-            entities.append(HomGarRSSISensor(coordinator, key, info, base_slug))
-            entities.append(HomGarBatterySensor(coordinator, key, info, base_slug))
-            entities.append(HomGarFirmwareVersionSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarLastUpdatedSensor(coordinator, key, info, base_slug))
         elif model == MODEL_RAIN:
             entities.append(HomGarRainSensor(coordinator, key, info, base_slug, "rain_last_hour_mm", "rain last hour"))
             entities.append(HomGarRainSensor(coordinator, key, info, base_slug, "rain_last_24h_mm", "rain last 24h"))
@@ -151,11 +136,7 @@ async def async_setup_entry(
             entities.append(HomGarRainSensor(coordinator, key, info, base_slug, "rain_total_mm", "rain total"))
         elif model == MODEL_TEMPHUM:
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_FLOWMETER:
             entities.append(HomGarFlowCurrentUsedSensor(coordinator, key, info, base_slug))
             entities.append(HomGarFlowCurrentDurationSensor(coordinator, key, info, base_slug))
@@ -211,22 +192,17 @@ async def async_setup_entry(
             entities.append(HomGarPoolHighTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolLowTempSensor(coordinator, key, info, base_slug))
             entities.append(HomGarPoolBatterySensor(coordinator, key, info, base_slug))
+        elif model == MODEL_HCS0565ARF:
+            # Pool temperature sensor - current temp only (no high/low in payload)
+            entities.append(HomGarPoolCurrentTempSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS027ARF:
             # Temperature/humidity sensor - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS016ARF:
             # Temperature/humidity sensor - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS044FRF:
             # Multi-sensor device - same as MODEL_MOISTURE_FULL
             entities.append(HomGarMoisturePercentSensor(coordinator, key, info, base_slug, simple=False))
@@ -260,73 +236,48 @@ async def async_setup_entry(
         elif model == MODEL_HCS701B:
             # Wall-mounted sensor - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS596WB:
             # Weather station base - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS596WB_V4:
             # Weather station base v4 - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS706ARF:
             # Environmental sensor - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS802ARF:
             # Environmental sensor - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS048B:
             # Compact sensor device - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS888ARF_V1:
             # Multi-function sensor v1 - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         elif model == MODEL_HCS0600ARF:
             # Advanced environmental sensor - same as MODEL_TEMPHUM
             entities.append(HomGarTempHumCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumLowSensor(coordinator, key, info, base_slug))
             entities.append(HomGarTempHumHumidityCurrentSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityHighSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarTempHumHumidityLowSensor(coordinator, key, info, base_slug))
         else:
             # Unknown/unsupported model - create diagnostic entity
             data = info.get("data", {})
             if data and data.get("type") == "unknown":
                 entities.append(HomGarUnknownSensor(coordinator, key, info, base_slug))
         
+        # Add diagnostic sensors for all sub-devices
+        if model != MODEL_DISPLAY_HUB:
+            entities.append(HomGarRSSISensor(coordinator, key, info, base_slug))
+            entities.append(HomGarBatterySensor(coordinator, key, info, base_slug))
+            entities.append(HomGarFirmwareVersionSensor(coordinator, key, info, base_slug))
+            entities.append(HomGarLastUpdatedSensor(coordinator, key, info, base_slug))
+
         # Add raw payload sensor for all devices (disabled by default)
         entities.append(HomGarRawPayloadSensor(coordinator, key, info, base_slug))
 

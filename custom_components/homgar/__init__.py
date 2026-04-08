@@ -85,7 +85,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up services
     await async_setup_services(hass)
 
+    _LOGGER.info("Setting up platforms: %s for entry: %s", PLATFORMS, entry.entry_id)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _LOGGER.info("Completed platform setup for entry: %s", entry.entry_id)
 
     return True
 

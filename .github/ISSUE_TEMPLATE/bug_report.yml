@@ -59,18 +59,38 @@ body:
       required: true
   
   - type: textarea
+    id: app_screenshots
+    attributes:
+      label: App Screenshots (REQUIRED for sensor/value bugs)
+      description: |
+        **If your bug involves incorrect sensor values or unknown readings, screenshots from the RainPoint or HomGar app are essential.**
+        
+        Please attach screenshots showing:
+        - The current reading the app displays (e.g., temperature 32.9°C)
+        - Any min/max or historical values shown in the app
+        - The device detail screen
+        
+        Without app screenshots we cannot verify what the correct decoded values should be — raw payloads alone are not enough to reverse-engineer sensor readings.
+      placeholder: |
+        Attach screenshots here. For example:
+        - App shows Pool Temperature: 32.9°C (Max: 34.9°C, Min: 29.0°C)
+        - HA shows: Unknown
+    validations:
+      required: false
+
+  - type: textarea
     id: payload_samples
     attributes:
       label: Payload Samples (if applicable)
       description: |
-        If the issue involves incorrect decoding, please provide payload samples.
-        Include samples that demonstrate the bug (e.g., valve open but showing closed).
+        If the issue involves incorrect decoding, please provide payload samples from the HA debug logs.
+        Include samples that demonstrate the bug alongside the app screenshots above.
       placeholder: |
-        Payload when bug occurs:
+        Payload when bug occurs (from HA debug logs):
         01#17E1CA0019D8111AD8001BD8001CD8001D201E201F20202018DC0121B75BBADC16...
         
-        Expected state: Zone 1 open
-        Actual state shown: Zone 1 closed
+        Expected state (from app): Zone 1 open
+        Actual state shown in HA: Zone 1 closed
       render: shell
     validations:
       required: false
@@ -137,3 +157,5 @@ body:
           required: true
         - label: I have included the integration version
           required: true
+        - label: For sensor value bugs, I have attached screenshots from the RainPoint/HomGar app showing the correct values
+          required: false
