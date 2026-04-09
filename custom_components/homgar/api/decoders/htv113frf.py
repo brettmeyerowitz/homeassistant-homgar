@@ -21,9 +21,11 @@ def decode_htv113frf(raw: str) -> dict:
             result.update({"type": "unknown", "error": f"Insufficient data: {len(bytes_list) if bytes_list else 0} bytes"})
             return result
 
-        rssi_raw = bytes_list[0]
+        # Byte 1: RSSI (byte 0 is a DP tag, not RSSI)
+        rssi_raw = bytes_list[1]
         result["rssi_dbm"] = rssi_raw - 256 if rssi_raw > 127 else rssi_raw
 
+        # Bytes 21-22: battery (0xFF 0x0F = 100%)
         battery_high = bytes_list[21]
         battery_low = bytes_list[22]
         if battery_high == 0xFF and battery_low == 0x0F:
@@ -33,19 +35,23 @@ def decode_htv113frf(raw: str) -> dict:
         else:
             result["battery_percent"] = None
 
-        zone_state_byte = bytes_list[8]
-        result["zones"][1] = {
-            "open": bool(zone_state_byte & 0x01),
-            "duration_seconds": 0,
-        }
+        # Byte 6: state flags — bit 0 = valve open, bit 5 = countdown active
+        state_byte = bytes_list[6]
+        valve_open = bool(state_byte & 0x01)
+        countdown_active = bool(state_byte & 0x20)
 
-        duration_raw = bytes_list[13]
-        if 0 < duration_raw <= 255:
-            result["zones"][1]["duration_seconds"] = duration_raw
+        # Bytes 14-15: set duration in seconds (little-endian)
+        duration_seconds = int.from_bytes(bytes_list[14:16], "little")
+
+        result["zones"][1] = {
+            "open": valve_open,
+            "duration_seconds": duration_seconds,
+        }
 
         result.update({
             "timer_mode": None,
-            "countdown_active": False,
+            "countdown_active": countdown_active,
+            "countdown_remaining_seconds": 0,
             "raw_bytes": bytes_list,
             "hub_online": True,
         })
@@ -55,9 +61,6 @@ def decode_htv113frf(raw: str) -> dict:
             result["timer_mode"] = "auto"
         elif mode_byte == 2:
             result["timer_mode"] = "manual"
-
-        if bytes_list[7] & 0x20:
-            result["countdown_active"] = True
 
         _LOGGER.debug(debug_with_version("HTV113FRF decoded: zones=%s, rssi=%d, battery=%s%%"),
                       result["zones"], result["rssi_dbm"], result["battery_percent"])

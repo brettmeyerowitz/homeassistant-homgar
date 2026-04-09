@@ -1,5 +1,6 @@
 """MQTT integration for HomGar coordinator - handles real-time valve updates."""
 import logging
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -56,20 +57,23 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         target_hub.get("model"),
     )
     
-    # Decode the payload using the same decoder as REST API
-    from .homgar_api import decode_valve_hub, decode_htv213frf_valve
-    from .const import MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245
-    
-    model = target_hub.get("model")
-    decoder = None
-    
-    if model == MODEL_VALVE_HUB:
-        decoder = decode_valve_hub
-    elif model in (MODEL_VALVE_213, MODEL_VALVE_245):
-        decoder = decode_htv213frf_valve
-    
+    # Use the shared DECODER_REGISTRY — same decoders as the REST poll path
+    from .coordinator import DECODER_REGISTRY
+
+    # Find sub-device model by addr in hub's subDevices list
+    sub_devices = target_hub.get("subDevices", [])
+    sub_model = None
+    for sub in sub_devices:
+        if sub.get("addr") == addr:
+            sub_model = sub.get("model")
+            break
+
+    # Fall back to hub model if no sub-device match
+    model = sub_model or target_hub.get("model")
+
+    decoder = DECODER_REGISTRY.get(model)
     if not decoder:
-        _LOGGER.debug("HomGar MQTT: No valve decoder for model=%s", model)
+        _LOGGER.debug("HomGar MQTT: No decoder for model=%s (sub_model=%s)", model, sub_model)
         return
     
     try:
@@ -86,14 +90,20 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         decoded_sensors = coordinator.data.get("sensors", {})
         
         if sensor_key in decoded_sensors:
+            # Stamp with current time and mark as MQTT-sourced
+            now_iso = datetime.now(timezone.utc).isoformat()
+            decoded["device_timestamp"] = now_iso
+            decoded["timestamp_source"] = "mqtt"
+
             # Update existing sensor data
             decoded_sensors[sensor_key]["data"] = decoded
             decoded_sensors[sensor_key]["raw_status"]["value"] = payload
             
+            valve_open = decoded.get("zones", {}).get(1, {}).get("open", False)
             _LOGGER.info(
                 "HomGar MQTT: Updated sensor %s with real-time data (valve state: %s)",
                 sensor_key,
-                "OPEN" if decoded.get("zones", {}).get(addr, {}).get("open") else "CLOSED",
+                "OPEN" if valve_open else "CLOSED",
             )
             
             # Trigger coordinator update to notify entities

@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_APP_TYPE
+from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_APP_TYPE, CONF_HIDS
 from .homgar_api import HomGarClient
 from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
 
@@ -66,17 +66,54 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if mqtt_creds.get("product_key") and mqtt_creds.get("device_name"):
                 _LOGGER.info("HomGar: Initializing MQTT for real-time valve updates")
 
+                # Call subscribeStatus to get fresh per-session virtual credentials
+                # (these rotate each session — do not use stored ones)
+                hubs = coordinator.data.get("hubs", []) if coordinator.data else []
+                hids = entry.data.get(CONF_HIDS, [])
+                sub_creds = {}
+                if hubs and hids:
+                    try:
+                        sub_creds = await client.subscribe_status(hids[0], hubs)
+                        _LOGGER.info(
+                            "HomGar: subscribeStatus returned device=%s productKey=%s host=%s",
+                            sub_creds.get("deviceName"),
+                            sub_creds.get("productKey"),
+                            sub_creds.get("mqttHostUrl"),
+                        )
+                    except Exception as sub_e:
+                        _LOGGER.warning("HomGar: subscribeStatus failed, falling back to stored creds: %s", sub_e)
+
+                # Use fresh creds from subscribeStatus if available, else fall back to stored
+                if sub_creds.get("deviceName") and sub_creds.get("deviceSecret"):
+                    mqtt_host = sub_creds.get("mqttHostUrl", mqtt_creds["mqtt_host"])
+                    if ":" in mqtt_host:
+                        mqtt_host, mqtt_port_str = mqtt_host.rsplit(":", 1)
+                        mqtt_port = int(mqtt_port_str)
+                    else:
+                        mqtt_port = 1883
+                    connect_product_key = sub_creds["productKey"]
+                    connect_device_name = sub_creds["deviceName"]
+                    connect_device_secret = sub_creds["deviceSecret"]
+                else:
+                    mqtt_host = mqtt_creds["mqtt_host"]
+                    mqtt_port = mqtt_creds.get("mqtt_port", 1883)
+                    connect_product_key = mqtt_creds["product_key"]
+                    connect_device_name = mqtt_creds["device_name"]
+                    connect_device_secret = mqtt_creds["device_secret"]
+
                 def on_mqtt_message(data: dict):
-                    """Handle MQTT message in async context."""
-                    hass.async_create_task(coordinator.handle_mqtt_update(data))
+                    """Handle MQTT message safely from paho's background thread."""
+                    hass.loop.call_soon_threadsafe(
+                        lambda: hass.async_create_task(coordinator.handle_mqtt_update(data))
+                    )
 
                 mqtt_client = HomGarMQTTClient(
-                    product_key=mqtt_creds["product_key"],
-                    device_name=mqtt_creds["device_name"],
-                    device_secret=mqtt_creds["device_secret"],
-                    mqtt_host=mqtt_creds["mqtt_host"],
+                    product_key=connect_product_key,
+                    device_name=connect_device_name,
+                    device_secret=connect_device_secret,
+                    mqtt_host=mqtt_host,
                     on_message_callback=on_mqtt_message,
-                    mqtt_port=mqtt_creds.get("mqtt_port", 1883),
+                    mqtt_port=mqtt_port,
                 )
             else:
                 _LOGGER.warning("HomGar: MQTT credentials not available, using polling only")

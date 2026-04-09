@@ -227,6 +227,14 @@ class HomGarClient:
             if not await self.refresh_token():
                 raise HomGarApiError("Authentication failed")
 
+    async def _reauth(self) -> None:
+        """Force a fresh login, invalidating the current token."""
+        _LOGGER.info("HomGar: token rejected by server, forcing fresh login")
+        self._token = None
+        self._token_expires_at = None
+        if not await self.login():
+            raise HomGarApiError("Re-authentication failed")
+
     # --- API calls ---
 
     async def list_homes(self) -> list[dict]:
@@ -240,10 +248,13 @@ class HomGarClient:
                 raise HomGarApiError(f"list_homes HTTP {resp.status}")
             data = await resp.json()
             _LOGGER.debug("API response: list_homes data=%s", data)
-            
-            if data.get("code") != 0:
-                raise HomGarApiError(f"list_homes failed: {data}")
-            return data.get("data", [])
+        if data.get("code") in (1001, 1004):
+            await self._reauth()
+            async with self._session.get(url, headers=self._auth_headers()) as resp2:
+                data = await resp2.json()
+        if data.get("code") != 0:
+            raise HomGarApiError(f"list_homes failed: {data}")
+        return data.get("data", [])
 
     async def get_devices_by_hid(self, hid: int) -> list[dict]:
         """Get devices by home ID (HID)."""
@@ -256,6 +267,10 @@ class HomGarClient:
                 raise HomGarApiError(f"getDeviceByHid HTTP {resp.status}")
             data = await resp.json()
         _LOGGER.debug("API response: get_devices_by_hid data=%s", data)
+        if data.get("code") in (1001, 1004):
+            await self._reauth()
+            async with self._session.get(url, headers=self._auth_headers(), params=params) as resp2:
+                data = await resp2.json()
         if data.get("code") != 0:
             raise HomGarApiError(f"getDeviceByHid failed: {data}")
         return data.get("data", [])
@@ -281,6 +296,10 @@ class HomGarClient:
                 raise HomGarApiError(f"Failed to get device status: {resp.status}")
             data = await resp.json()
         _LOGGER.debug("API response: get_multiple_device_status data=%s", data)
+        if data.get("code") in (1001, 1004):
+            await self._reauth()
+            async with self._session.post(url, headers=self._auth_headers(), json=payload) as resp2:
+                data = await resp2.json()
         if data.get("code") != 0:
             raise HomGarApiError(f"Device status API error: {data.get('msg')}")
         
@@ -310,6 +329,43 @@ class HomGarClient:
         _LOGGER.debug("API response: get_device_status data=%s", data)
         if data.get("code") != 0:
             raise HomGarApiError(f"getDeviceStatus failed: {data}")
+        return data.get("data", {})
+
+    async def subscribe_status(self, hid: int, hubs: list[dict]) -> dict:
+        """Call /app/device/subscribeStatus to get fresh per-session MQTT credentials.
+
+        Returns the full response data dict including:
+          deviceName, productKey, deviceSecret, mqttHostUrl (physical hub observer session)
+        """
+        await self._ensure_auth()
+        url = f"{self._base_url}/app/device/subscribeStatus"
+
+        import uuid as _uuid
+        subscribe_list = [
+            {"deviceName": h.get("deviceName", ""), "mid": h["mid"], "productKey": h.get("productKey", "")}
+            for h in hubs
+        ]
+        payload = {
+            "hid": str(hid),
+            "hidList": [str(hid)],
+            "subscribe": subscribe_list,
+            "unsubscribe": [],
+            "userInfo": {
+                "deviceName": self._mqtt_credentials.get("device_name", ""),
+                "deviceType": 1,
+                "notice": 0,
+                "productKey": self._mqtt_credentials.get("product_key", ""),
+                "pushId": _uuid.uuid4().hex,
+            },
+        }
+        _LOGGER.debug("API call: subscribe_status URL=%s payload=%s", url, payload)
+        async with self._session.post(url, headers=self._auth_headers(), json=payload) as resp:
+            if resp.status != 200:
+                raise HomGarApiError(f"subscribeStatus HTTP {resp.status}")
+            data = await resp.json()
+        _LOGGER.debug("API response: subscribe_status data=%s", data)
+        if data.get("code") != 0:
+            raise HomGarApiError(f"subscribeStatus failed: {data}")
         return data.get("data", {})
 
     async def set_device_state(self, home_id: int, device_name: str, mid: int, product_key: str, state: dict) -> bool:

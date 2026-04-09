@@ -19,16 +19,23 @@ except ImportError:
 
 _LOGGER = logging.getLogger(__name__)
 
-PROP_SET_TOPIC = "/sys/{product_key}/{device_name}/thing/service/property/set"
+TOPICS_TEMPLATE = [
+    "/sys/{product_key}/{device_name}/thing/event/property/post",
+    "/sys/{product_key}/{device_name}/thing/service/property/set",
+    "/sys/{product_key}/{device_name}/thing/status/update",
+    "/sys/{product_key}/{device_name}/thing/sub/event/property/post",
+    "/sys/{product_key}/{device_name}/thing/sub/status/update",
+]
 
 
 def _build_aliyun_auth(product_key: str, device_name: str, device_secret: str) -> tuple[str, str, str]:
-    """Build Alibaba Cloud IoT MQTT authentication credentials.
+    """Build Alibaba Cloud IoT MQTT authentication credentials (securemode=2, Observer mode).
     
     Returns: (client_id, username, password)
     """
-    client_id = f"{device_name}|securemode=3,signmethod=hmacsha1|"
-    content = f"clientId{device_name}deviceName{device_name}productKey{product_key}"
+    timestamp_ms = str(int(time.time() * 1000))
+    client_id = f"{device_name}|securemode=2,signmethod=hmacsha1,timestamp={timestamp_ms}|"
+    content = f"clientId{device_name}deviceName{device_name}productKey{product_key}timestamp{timestamp_ms}"
     sign = hmac.new(device_secret.encode(), content.encode(), hashlib.sha1).hexdigest()
     username = f"{device_name}&{product_key}"
     
@@ -82,16 +89,16 @@ class HomGarMQTTClient:
         self._client_id, self._username, self._password = _build_aliyun_auth(
             product_key, device_name, device_secret
         )
-        self._topic = PROP_SET_TOPIC.format(
-            product_key=product_key,
-            device_name=device_name,
-        )
+        self._topics = [
+            t.format(product_key=product_key, device_name=device_name)
+            for t in TOPICS_TEMPLATE
+        ]
         
         _LOGGER.info(
-            "HomGar MQTT client initialized: host=%s port=%d topic=%s",
+            "HomGar MQTT client initialized: host=%s port=%d topics=%d",
             mqtt_host,
             mqtt_port,
-            self._topic,
+            len(self._topics),
         )
     
     def connect(self) -> bool:
@@ -121,7 +128,11 @@ class HomGarMQTTClient:
                     _LOGGER.debug("HomGar MQTT disconnect failed during shutdown", exc_info=True)
     
     def _build_client(self):
-        """Build MQTT client instance."""
+        """Build MQTT client instance with fresh timestamp credentials."""
+        # Regenerate auth on every connect — securemode=2 timestamp must be fresh
+        self._client_id, self._username, self._password = _build_aliyun_auth(
+            self._product_key, self._device_name, self._device_secret
+        )
         client = mqtt.Client(client_id=self._client_id, protocol=mqtt.MQTTv311)
         client.username_pw_set(self._username, self._password)
         client.on_connect = self._on_connect
@@ -163,8 +174,9 @@ class HomGarMQTTClient:
         if rc == 0:
             self._connected = True
             self._last_connect_time = time.time()
-            client.subscribe(self._topic, qos=0)
-            _LOGGER.info("HomGar MQTT connected successfully, subscribed to: %s", self._topic)
+            for topic in self._topics:
+                client.subscribe(topic, qos=0)
+            _LOGGER.info("HomGar MQTT connected successfully, subscribed to %d topics", len(self._topics))
         else:
             _LOGGER.error("HomGar MQTT connect failed with rc=%s", rc)
     
@@ -241,8 +253,9 @@ class HomGarMQTTClient:
                 _LOGGER.warning("HomGar MQTT message invalid format: %s", param_str[:100])
                 return
             
-            # Extract hub MID from first part (last 5 digits)
-            hub_mid = parts[0][-5:].lstrip("0") or parts[0][-5:]
+            # Extract hub MID: last 6 chars of prefix e.g. "#P260409210202000016772081235522" -> "235522"
+            raw_mid = parts[0][-6:]
+            hub_mid = raw_mid.lstrip("0") or raw_mid
             rest = parts[1]
             
             # Extract device updates (before final | separators)
@@ -302,7 +315,7 @@ class HomGarMQTTClient:
             "last_message_age_seconds": last_message_age if self._last_message_time else None,
             "mqtt_host": self._mqtt_host,
             "mqtt_port": self._mqtt_port,
-            "topic": self._topic,
+            "topics": self._topics,
         }
 
     def send_message(self, payload: dict) -> bool:
@@ -313,7 +326,8 @@ class HomGarMQTTClient:
         
         try:
             message = json.dumps(payload)
-            result = self._client.publish(self._topic, message, qos=0)
+            prop_set_topic = next((t for t in self._topics if "property/set" in t), self._topics[0])
+            result = self._client.publish(prop_set_topic, message, qos=0)
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
                 self._messages_sent += 1
                 _LOGGER.debug("HomGar MQTT message sent successfully (total: %d)", self._messages_sent)

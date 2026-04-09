@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.1] - 2026-04-10
+
+### 🐛 BUG FIXES
+
+- **MQTT auto-relogin on token expiry** — integration now detects `code 1001/1004` token errors and automatically re-authenticates without requiring a restart
+- **MQTT `securemode=2` with fresh timestamp on every reconnect** — prevents stale HMAC signatures causing `rc=16` disconnects after prolonged idle
+- **Hub MID extraction** — fixed off-by-one in MQTT message parsing that caused hub lookups to fail
+- **MQTT thread-safety** — callbacks now correctly scheduled via `call_soon_threadsafe` to avoid event loop errors
+- **`device_timestamp` set on MQTT updates** — "Last Updated" in HA UI now reflects real-time MQTT push time instead of showing Unknown
+
+### ✨ NEW FEATURES
+
+- **HTV113FRF 1-zone smart hose timer** — real-time MQTT updates now fully decoded: valve open/close state, duration, RSSI, battery, countdown active
+- **Sub-device model lookup via `subDevices`** — MQTT updates correctly identify the sub-device model (e.g. HTV113FRF) from the hub's sub-device list rather than falling back to the hub model
+
+### 🔧 INTERNAL
+
+- **MQTT decoder lookup uses shared `DECODER_REGISTRY`** — adding a new device to the registry automatically enables real-time MQTT support without touching `coordinator_mqtt.py`
+- **API client `_reauth()` helper** — `list_homes`, `get_devices_by_hid`, and `get_multiple_device_status` all retry once with a fresh login on auth errors
+
 ## [2.1.0] - 2026-04-09
 
 ### ⚠️ BREAKING CHANGE — Clean Install Recommended for Some Upgraders
