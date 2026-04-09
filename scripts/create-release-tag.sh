@@ -44,7 +44,7 @@ fi
 
 # Check if changelog entry exists
 CHANGELOG_ENTRY="## [$VERSION]"
-if grep -q "$CHANGELOG_ENTRY" CHANGELOG.md; then
+if grep -qF "$CHANGELOG_ENTRY" CHANGELOG.md; then
     echo "✅ Changelog entry found for v$VERSION"
 else
     echo "⚠️ WARNING: No changelog entry found for v$VERSION"
