@@ -33,6 +33,12 @@ trigger: always_on
 - Virtual MQTT product key and host are returned by the `subscribeStatus` API call at runtime — do not hardcode
 - Never mix HomGar and RainPoint credentials between accounts
 
+## README maintenance
+- When adding a new supported device, update the device compatibility table in `README.md`
+- When bumping the version, update the `manifest.json` code snippet version in `README.md`
+- When adding new entities for a device, update the entities column in the device table
+- The pre-commit script checks README version matches manifest — it will fail if out of sync
+
 ## Code style
 - `DECODER_REGISTRY` in `coordinator.py` is the single source of truth for model→decoder mappings — both REST poll and MQTT paths use it
 - New device support requires: decoder file → export chain → `const.py` constant → `DECODER_REGISTRY` entry → sensor entities
