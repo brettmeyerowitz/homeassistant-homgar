@@ -65,7 +65,8 @@ class HomGarClient:
 
     def restore_tokens(self, data: dict) -> None:
         """Restore tokens from config entry data."""
-        from ..const import CONF_TOKEN, CONF_REFRESH_TOKEN, CONF_TOKEN_EXPIRES_AT
+        from ..const import CONF_TOKEN, CONF_REFRESH_TOKEN, CONF_TOKEN_EXPIRES_AT, \
+            CONF_MQTT_PRODUCT_KEY, CONF_MQTT_DEVICE_NAME, CONF_MQTT_DEVICE_SECRET, CONF_MQTT_HOST
         
         self._token = data.get(CONF_TOKEN)
         self._refresh_token = data.get(CONF_REFRESH_TOKEN)
@@ -75,19 +76,35 @@ class HomGarClient:
         except (ValueError, TypeError):
             self._token_expires_at = None
 
+        if data.get(CONF_MQTT_PRODUCT_KEY) and data.get(CONF_MQTT_DEVICE_NAME):
+            self._mqtt_credentials = {
+                "product_key": data[CONF_MQTT_PRODUCT_KEY],
+                "device_name": data[CONF_MQTT_DEVICE_NAME],
+                "device_secret": data.get(CONF_MQTT_DEVICE_SECRET, ""),
+                "mqtt_host": data.get(CONF_MQTT_HOST, ""),
+                "mqtt_port": 1883,
+            }
+
     def get_mqtt_credentials(self) -> dict:
         """Get MQTT credentials for real-time updates."""
         return self._mqtt_credentials.copy()
 
     def export_tokens(self) -> dict:
         """Export tokens for config entry storage."""
-        from ..const import CONF_TOKEN, CONF_REFRESH_TOKEN, CONF_TOKEN_EXPIRES_AT
+        from ..const import CONF_TOKEN, CONF_REFRESH_TOKEN, CONF_TOKEN_EXPIRES_AT, \
+            CONF_MQTT_PRODUCT_KEY, CONF_MQTT_DEVICE_NAME, CONF_MQTT_DEVICE_SECRET, CONF_MQTT_HOST
         
-        return {
+        result = {
             CONF_TOKEN: self._token,
             CONF_REFRESH_TOKEN: self._refresh_token,
             CONF_TOKEN_EXPIRES_AT: self._token_expires_at.isoformat() if self._token_expires_at else None,
         }
+        if self._mqtt_credentials.get("product_key"):
+            result[CONF_MQTT_PRODUCT_KEY] = self._mqtt_credentials["product_key"]
+            result[CONF_MQTT_DEVICE_NAME] = self._mqtt_credentials["device_name"]
+            result[CONF_MQTT_DEVICE_SECRET] = self._mqtt_credentials.get("device_secret", "")
+            result[CONF_MQTT_HOST] = self._mqtt_credentials.get("mqtt_host", "")
+        return result
 
     def is_token_valid(self) -> bool:
         """Check if current token is valid and not expired."""
@@ -146,6 +163,9 @@ class HomGarClient:
             # Extract MQTT credentials from user data (only if present)
             user_data = d.get("user", {})
             mqtt_host = d.get("mqttHostUrl", "")
+            _LOGGER.debug("HomGar login response keys: top=%s, user_keys=%s, mqtt_host=%s, productKey=%s, deviceName=%s",
+                list(d.keys()), list(user_data.keys()) if user_data else [], mqtt_host,
+                user_data.get("productKey"), user_data.get("deviceName"))
             
             if user_data.get("productKey") and user_data.get("deviceName") and mqtt_host:
                 self._mqtt_credentials = {

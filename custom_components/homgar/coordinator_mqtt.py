@@ -82,7 +82,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         )
         
         # Update the sensor data in coordinator
-        sensor_key = f"{target_hub['hid']}_{hub_mid}_{addr}"
+        sensor_key = f"{hub_mid}_{addr}"
         decoded_sensors = coordinator.data.get("sensors", {})
         
         if sensor_key in decoded_sensors:

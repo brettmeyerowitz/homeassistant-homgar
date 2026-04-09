@@ -1,7 +1,7 @@
 # Display Hub model constant
 DOMAIN = "homgar"
 NAME = "HomGar/RainPoint Cloud"
-VERSION = "2.0.23"
+VERSION = "2.1.0"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
@@ -20,6 +20,10 @@ DEFAULT_SCAN_INTERVAL = 120  # seconds
 CONF_TOKEN = "token"
 CONF_REFRESH_TOKEN = "refresh_token"
 CONF_TOKEN_EXPIRES_AT = "token_expires_at"
+CONF_MQTT_PRODUCT_KEY = "mqtt_product_key"
+CONF_MQTT_DEVICE_NAME = "mqtt_device_name"
+CONF_MQTT_DEVICE_SECRET = "mqtt_device_secret"
+CONF_MQTT_HOST = "mqtt_host"
 
 # App type mappings
 APP_TYPE_HOMGAR = "homgar"
@@ -54,6 +58,7 @@ MODEL_HCS0528ARF = "HCS0528ARF"   # Pool/Temperature
 MODEL_HCS0565ARF = "HCS0565ARF"   # Pool/Temperature (newer model)
 MODEL_HCS015ARF_PLUS = "HCS015ARF+"  # Pool + Ambient temp/humidity
 MODEL_HWS019WRF_V2 = "HWS019WRF-V2"  # Smart+ Irrigation Display Hub
+MODEL_HWS388WRF_V13 = "HWS388WRF-V13"  # Display Hub (EU variant, same payload format)
 MODEL_HWG023WRF = "HWG023WRF"  # Main hub V1 (modelCode: 273)
 MODEL_HWG023WBRF_V2 = "HWG023WBRF-V2"  # Main hub V2 (modelCode: 289)
 
@@ -110,6 +115,8 @@ MODEL_HTV213FRF = "HTV213FRF"        # Single-zone RF irrigation timer (similar 
 MODEL_HTV245FRF = "HTV245FRF"        # Irrigation valve (similar to HTV0540FRF)
 MODEL_HTV0540FRF = "HTV0540FRF"      # Multi-zone valve hub (fully supported)
 MODEL_HTV0542FRF = "HTV0542FRF"      # 4-zone RF irrigation timer (v2.0.3)
+MODEL_HTV405FRF = "HTV405FRF"        # 4-zone RF valve controller
+MODEL_HIC801W = "HIC801W"            # 8-zone WiFi irrigation controller
 
 # Legacy valve aliases
 MODEL_VALVE_213 = MODEL_HTV213FRF

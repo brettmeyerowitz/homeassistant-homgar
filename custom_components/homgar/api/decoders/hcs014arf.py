@@ -1,6 +1,6 @@
 """Decoder for HCS014ARF Temperature/Humidity sensor."""
 import logging
-from ..utils import _parse_homgar_payload, _le16, _f10_to_c
+from ..utils import _parse_homgar_payload, _le16, _f10_to_c, _parse_ascii_sensor_payload, _parse_stats
 from ..validators import _extract_rssi, _extract_status_code, _battery_status_to_percent
 
 _LOGGER = logging.getLogger(__name__)
@@ -8,12 +8,30 @@ _LOGGER = logging.getLogger(__name__)
 
 def decode_hcs014arf(raw: str) -> dict:
     """Decode HCS014ARF (Temperature/Humidity) sensor.
-    
-    Based on user reverse engineering from Issue #21.
+
+    Supports both US binary format (10#...) and EU ASCII format (battery,rssi;temp,hum).
     """
     from ...const import debug_with_version
 
     _LOGGER.debug(debug_with_version("Decoding HCS014ARF: %s"), raw)
+
+    # EU ASCII format: e.g. "1,0,1;798(798/798/1),30(30/30/1)"
+    fields, battery_code, rssi_dbm = _parse_ascii_sensor_payload(raw)
+    if fields is not None:
+        try:
+            temp_f10, _, _ = _parse_stats(fields[0]) if len(fields) > 0 else (None, None, None)
+            hum, _, _ = _parse_stats(fields[1]) if len(fields) > 1 else (None, None, None)
+            temp_c = round(_f10_to_c(temp_f10), 1) if temp_f10 is not None else None
+            return {
+                "type": "temphum",
+                "rssi_dbm": rssi_dbm or 0,
+                "tempcurrent": temp_c,
+                "humiditycurrent": hum,
+                "battery_percent": None,
+                "decoder": "hcs014arf_ascii",
+            }
+        except Exception as e:
+            _LOGGER.warning("HCS014ARF ASCII decode failed: %s (raw: %r)", e, raw)
 
     try:
         b = _parse_homgar_payload(raw)

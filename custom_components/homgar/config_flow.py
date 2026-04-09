@@ -5,6 +5,7 @@ from typing import Any
 
 import aiohttp
 import voluptuous as vol
+from homeassistant.helpers import config_validation as cv
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -108,16 +109,12 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         _LOGGER.info("Available homes: %s", home_options)
 
         if user_input is not None:
-            selected_hids = user_input["hids"]
-            _LOGGER.info("Selected home IDs: %s", selected_hids)
-
-        if user_input is not None:
             selected = user_input.get(CONF_HIDS)
             if not selected:
                 errors["base"] = "select_at_least_one"
             else:
-                # single home for now
-                hids = [int(selected)]
+                hids = [int(h) for h in selected]
+                _LOGGER.info("Selected home IDs: %s", hids)
 
                 token_data = self._client.export_tokens()
 
@@ -142,10 +139,10 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         data=data,
                     )
 
-        # single-select dropdown – keys are HIDs, labels come from options dict
+        # Multi-select checkboxes — one or more homes
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_HIDS): vol.In(home_options)
+                vol.Required(CONF_HIDS): cv.multi_select(home_options)
             }
         )
 
@@ -242,8 +239,7 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not selected:
                 errors["base"] = "select_at_least_one"
             else:
-                # single home for now
-                hids = [int(selected)]
+                hids = [int(h) for h in selected]
 
                 token_data = self._client.export_tokens()
 
@@ -262,12 +258,12 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     title=f"HomGar/RainPoint ({self._email})",
                 )
 
-        # Pre-select current home
-        current_hid = str(current_hids[0]) if current_hids else None
+        # Pre-select currently configured homes
+        current_selected = {str(h) for h in current_hids}
         
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_HIDS, default=current_hid): vol.In(home_options)
+                vol.Required(CONF_HIDS, default=current_selected): cv.multi_select(home_options)
             }
         )
 

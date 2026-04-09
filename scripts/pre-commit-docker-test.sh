@@ -303,6 +303,41 @@ else
     exit 1
 fi
 
+# Test EU ASCII format decoders (issue #29 — HCS014ARF, HCS012ARF, HWS388WRF-V13)
+echo "🧪 Testing EU ASCII format decoders..."
+cp scripts/test_eu_decoders.py /tmp/test_eu_decoders.py 2>/dev/null || true
+docker cp scripts/test_eu_decoders.py ha-test:/tmp/test_eu_decoders.py > /dev/null 2>&1
+EU_TEST=$(docker exec ha-test python3 /tmp/test_eu_decoders.py 2>/dev/null | tail -1)
+
+if [[ $EU_TEST == "EU_DECODER_TEST:PASS" ]]; then
+    echo "✅ EU ASCII format decoder test passed"
+else
+    echo "❌ ERROR: EU ASCII format decoder test failed"
+    docker exec ha-test python3 /tmp/test_eu_decoders.py 2>/dev/null
+    exit 1
+fi
+
+# Test HWS388WRF-V13 is in coordinator decoder registry
+echo "🧪 Testing HWS388WRF-V13 in decoder registry..."
+HWS388_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.append('/config/custom_components')
+from custom_components.homgar.coordinator import DECODER_REGISTRY
+from custom_components.homgar.const import MODEL_HWS388WRF_V13
+if MODEL_HWS388WRF_V13 in DECODER_REGISTRY:
+    print('HWS388_TEST:PASS')
+else:
+    print('HWS388_TEST:FAIL:not in DECODER_REGISTRY')
+" 2>/dev/null)
+
+if [[ $HWS388_TEST == "HWS388_TEST:PASS" ]]; then
+    echo "✅ HWS388WRF-V13 decoder registry test passed"
+else
+    echo "❌ ERROR: HWS388WRF-V13 not registered"
+    echo "Result: $HWS388_TEST"
+    exit 1
+fi
+
 # Test pool sensor decoder produces correct output keys
 echo "🧪 Testing HCS0528ARF pool decoder output keys..."
 POOL_DECODER_TEST=$(docker exec ha-test python3 -c "

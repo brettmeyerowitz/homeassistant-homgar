@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113
+from .const import DOMAIN, MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113, MODEL_HTV405FRF, MODEL_HIC801W
 from .coordinator import HomGarCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ async def async_setup_entry(
 
     for key, info in sensors_cfg.items():
         model = info.get("model")
-        if model not in [MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113]:
+        if model not in [MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113, MODEL_HTV405FRF, MODEL_HIC801W]:
             continue
 
         decoded = info.get("data") or {}
@@ -87,7 +87,7 @@ class HomGarZoneDurationNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
         addr = sensor_info["addr"]
         sub_name = sensor_info.get("sub_name") or f"Valve Hub {addr}"
 
-        self._attr_unique_id = f"homgar_{hid}_{mid}_{addr}_zone{zone_num}_duration"
+        self._attr_unique_id = f"rainpoint_{mid}_{addr}_zone{zone_num}_duration"
         self._attr_name = f"{sub_name} Zone {zone_num} Duration"
 
     async def async_added_to_hass(self) -> None:
@@ -138,14 +138,20 @@ class HomGarZoneDurationNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
 
     @property
     def device_info(self) -> dict[str, Any]:
-        hid = self._sensor_info["hid"]
         mid = self._sensor_info["mid"]
         addr = self._sensor_info["addr"]
         sub_name = self._sensor_info.get("sub_name") or f"Valve Hub {addr}"
         model = self._sensor_info.get("model") or "Unknown"
+        if self._sensor_info.get("type_flag") == 1:
+            return {
+                "identifiers": {(DOMAIN, f"rainpoint_hub_{mid}")},
+                "name": sub_name,
+                "manufacturer": "RainPoint",
+                "model": model,
+            }
         return {
-            "identifiers": {(DOMAIN, f"{hid}_{mid}_{addr}")},
+            "identifiers": {(DOMAIN, f"{mid}_{addr}")},
             "name": sub_name,
-            "manufacturer": "HomGar",
+            "manufacturer": "RainPoint",
             "model": model,
         }

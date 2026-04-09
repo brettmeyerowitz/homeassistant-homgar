@@ -1,13 +1,38 @@
 """Decoder for HCS012ARF Rain Gauge."""
 import logging
-from ..utils import _le16, _base_decoder_dict
+from ..utils import _le16, _base_decoder_dict, _parse_ascii_sensor_payload, _parse_stats
 from ..validators import _validate_payload, _validate_tag, _extract_status_code, _battery_status_to_percent
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def decode_hcs012arf(raw: str) -> dict:
-    """Decode HCS012ARF (rain gauge)."""
+    """Decode HCS012ARF (rain gauge).
+
+    Supports both US binary format (10#...) and EU ASCII format.
+    EU format fields: last_hour_mm10, last_24h_mm10, last_7d_mm10[, total_mm10]
+    """
+    # EU ASCII format: e.g. "1,0,1;0(0/0/1),0(0/0/1),0(0/0/1),0(0/0/1)"
+    fields, battery_code, rssi_dbm = _parse_ascii_sensor_payload(raw)
+    if fields is not None:
+        try:
+            last_hour_raw, _, _ = _parse_stats(fields[0]) if len(fields) > 0 else (0, None, None)
+            last_24h_raw, _, _ = _parse_stats(fields[1]) if len(fields) > 1 else (0, None, None)
+            last_7d_raw, _, _ = _parse_stats(fields[2]) if len(fields) > 2 else (0, None, None)
+            total_raw, _, _ = _parse_stats(fields[3]) if len(fields) > 3 else (0, None, None)
+            return {
+                "type": "rain",
+                "rssi_dbm": rssi_dbm or 0,
+                "rain_last_hour_mm": (last_hour_raw or 0) / 10.0,
+                "rain_last_24h_mm": (last_24h_raw or 0) / 10.0,
+                "rain_last_7d_mm": (last_7d_raw or 0) / 10.0,
+                "rain_total_mm": (total_raw or 0) / 10.0,
+                "battery_percent": None,
+                "decoder": "hcs012arf_ascii",
+            }
+        except Exception as e:
+            _LOGGER.warning("HCS012ARF ASCII decode failed: %s (raw: %r)", e, raw)
+
     b = _validate_payload(raw, 24)
 
     if not (b[3] == 0xFD and b[4] == 0x04):

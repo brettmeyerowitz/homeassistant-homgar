@@ -49,15 +49,21 @@ class HomGarDiagnosticSensorBase(CoordinatorEntity, SensorEntity):
     def device_info(self) -> dict[str, Any]:
         """Represent each subDevice as its own HA device."""
         from .const import DOMAIN
-        hid = self._sensor_info["hid"]
         mid = self._sensor_info["mid"]
         addr = self._sensor_info["addr"]
         sub_name = self._sensor_info.get("sub_name") or f"Sensor {addr}"
         model = self._sensor_info.get("model") or "Unknown"
+        if self._sensor_info.get("type_flag") == 1:
+            return {
+                "identifiers": {(DOMAIN, f"rainpoint_hub_{mid}")},
+                "name": sub_name,
+                "manufacturer": "RainPoint",
+                "model": model,
+            }
         return {
-            "identifiers": {(DOMAIN, f"{hid}_{mid}_{addr}")},
+            "identifiers": {(DOMAIN, f"{mid}_{addr}")},
             "name": sub_name,
-            "manufacturer": "HomGar",
+            "manufacturer": "RainPoint",
             "model": model,
         }
 
@@ -70,7 +76,7 @@ class HomGarDeviceIDSensor(HomGarDiagnosticSensorBase):
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
         sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"homgar_{base_slug}_device_id"
+        self._attr_unique_id = f"rainpoint_{base_slug}_device_id"
         self._attr_name = f"{sub_name} Device ID"
 
     @property
@@ -142,7 +148,7 @@ class HomGarRSSISensor(HomGarDiagnosticSensorBase):
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
         sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"homgar_{base_slug}_rssi"
+        self._attr_unique_id = f"rainpoint_{base_slug}_rssi"
         self._attr_name = f"{sub_name} Signal Strength"
 
     @property
@@ -164,7 +170,7 @@ class HomGarBatterySensor(HomGarDiagnosticSensorBase):
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
         sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"homgar_{base_slug}_battery"
+        self._attr_unique_id = f"rainpoint_{base_slug}_battery"
         self._attr_name = f"{sub_name} Battery"
 
     @property
@@ -183,7 +189,7 @@ class HomGarFirmwareVersionSensor(HomGarDiagnosticSensorBase):
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
         sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"homgar_{base_slug}_firmware_version"
+        self._attr_unique_id = f"rainpoint_{base_slug}_firmware_version"
         self._attr_name = f"{sub_name} Firmware Version"
 
     @property
@@ -204,7 +210,7 @@ class HomGarLastUpdatedSensor(HomGarDiagnosticSensorBase):
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
         sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"homgar_{base_slug}_last_updated"
+        self._attr_unique_id = f"rainpoint_{base_slug}_last_updated"
         self._attr_name = f"{sub_name} Last Updated"
 
     @property

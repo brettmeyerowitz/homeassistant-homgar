@@ -1,5 +1,6 @@
 """Decoder for HTV113FRF 1-zone timer."""
 import logging
+from ..utils import _parse_homgar_payload
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,11 +16,9 @@ def decode_htv113frf(raw: str) -> dict:
     }
 
     try:
-        hex_part = raw[3:] if raw.startswith("10#") else raw
-        bytes_list = [int(hex_part[i:i+2], 16) for i in range(0, len(hex_part), 2)]
-
-        if len(bytes_list) < 27:
-            result.update({"type": "unknown", "error": f"Insufficient data: {len(bytes_list)} bytes"})
+        bytes_list = _parse_homgar_payload(raw)
+        if not bytes_list or len(bytes_list) < 27:
+            result.update({"type": "unknown", "error": f"Insufficient data: {len(bytes_list) if bytes_list else 0} bytes"})
             return result
 
         rssi_raw = bytes_list[0]

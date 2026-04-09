@@ -44,6 +44,7 @@ from .decoders import (
     decode_hcs048b,
     decode_hcs888arf_v1,
     decode_hcs0600arf,
+    decode_hic801w,
     decode_htv113frf,
 )
 
@@ -104,6 +105,7 @@ __all__ = [
     "decode_hcs048b",
     "decode_hcs888arf_v1",
     "decode_hcs0600arf",
+    "decode_hic801w",
     "decode_htv113frf",
     # Validators
     "_validate_payload",

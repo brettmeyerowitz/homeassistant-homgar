@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2026-04-09
+
+### ⚠️ BREAKING CHANGE — Clean Install Recommended for Some Upgraders
+
+This release overhauls how devices and entities are identified internally to properly support multiple hubs and multiple homes. An automatic migration runs on startup, but users upgrading from pre-2.1.0 with a WiFi controller (HIC801W) or multiple hubs may see duplicate devices. See the README upgrade section for details.
+
+### ✨ NEW FEATURES
+
+- **Multi-home support**: You can now select multiple homes during setup and reconfiguration (checkboxes instead of radio button)
+- **Per-home Area grouping**: Devices are automatically assigned to a Home Assistant Area matching their home name on first registration
+- **Correct multi-hub support**: Two hubs in the same home are now properly distinct devices in HA
+- **EU cloud backend support** (fixes #29) — sensors connected to the EU HomGar backend deliver data in a different ASCII format (`battery,rssi;value(max/min/trend),...`) rather than binary hex. The following decoders now handle both formats:
+  - **HCS014ARF** (Temperature/Humidity): EU payload `1,0,1;798(798/798/1),30(30/30/1)` correctly decodes to 26.6°C, 30%
+  - **HCS012ARF** (Rain Gauge): EU payload fields decoded to mm values
+- **HWS388WRF-V13 Display Hub** (EU variant) now fully supported — previously fell through to "unknown sensor" and showed raw payload. Now decoded identically to HWS019WRF-V2 with temperature/humidity/pressure entities
+- **MQTT diagnostic sensors** for WiFi hubs (HIC801W, HWG023WRF) — connection status, messages received/sent, last message age (disabled by default, enable per-entity in HA)
+
+### 🐛 BUG FIXES
+
+- **Fixed MQTT diagnostic sensors not appearing** — variable name collision (`data` overwritten in sensor loop) and wrong class MRO (`SensorEntity` before `CoordinatorEntity`)
+- **Fixed duplicate HIC801W device** — stale `{mid}_{addr}` sub-device is now merged into the hub device after platform setup; migration split into pre-setup unique-ID migration and post-setup device merge
+- **Fixed MQTT diagnostics showing `disconnected` on first poll** — coordinator now passes current hub list directly to `_update_mqtt_diagnostics` rather than relying on stale `self.data` (which is `None` on first refresh)
+
+### 🔧 INTERNAL CHANGES
+
+- All entity unique IDs migrated from `homgar_` prefix to `rainpoint_` prefix
+- Hub device identifiers now use `mid` (unique hub device ID) instead of `hid` (home ID), fixing collisions when multiple hubs share a home
+- Sensor keys drop the `hid` component: `{mid}_{addr}` instead of `{hid}_{mid}_{addr}`
+- Sub-sensor `via_device` correctly links to parent hub via `mid`
+- Added `_parse_stats()` and `_parse_ascii_sensor_payload()` shared helpers to `api/utils.py` for EU ASCII format parsing
+- Added `scripts/test_eu_decoders.py` with 45 test cases; EU decoder suite added to pre-commit Docker test script
+
+### 🔄 MIGRATION
+
+On first startup after upgrade, a migration runs automatically to update all existing entity unique IDs in the HA entity registry. Entity IDs (e.g. `sensor.front_garden_moisture_percent`) and history are preserved. WiFi controller (HIC801W) sub-devices are merged into the hub device post-setup.
+
+---
+
 ## [2.0.23] - 2026-04-08
 
 ### ✨ NEW FEATURES

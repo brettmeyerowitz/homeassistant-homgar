@@ -36,6 +36,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Restore tokens if present
     client.restore_tokens(entry.data)
 
+    # If MQTT credentials weren't stored, do a fresh login to obtain them
+    from .const import CONF_MQTT_PRODUCT_KEY
+    if not entry.data.get(CONF_MQTT_PRODUCT_KEY):
+        await client.login()
+
     # Simple: one coordinator per config entry
     from .coordinator import HomGarCoordinator
 
@@ -43,18 +48,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await coordinator.async_config_entry_first_refresh()
 
-    # Initialize MQTT for real-time valve updates (optional, graceful fallback)
+    # Persist MQTT credentials to config entry if freshly obtained via login
+    mqtt_creds = client.get_mqtt_credentials()
+    if mqtt_creds.get("product_key") and not entry.data.get(CONF_MQTT_PRODUCT_KEY):
+        hass.config_entries.async_update_entry(entry, data={**entry.data, **client.export_tokens()})
+
+    # Migrate v1->v2 unique_ids before platform setup so renamed IDs don't
+    # collide with freshly registered entities
+    from .migrate import async_migrate_unique_ids, async_merge_wifi_devices
+    await async_migrate_unique_ids(hass, entry, coordinator)
+
+    # Initialize MQTT client object (connect happens below after hass.data is set)
     mqtt_client = None
     try:
         if PAHO_AVAILABLE:
             mqtt_creds = client.get_mqtt_credentials()
             if mqtt_creds.get("product_key") and mqtt_creds.get("device_name"):
                 _LOGGER.info("HomGar: Initializing MQTT for real-time valve updates")
-                
+
                 def on_mqtt_message(data: dict):
                     """Handle MQTT message in async context."""
                     hass.async_create_task(coordinator.handle_mqtt_update(data))
-                
+
                 mqtt_client = HomGarMQTTClient(
                     product_key=mqtt_creds["product_key"],
                     device_name=mqtt_creds["device_name"],
@@ -63,10 +78,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     on_message_callback=on_mqtt_message,
                     mqtt_port=mqtt_creds.get("mqtt_port", 1883),
                 )
-                
-                # Connect MQTT in background
-                await hass.async_add_executor_job(mqtt_client.connect)
-                _LOGGER.info("HomGar: MQTT client connected successfully")
             else:
                 _LOGGER.warning("HomGar: MQTT credentials not available, using polling only")
         else:
@@ -75,12 +86,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("HomGar: MQTT initialization failed, using polling only: %s", e)
         mqtt_client = None
 
+    # Store data before platform setup so sensor.py can access mqtt_client
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
         "client": client,
         "coordinator": coordinator,
         "mqtt_client": mqtt_client,
     }
+
+    # Connect MQTT after hass.data is set
+    if mqtt_client is not None:
+        try:
+            await hass.async_add_executor_job(mqtt_client.connect)
+            _LOGGER.info("HomGar: MQTT client connected successfully")
+        except Exception as e:
+            _LOGGER.warning("HomGar: MQTT connect failed, using polling only: %s", e)
+            hass.data[DOMAIN][entry.entry_id]["mqtt_client"] = None
 
     # Set up services
     await async_setup_services(hass)
@@ -89,7 +110,64 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _LOGGER.info("Completed platform setup for entry: %s", entry.entry_id)
 
+    # Merge WiFi self-contained devices after platform setup (hub device must exist first)
+    await async_merge_wifi_devices(hass, entry, coordinator)
+
+    # Assign devices to HA Areas based on home name — runs every startup so
+    # areas are kept in sync even when suggested_area hint was missed
+    _assign_devices_to_areas(hass, entry, coordinator)
+
     return True
+
+
+def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
+    """Create HA Areas for each home and assign all homgar devices to them."""
+    from homeassistant.helpers import area_registry as ar, device_registry as dr
+
+    data = coordinator.data
+    if not data:
+        return
+
+    area_reg = ar.async_get(hass)
+    device_reg = dr.async_get(hass)
+
+    hubs = data.get("hubs", [])
+    if isinstance(hubs, dict):
+        hubs = list(hubs.values())
+
+    for hub_info in hubs:
+        home_name = hub_info.get("homeName") or ""
+        if not home_name:
+            continue
+        mid = hub_info.get("mid")
+        if not mid:
+            continue
+
+        area = area_reg.async_get_area_by_name(home_name)
+        if not area:
+            area = area_reg.async_create(home_name)
+
+        hub_device = device_reg.async_get_device(identifiers={(DOMAIN, f"rainpoint_hub_{mid}")})
+        if hub_device and hub_device.area_id != area.id:
+            device_reg.async_update_device(hub_device.id, area_id=area.id)
+
+    sensors = data.get("sensors", {})
+    for sensor_info in sensors.values():
+        home_name = sensor_info.get("home_name") or ""
+        if not home_name:
+            continue
+        mid = sensor_info.get("mid")
+        addr = sensor_info.get("addr")
+        if mid is None or addr is None:
+            continue
+
+        area = area_reg.async_get_area_by_name(home_name)
+        if not area:
+            area = area_reg.async_create(home_name)
+
+        device = device_reg.async_get_device(identifiers={(DOMAIN, f"{mid}_{addr}")})
+        if device and device.area_id != area.id:
+            device_reg.async_update_device(device.id, area_id=area.id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

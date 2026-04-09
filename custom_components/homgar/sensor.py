@@ -28,6 +28,7 @@ from .const import (
     MODEL_POOL,
     MODEL_POOL_PLUS,
     MODEL_DISPLAY_HUB,
+    MODEL_HWS388WRF_V13,
     # New HCS sensor models
     MODEL_HCS005FRF,
     MODEL_HCS003FRF,
@@ -83,8 +84,8 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    data = hass.data[DOMAIN][entry.entry_id]
-    coordinator: HomGarCoordinator = data["coordinator"]
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    coordinator: HomGarCoordinator = entry_data["coordinator"]
 
     sensors_cfg = coordinator.data.get("sensors", {})
     hubs_cfg = coordinator.data.get("hubs", [])
@@ -94,7 +95,7 @@ async def async_setup_entry(
     # Create hub entities first
     if isinstance(hubs_cfg, list):
         # Convert list to dict for easier processing
-        hubs_dict = {str(hub.get("hid", i)): hub for i, hub in enumerate(hubs_cfg)}
+        hubs_dict = {str(hub.get("mid", i)): hub for i, hub in enumerate(hubs_cfg)}
     else:
         hubs_dict = hubs_cfg
     
@@ -118,7 +119,7 @@ async def async_setup_entry(
         base_slug = key
         _LOGGER.debug("Creating sensor entity: key=%s, model=%s, sub_name=%s, home_name=%s, base_slug=%s, info=%s", key, model, sub_name, home_name, base_slug, info)
 
-        if model == MODEL_DISPLAY_HUB:
+        if model in (MODEL_DISPLAY_HUB, MODEL_HWS388WRF_V13):
             entities.append(DisplayHubTempCurrentSensor(coordinator, key, info, base_slug))
             entities.append(DisplayHubTempHighSensor(coordinator, key, info, base_slug))
             entities.append(DisplayHubTempLowSensor(coordinator, key, info, base_slug))
@@ -290,28 +291,18 @@ async def async_setup_entry(
         HomGarMQTTMessagesSentSensor,
         HomGarMQTTLastMessageSensor,
     )
-    
-    # Check if MQTT client is available and has diagnostics
-    mqtt_client = None
-    if hasattr(coordinator.hass, 'data') and DOMAIN in coordinator.hass.data:
-        entry_data = coordinator.hass.data[DOMAIN].get(coordinator._entry.entry_id, {})
-        mqtt_client = entry_data.get("mqtt_client")
-    
-    if mqtt_client and hasattr(mqtt_client, 'get_diagnostics'):
-        # Create diagnostic sensors for each hub with MQTT
-        hubs = coordinator.data.get("hubs", [])
-        for hub in hubs:
-            hub_key = f"{hub.get('hid')}_{hub.get('mid')}"
-            
-            # Only create if hub has MQTT credentials
+    mqtt_client = entry_data.get("mqtt_client")
+    if mqtt_client and hasattr(mqtt_client, "get_diagnostics"):
+        for hub in hubs_cfg if isinstance(hubs_cfg, list) else hubs_cfg.values():
+            mid = hub.get("mid")
             if hub.get("productKey") and hub.get("deviceName"):
+                hub_key = f"rainpoint_hub_{mid}"
                 device_info = {
                     "hid": hub.get("hid"),
-                    "mid": hub.get("mid"),
-                    "sub_name": f"MQTT {hub.get('name', 'Hub')}",
+                    "mid": mid,
+                    "sub_name": hub.get("name", "Hub"),
                     "model": "MQTT Diagnostics",
                 }
-
                 entities.extend([
                     HomGarMQTTConnectionSensor(coordinator, hub_key, device_info),
                     HomGarMQTTMessagesReceivedSensor(coordinator, hub_key, device_info),
@@ -362,13 +353,21 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
         sub_name = self._sensor_info.get("sub_name") or f"Sensor {addr}"
         model = self._sensor_info.get("model") or "Unknown"
 
+        if self._sensor_info.get("type_flag") == 1:
+            return {
+                "identifiers": {(DOMAIN, f"rainpoint_hub_{mid}")},
+                "name": f"{sub_name}",
+                "manufacturer": "RainPoint",
+                "model": model,
+                "suggested_area": self._sensor_info.get("home_name"),
+            }
         return {
-            # Unique per subdevice
-            "identifiers": {(DOMAIN, f"{hid}_{mid}_{addr}")},
+            "identifiers": {(DOMAIN, f"{mid}_{addr}")},
             "name": f"{sub_name}",
-            "manufacturer": "RainPoint",  # RainPoint is the actual device manufacturer
+            "manufacturer": "RainPoint",
             "model": model,
-            "via_device": (DOMAIN, f"hub_{hid}"),  # Link to parent hub
+            "suggested_area": self._sensor_info.get("home_name"),
+            "via_device": (DOMAIN, f"rainpoint_hub_{mid}"),
         }
 
     @property
@@ -435,7 +434,7 @@ class HomGarMoisturePercentSensor(HomGarSensorBase):
         self._simple = simple
         model = sensor_info.get("model", "")
         sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"homgar_{base_slug}_moisture_percent"
+        self._attr_unique_id = f"rainpoint_{base_slug}_moisture_percent"
         self._attr_name = f"{sub_name} Moisture Percent"
 
     @property
@@ -462,7 +461,7 @@ class HomGarTemperatureSensor(HomGarSensorBase):
     ) -> None:
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
         sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"homgar_{base_slug}_temperature"
+        self._attr_unique_id = f"rainpoint_{base_slug}_temperature"
         self._attr_name = f"{sub_name} Temperature"
 
     @property
@@ -490,7 +489,7 @@ class HomGarIlluminanceSensor(HomGarSensorBase):
     ) -> None:
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
         sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"homgar_{base_slug}_illuminance"
+        self._attr_unique_id = f"rainpoint_{base_slug}_illuminance"
         self._attr_name = f"{sub_name} Illuminance"
 
     @property
@@ -522,7 +521,7 @@ class HomGarRainSensor(HomGarSensorBase):
         self._data_key = data_key
         sub_name = sensor_info.get("sub_name") or "Rain Sensor"
         slug_suffix = data_key
-        self._attr_unique_id = f"homgar_{base_slug}_{slug_suffix}"
+        self._attr_unique_id = f"rainpoint_{base_slug}_{slug_suffix}"
         # Format rain labels: convert to "Rain (Last X)" style
         window = label.replace("rain", "").strip()
         window_map = {
@@ -553,7 +552,7 @@ class DisplayHubTempCurrentSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_temp_current"
+        self._attr_unique_id = f"rainpoint_{base_slug}_displayhub_temp_current"
         self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Temperature"
 
     @property
@@ -569,7 +568,7 @@ class DisplayHubTempHighSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_temp_high"
+        self._attr_unique_id = f"rainpoint_{base_slug}_displayhub_temp_high"
         self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Temperature Daily High"
 
     @property
@@ -585,7 +584,7 @@ class DisplayHubTempLowSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_temp_low"
+        self._attr_unique_id = f"rainpoint_{base_slug}_displayhub_temp_low"
         self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Temperature Daily Low"
 
     @property
@@ -601,7 +600,7 @@ class DisplayHubHumidityCurrentSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_hum_current"
+        self._attr_unique_id = f"rainpoint_{base_slug}_displayhub_hum_current"
         self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Humidity"
 
     @property
@@ -617,7 +616,7 @@ class DisplayHubHumidityHighSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_hum_high"
+        self._attr_unique_id = f"rainpoint_{base_slug}_displayhub_hum_high"
         self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Humidity Daily High"
 
     @property
@@ -633,7 +632,7 @@ class DisplayHubHumidityLowSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_hum_low"
+        self._attr_unique_id = f"rainpoint_{base_slug}_displayhub_hum_low"
         self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Humidity Daily Low"
 
     @property
@@ -649,7 +648,7 @@ class DisplayHubPressureCurrentSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_press_current"
+        self._attr_unique_id = f"rainpoint_{base_slug}_displayhub_press_current"
         self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Pressure"
 
     @property
@@ -665,7 +664,7 @@ class DisplayHubPressureHighSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_press_high"
+        self._attr_unique_id = f"rainpoint_{base_slug}_displayhub_press_high"
         self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Pressure Daily High"
 
     @property
@@ -681,7 +680,7 @@ class DisplayHubPressureLowSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_displayhub_press_low"
+        self._attr_unique_id = f"rainpoint_{base_slug}_displayhub_press_low"
         self._attr_name = f"{sensor_info.get('sub_name', 'Display Hub')} Pressure Daily Low"
 
     @property
@@ -698,7 +697,7 @@ class HomGarTempHumCurrentSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_temphum_current"
+        self._attr_unique_id = f"rainpoint_{base_slug}_temphum_current"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Current Temperature"
 
     @property
@@ -714,7 +713,7 @@ class HomGarTempHumHighSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_temphum_high"
+        self._attr_unique_id = f"rainpoint_{base_slug}_temphum_high"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} High Temperature"
 
     @property
@@ -730,7 +729,7 @@ class HomGarTempHumLowSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_temphum_low"
+        self._attr_unique_id = f"rainpoint_{base_slug}_temphum_low"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Low Temperature"
 
     @property
@@ -746,7 +745,7 @@ class HomGarTempHumHumidityCurrentSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_temphum_humidity_current"
+        self._attr_unique_id = f"rainpoint_{base_slug}_temphum_humidity_current"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Current Humidity"
 
     @property
@@ -762,7 +761,7 @@ class HomGarTempHumHumidityHighSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_temphum_humidity_high"
+        self._attr_unique_id = f"rainpoint_{base_slug}_temphum_humidity_high"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} High Humidity"
 
     @property
@@ -778,7 +777,7 @@ class HomGarTempHumHumidityLowSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_temphum_humidity_low"
+        self._attr_unique_id = f"rainpoint_{base_slug}_temphum_humidity_low"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Low Humidity"
 
     @property
@@ -794,7 +793,7 @@ class HomGarFlowCurrentUsedSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_flow_current_used"
+        self._attr_unique_id = f"rainpoint_{base_slug}_flow_current_used"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Flow Current Used"
 
     @property
@@ -809,7 +808,7 @@ class HomGarFlowCurrentDurationSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_flow_current_duration"
+        self._attr_unique_id = f"rainpoint_{base_slug}_flow_current_duration"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Flow Current Duration"
 
     @property
@@ -824,7 +823,7 @@ class HomGarFlowLastUsedSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_flow_last_used"
+        self._attr_unique_id = f"rainpoint_{base_slug}_flow_last_used"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Flow Last Used"
 
     @property
@@ -839,7 +838,7 @@ class HomGarFlowLastUsedDurationSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_flow_last_used_duration"
+        self._attr_unique_id = f"rainpoint_{base_slug}_flow_last_used_duration"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Flow Last Used Duration"
 
     @property
@@ -854,7 +853,7 @@ class HomGarFlowTotalTodaySensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_flow_total_today"
+        self._attr_unique_id = f"rainpoint_{base_slug}_flow_total_today"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Flow Total Today"
 
     @property
@@ -869,7 +868,7 @@ class HomGarFlowTotalSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_flow_total"
+        self._attr_unique_id = f"rainpoint_{base_slug}_flow_total"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Flow Total"
 
     @property
@@ -885,7 +884,7 @@ class HomGarFlowBatterySensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_flow_battery"
+        self._attr_unique_id = f"rainpoint_{base_slug}_flow_battery"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Flow Battery"
 
     @property
@@ -902,7 +901,7 @@ class HomGarCO2Sensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_co2"
+        self._attr_unique_id = f"rainpoint_{base_slug}_co2"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} CO2"
 
     @property
@@ -918,7 +917,7 @@ class HomGarCO2LowSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_co2_low"
+        self._attr_unique_id = f"rainpoint_{base_slug}_co2_low"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} CO2 Low"
 
     @property
@@ -934,7 +933,7 @@ class HomGarCO2HighSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_co2_high"
+        self._attr_unique_id = f"rainpoint_{base_slug}_co2_high"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} CO2 High"
 
     @property
@@ -950,7 +949,7 @@ class HomGarCO2TempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_co2_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_co2_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} CO2 Temperature"
 
     @property
@@ -966,7 +965,7 @@ class HomGarCO2HumiditySensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_co2_humidity"
+        self._attr_unique_id = f"rainpoint_{base_slug}_co2_humidity"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} CO2 Humidity"
 
     @property
@@ -982,7 +981,7 @@ class HomGarCO2BatterySensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_co2_battery"
+        self._attr_unique_id = f"rainpoint_{base_slug}_co2_battery"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} CO2 Battery"
 
     @property
@@ -999,7 +998,7 @@ class HomGarPoolCurrentTempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_current_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_current_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool Current Temperature"
 
     @property
@@ -1015,7 +1014,7 @@ class HomGarPoolHighTempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_high_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_high_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool High Temperature"
 
     @property
@@ -1031,7 +1030,7 @@ class HomGarPoolLowTempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_low_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_low_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool Low Temperature"
 
     @property
@@ -1047,7 +1046,7 @@ class HomGarPoolBatterySensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_battery"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_battery"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool Battery"
 
     @property
@@ -1064,7 +1063,7 @@ class HomGarPoolPlusPoolCurrentTempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_pool_current_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_plus_pool_current_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool Temperature"
 
     @property
@@ -1080,7 +1079,7 @@ class HomGarPoolPlusPoolHighTempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_pool_high_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_plus_pool_high_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool High Temperature"
 
     @property
@@ -1096,7 +1095,7 @@ class HomGarPoolPlusPoolLowTempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_pool_low_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_plus_pool_low_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Pool Low Temperature"
 
     @property
@@ -1112,7 +1111,7 @@ class HomGarPoolPlusAmbientCurrentTempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_ambient_current_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_plus_ambient_current_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient Temperature"
 
     @property
@@ -1128,7 +1127,7 @@ class HomGarPoolPlusAmbientHighTempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_ambient_high_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_plus_ambient_high_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient High Temperature"
 
     @property
@@ -1144,7 +1143,7 @@ class HomGarPoolPlusAmbientLowTempSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_ambient_low_temp"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_plus_ambient_low_temp"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient Low Temperature"
 
     @property
@@ -1160,7 +1159,7 @@ class HomGarPoolPlusHumidityCurrentSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_humidity_current"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_plus_humidity_current"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient Humidity"
 
     @property
@@ -1176,7 +1175,7 @@ class HomGarPoolPlusHumidityHighSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_humidity_high"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_plus_humidity_high"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient High Humidity"
 
     @property
@@ -1192,7 +1191,7 @@ class HomGarPoolPlusHumidityLowSensor(HomGarSensorBase):
 
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"homgar_{base_slug}_pool_plus_humidity_low"
+        self._attr_unique_id = f"rainpoint_{base_slug}_pool_plus_humidity_low"
         self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Ambient Low Humidity"
 
     @property
@@ -1214,7 +1213,7 @@ class HomGarUnknownSensor(HomGarSensorBase):
     def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
         model = sensor_info.get("model", "unknown")
-        self._attr_unique_id = f"homgar_{base_slug}_unknown_{model}"
+        self._attr_unique_id = f"rainpoint_{base_slug}_unknown_{model}"
         sub_name = sensor_info.get("sub_name") or "Sensor"
         self._attr_name = f"{sub_name} Unsupported ({model})"
 
@@ -1259,7 +1258,7 @@ class HomGarRawPayloadSensor(HomGarSensorBase):
     ) -> None:
         super().__init__(coordinator, sensor_key, sensor_info, base_slug)
         sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"homgar_{base_slug}_raw_payload"
+        self._attr_unique_id = f"rainpoint_{base_slug}_raw_payload"
         self._attr_name = f"{sub_name} Raw Payload"
     
     @property

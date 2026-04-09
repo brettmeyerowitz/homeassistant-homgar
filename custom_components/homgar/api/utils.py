@@ -6,8 +6,38 @@ and common operations used across the API.
 """
 
 import logging
+import re
 
 _LOGGER = logging.getLogger(__name__)
+
+_STATS_RE = re.compile(r'^(\d+)\((\d+)/(\d+)/(\d+)\)')
+
+
+def _parse_stats(s: str):
+    """Parse 'value(max/min/trend)' format. Returns (current, max, min) or (value, None, None)."""
+    m = _STATS_RE.match(s.strip())
+    if m:
+        return int(m.group(1)), int(m.group(2)), int(m.group(3))
+    try:
+        return int(s.strip()), None, None
+    except (ValueError, TypeError):
+        return None, None, None
+
+
+def _parse_ascii_sensor_payload(raw: str):
+    """Parse EU-format ASCII sensor payload: 'battery,rssi,extra;field1,field2,...'
+
+    Returns (fields, battery_code, rssi_dbm) where fields is a list of stripped strings.
+    Returns None if the payload does not match this format (no semicolon, or has '#').
+    """
+    if '#' in raw or ';' not in raw:
+        return None, None, None
+    parts = raw.split(';', 1)
+    prefix_parts = [x.strip() for x in parts[0].split(',') if x.strip()]
+    battery_code = int(prefix_parts[0]) if prefix_parts else None
+    rssi_dbm = -int(prefix_parts[1]) if len(prefix_parts) >= 2 else None
+    fields = [f.strip() for f in parts[1].split(',') if f.strip()]
+    return fields, battery_code, rssi_dbm
 
 
 def _parse_homgar_payload(raw: str) -> bytes:
@@ -18,8 +48,8 @@ def _parse_homgar_payload(raw: str) -> bytes:
     prefix, hex_data = raw.split("#", 1)
     
     # Handle different formats
-    if prefix == "10":
-        # Standard format: 10#ABCDEF...
+    if prefix in ("10", "00"):
+        # Standard format: 10#ABCDEF... (00# is an alternate form of same format)
         return bytes.fromhex(hex_data)
     elif prefix == "11":
         # TLV format: 11#ABCDEF...
@@ -56,6 +86,7 @@ def _parse_tlv_payload(raw: str) -> dict:
         0xC5: 1,
         0xC6: 1,
         0x20: 0,
+        0xFF: 1,
     }
     
     b = _parse_homgar_payload(raw)

@@ -40,16 +40,20 @@ This integration supports RainPoint Smart+ devices via HomGar cloud API. **Impor
 
 | Device | Model | Entities |
 |--------|-------|---------|
-| Irrigation Display Hub / Weather Station | HWS019WRF-V2 | Temperature °C (current/daily high/low), Humidity % (current/daily high/low), Pressure hPa (current/daily high/low) |
+| Irrigation Display Hub / Weather Station | HWS019WRF-V2, HWS388WRF-V13 | Temperature °C (current/daily high/low), Humidity % (current/daily high/low), Pressure hPa (current/daily high/low) |
+
+> **Note:** Both US and EU cloud backend payload formats are supported for display hubs and temperature/humidity sensors.
 
 #### 💧 Irrigation Valves & Timers
 
-| Device | Model(s) | Entities |
-|--------|----------|---------|
-| Multi-zone Valve Hub | HTV0540FRF | Per-zone open/close valve control |
-| 2-zone Valve / Timer | HTV213FRF, HTV245FRF | Per-zone open/close valve control |
-| 4-zone RF Timer | HTV0542FRF | Per-zone open/close valve control |
-| 1-zone Timer | HTV113FRF | Open/close valve control |
+| Device | Model(s) | Zones | Entities per zone |
+|--------|----------|-------|-------------------|
+| Multi-zone Valve Hub (RF, auto-detected) | HTV0540FRF | Up to 8 | Valve open/close, Duration (minutes) |
+| 2-zone Valve / Timer | HTV213FRF, HTV245FRF | 2 | Valve open/close, Duration (minutes) |
+| 4-zone RF Timer | HTV0542FRF | 4 | Valve open/close, Duration (minutes) |
+| 4-zone RF Valve Controller | HTV405FRF | 4 | Valve open/close, Duration (minutes) |
+| 1-zone Timer | HTV113FRF | 1 | Valve open/close, Duration (minutes) |
+| 8-zone WiFi Irrigation Controller | HIC801W | 8 | Valve open/close, Duration (minutes) |
 
 #### 🔌 Hubs (Gateway devices — no direct sensor entities)
 
@@ -123,17 +127,16 @@ Each account creates unique entities based on the app selection:
 - Exposes:
   - Moisture %
   - Temperature (where applicable)
-  - Illuminance (HCS021FRF)
-  - Rain:
-    - Last hour
-    - Last 24 hours
-    - Last 7 days
-    - Total rainfall
-  - Temperature/Humidity (HCS014ARF)
+  - Illuminance (HCS021FRF and variants)
+  - Rain: last hour / 24h / 7d / total (HCS012ARF)
+  - Temperature/Humidity (HCS014ARF and variants)
   - Flowmeter readings (HCS008FRF)
   - CO2, temperature, humidity (HCS0530THO)
-  - Pool temperature (HCS0528ARF)
+  - Pool temperature (HCS0528ARF, HCS015ARF, HCS0565ARF)
   - Pool + ambient temperature and humidity (HCS015ARF+)
+  - Weather station: temperature, humidity, pressure (HWS019WRF-V2, HWS388WRF-V13)
+  - Irrigation valve open/close + duration (HTV0540FRF, HTV213FRF, HTV245FRF, HTV0542FRF, HTV405FRF, HTV113FRF, HIC801W)
+  - **MQTT diagnostics** for WiFi hubs: connection status, messages received/sent, last message age (disabled by default, enable in device settings)
 - Attributes:
   - `rssi_dbm`
   - `battery_status_code`
@@ -197,35 +200,55 @@ This ensures unique, descriptive entity IDs that reflect your app choice and hom
 
 ---
 
-## Upgrade and Migration
+## Upgrading to 2.1.0
 
-### For Existing Users (v1.0.0 and earlier)
+### ⚠️ IMPORTANT: Clean Install Required for Some Upgraders
 
-If you're upgrading from a previous version of this integration:
+**If you are upgrading from any version before 2.1.0**, you may see duplicate devices in Home Assistant — particularly if you have a WiFi-only controller like the HIC801W ("8 Zone Wifi Irrigation Controller"). **This is a known issue and is not a bug in 2.1.0 itself** — it results from how older versions stored device identifiers.
 
-**No action required for most users!** The integration will automatically:
-- **Default to HomGar app type** for backward compatibility
-- **Continue working** with your existing devices and settings
-- **Maintain all current functionality**
+#### Why this happens
 
-### When to Reconfigure
+Version 2.1.0 made two significant structural changes to how devices are tracked internally:
 
-Consider reconfiguring the integration if:
-- You want to switch from HomGar to RainPoint app (or vice versa)
-- You're not seeing your devices or getting empty data
-- You want to take advantage of the app selection feature
+1. **Multi-home support** — Hub device identifiers were changed from `{hid}_{mid}` (home-ID + module-ID) to `rainpoint_hub_{mid}` (module-ID only). This was necessary because using the home ID (`hid`) as part of a device identifier caused collisions when multiple hubs were in the same home, and made migration between homes impossible. Devices that existed under the old identifier format remain in Home Assistant's device registry as orphans alongside the newly registered ones.
 
-### How to Reconfigure
+2. **WiFi self-contained controllers** — Devices like the HIC801W that act as both hub and sensor were previously registered as two separate HA devices (one hub + one sub-device). In 2.1.0, all entities are consolidated under a single hub device. If the old sub-device entry is still in the registry, HA will display both the old (stale) device and the new consolidated one.
 
-1. Go to **Settings → Devices & Services → HomGar**
-2. Click on your integration
-3. Select **Configure** (or **Reconfigure**)
-4. **Select your app type**:
-   - **HomGar App**: Choose if you use the HomGar mobile app
-   - **RainPoint App**: Choose if you use the RainPoint Smart+ mobile app
-5. Complete the setup
+An automatic migration runs on startup that attempts to reconcile these, but if the old device entries are deeply cached in your HA instance's registry they may persist across restarts.
 
-**Important**: Choose the app you actually use on your phone to ensure you get access to your correct devices.
+#### Recommended solution: delete and re-add the integration
+
+The cleanest fix is to remove and re-add the integration:
+
+1. Go to **Settings → Devices & Services**
+2. Find **HomGar/RainPoint Cloud** and click the three-dot menu → **Delete**
+3. Confirm deletion (this removes all HomGar entities and devices from HA — **your sensor history is lost**)
+4. Click **+ Add Integration**, search for **HomGar/RainPoint Cloud**, and set it up fresh
+
+After a clean install, all devices and entities will be correctly structured from the start.
+
+#### If you want to preserve sensor history
+
+If losing history is not acceptable:
+- Go to **Settings → Devices & Services → HomGar**
+- Open each duplicate/stale device and use **Delete Device** to manually remove the old one
+- The surviving device (with the correct `rainpoint_hub_{mid}` identifier) will retain its entities and history
+
+#### Verifying your setup is correct
+
+After upgrading or reinstalling, each physical hub should appear as **exactly one device** in Home Assistant. For a setup with:
+- 1× RainPoint hub (HWG023WRF) → 1 HA device
+- 1× HIC801W 8-zone WiFi controller → 1 HA device (hub + zones consolidated)
+
+If you see two devices with the same name, a stale old-format device is still present. Delete it manually.
+
+---
+
+## Previous Version Migration
+
+### For users upgrading from v1.x
+
+Unique IDs were migrated automatically from the `homgar_` prefix to the `rainpoint_` prefix. Entity IDs (e.g. `sensor.front_garden_moisture_percent`) and history are preserved as long as you do not delete and re-add the integration.
 
 ---
 
@@ -286,7 +309,7 @@ Below is the manifest file for this integration (as of version 2.0.18):
 {
     "domain": "homgar",
     "name": "HomGar/RainPoint Cloud",
-    "version": "2.0.23",
+    "version": "2.1.0",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "requirements": ["paho-mqtt>=1.6.0"],

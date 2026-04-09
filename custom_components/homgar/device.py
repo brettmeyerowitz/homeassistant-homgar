@@ -16,21 +16,23 @@ class HomGarHubDevice(Entity):
         hub_info: dict,
     ) -> None:
         self._hub_info = hub_info
-        self._attr_unique_id = f"homgar_hub_{hub_info['hid']}"
+        self._attr_unique_id = f"rainpoint_hub_{hub_info['mid']}"
         self._attr_name = hub_info.get("name", "HomGar Hub")
         self._attr_should_poll = False
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device registry information for this hub."""
+        mid = self._hub_info['mid']
         return DeviceInfo(
-            identifiers={(DOMAIN, f"hub_{self._hub_info['hid']}")},
+            identifiers={(DOMAIN, f"rainpoint_hub_{mid}")},
             name=self._hub_info.get("name", "HomGar Hub"),
-            manufacturer="RainPoint",  # RainPoint is the actual device manufacturer
+            manufacturer="RainPoint",
             model=self._hub_info.get("model", "Unknown"),
             sw_version=self._hub_info.get("softVer"),
             hw_version=self._hub_info.get("hardwareVersion"),
             serial_number=self._hub_info.get("mac"),
+            suggested_area=self._hub_info.get("homeName"),
         )
 
     @property
@@ -52,11 +54,13 @@ class HomGarSubDevice(Entity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device registry information for this sub-device."""
+        mid = self._sub_device_info['mid']
+        addr = self._sub_device_info['addr']
         return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._hub_info['hid']}_{self._sub_device_info['mid']}_{self._sub_device_info['addr']}")},
-            name=self._sub_device_info.get("sub_name") or f"Device {self._sub_device_info['addr']}",
-            manufacturer="RainPoint",  # RainPoint is the actual device manufacturer
+            identifiers={(DOMAIN, f"{mid}_{addr}")},
+            name=self._sub_device_info.get("sub_name") or f"Device {addr}",
+            manufacturer="RainPoint",
             model=self._sub_device_info.get("model", "Unknown"),
             sw_version=self._sub_device_info.get("softVer"),
-            via_device=(DOMAIN, f"hub_{self._hub_info['hid']}"),  # Link to parent hub
+            via_device=(DOMAIN, f"rainpoint_hub_{self._hub_info['mid']}"),
         )

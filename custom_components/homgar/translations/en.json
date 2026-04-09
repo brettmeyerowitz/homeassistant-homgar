@@ -15,10 +15,10 @@
                 }
             },
             "select_homes": {
-                "title": "Select Home",
-                "description": "Choose which Home to add to Home Assistant.",
+                "title": "Select Homes",
+                "description": "Choose which homes to add to Home Assistant. You can select multiple.",
                 "data": {
-                    "hids": "Home"
+                    "hids": "Homes"
                 }
             },
             "reconfigure": {
@@ -35,10 +35,10 @@
                 }
             },
             "select_homes_reconfigure": {
-                "title": "Select Home",
-                "description": "Choose which Home to use with this integration.",
+                "title": "Select Homes",
+                "description": "Choose which homes to use with this integration. You can select multiple.",
                 "data": {
-                    "hids": "Home"
+                    "hids": "Homes"
                 }
             }
         },

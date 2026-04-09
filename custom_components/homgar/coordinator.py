@@ -28,6 +28,7 @@ from .const import (
     MODEL_POOL,
     MODEL_POOL_PLUS,
     MODEL_DISPLAY_HUB,
+    MODEL_HWS388WRF_V13,
     MODEL_HWG023WRF,  # Main hub V1
     MODEL_HWG023WBRF_V2,  # Main hub V2
     MODEL_VALVE_HUB,
@@ -35,6 +36,8 @@ from .const import (
     MODEL_VALVE_245,  # HTV245FRF support
     MODEL_HTV0542FRF,  # HTV0542FRF 4-zone valve support (v2.0.3)
     MODEL_VALVE_113,  # HTV113FRF 1-zone timer
+    MODEL_HTV405FRF,  # HTV405FRF 4-zone RF valve controller
+    MODEL_HIC801W,  # HIC801W 8-zone WiFi irrigation controller
     # New HCS sensor models
     MODEL_HCS005FRF,
     MODEL_HCS003FRF,
@@ -76,6 +79,7 @@ from .homgar_api import (
     decode_hcs596wb_v4, decode_hcs706arf, decode_hcs802arf, decode_hcs048b,
     decode_hcs888arf_v1, decode_hcs0600arf,
     decode_hws019wrf_v2,
+    decode_hic801w,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -97,6 +101,8 @@ DECODER_REGISTRY = {
     MODEL_VALVE_245: decode_htv213frf,
     MODEL_HTV0542FRF: decode_htv0542frf,  # HTV0542FRF 4-zone valve (v2.0.3)
     MODEL_VALVE_113: decode_htv113frf,  # HTV113FRF 1-zone timer
+    MODEL_HTV405FRF: decode_htv213frf,  # HTV405FRF 4-zone RF (same TLV format as HTV213FRF)
+    MODEL_HIC801W: decode_hic801w,  # HIC801W 8-zone WiFi controller
     # HCS sensor models (v1.3.0)
     MODEL_HCS005FRF: decode_hcs005frf,
     MODEL_HCS003FRF: decode_hcs003frf,
@@ -122,6 +128,7 @@ DECODER_REGISTRY = {
     MODEL_HCS888ARF_V1: decode_hcs888arf_v1,
     MODEL_HCS0600ARF: decode_hcs0600arf,
     MODEL_DISPLAY_HUB: decode_hws019wrf_v2,
+    MODEL_HWS388WRF_V13: decode_hws019wrf_v2,
 }
 
 
@@ -152,13 +159,26 @@ class HomGarCoordinator(DataUpdateCoordinator):
             homes = self._hids
             hubs: list[dict] = []
             _LOGGER.info("Updating data for HIDs: %s", homes)
+
+            # Build hid -> homeName map from the homes list
+            home_name_by_hid: dict[int, str] = {}
+            try:
+                all_homes = await self._client.list_homes()
+                for h in all_homes:
+                    hid_val = h.get("hid")
+                    name_val = h.get("homeName") or h.get("name") or ""
+                    if hid_val:
+                        home_name_by_hid[int(hid_val)] = name_val
+            except Exception as ex:  # noqa: BLE001
+                _LOGGER.warning("HomGar: could not fetch home names: %s", ex)
+
             for hid in homes:
                 devices = await self._client.get_devices_by_hid(hid)
                 _LOGGER.info("Found %d devices for HID %s: %s", len(devices), hid, [d.get('model', 'unknown') for d in devices])
                 for hub in devices:
                     hub_copy = dict(hub)
                     hub_copy["hid"] = hid
-                    # All devices are RainPoint hardware
+                    hub_copy["homeName"] = home_name_by_hid.get(int(hid), "")
                     hub_copy["brand"] = "RainPoint"
                     hubs.append(hub_copy)
 
@@ -291,7 +311,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                             )
                             decoded = None
 
-                    sensor_key = f"{hub['hid']}_{mid}_{addr}"
+                    sensor_key = f"{mid}_{addr}"
                     
                     # Extract device timestamp from API response
                     device_time = s.get("time")
@@ -315,6 +335,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         "firmware_version": sub.get("softVer"),
                         "raw_status": s,
                         "data": decoded,
+                        "type_flag": sub.get("typeFlag", 0),
                     }
 
                     _LOGGER.debug(debug_with_version("Sensor entity key=%s info=%s"), sensor_key, decoded_sensors[sensor_key])
@@ -323,7 +344,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(debug_with_version("Final data: hubs=%s, sensors=%s"), hubs, list(decoded_sensors.keys()))
             
             # Update MQTT diagnostics
-            self._update_mqtt_diagnostics()
+            self._update_mqtt_diagnostics(hubs)
             
             return {
                 "hubs": hubs,
@@ -336,7 +357,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(f"Unexpected HomGar error: {err}") from err
 
-    def _update_mqtt_diagnostics(self):
+    def _update_mqtt_diagnostics(self, hubs: list) -> None:
         """Update MQTT diagnostics from MQTT client."""
         try:
             # Get MQTT client from hass data
@@ -346,18 +367,15 @@ class HomGarCoordinator(DataUpdateCoordinator):
                 mqtt_client = entry_data.get("mqtt_client")
             
             if not mqtt_client or not hasattr(mqtt_client, 'get_diagnostics'):
-                # Clear diagnostics if MQTT client not available
-                self._mqtt_diagnostics.clear()
+                # Only clear if we previously had data (client removed), not on first poll
+                if mqtt_client is not None:
+                    self._mqtt_diagnostics.clear()
                 return
             
-            # Get diagnostics for each hub with MQTT credentials
-            hubs = self.data.get("hubs", []) if self.data else []
+            diagnostics = mqtt_client.get_diagnostics()
             for hub in hubs:
-                hub_key = f"{hub.get('hid')}_{hub.get('mid')}"
-                
-                # Only collect diagnostics for hubs with MQTT credentials
+                hub_key = f"rainpoint_hub_{hub.get('mid')}"
                 if hub.get("productKey") and hub.get("deviceName"):
-                    diagnostics = mqtt_client.get_diagnostics()
                     self._mqtt_diagnostics[hub_key] = diagnostics
                 else:
                     # Remove diagnostics for hubs without MQTT

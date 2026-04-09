@@ -59,7 +59,7 @@ class HomGarHubDeviceIDSensor(HomGarHubSensorBase):
 
     def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
         super().__init__(coordinator, hub_info)
-        self._attr_unique_id = f"homgar_hub_{hub_info.get('hid', 'unknown')}_device_id"
+        self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_device_id"
         self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} Device ID"
 
     @property
@@ -74,7 +74,7 @@ class HomGarHubFirmwareSensor(HomGarHubSensorBase):
 
     def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
         super().__init__(coordinator, hub_info)
-        self._attr_unique_id = f"homgar_hub_{hub_info.get('hid', 'unknown')}_firmware"
+        self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_firmware"
         self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} Firmware Version"
 
     @property
@@ -89,7 +89,7 @@ class HomGarHubMACSensor(HomGarHubSensorBase):
 
     def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
         super().__init__(coordinator, hub_info)
-        self._attr_unique_id = f"homgar_hub_{hub_info.get('hid', 'unknown')}_mac"
+        self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_mac"
         self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} MAC Address"
 
     @property
@@ -106,7 +106,7 @@ class HomGarHubChannelSelect(CoordinatorEntity, SelectEntity, HomGarHubDevice):
     def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
         CoordinatorEntity.__init__(self, coordinator)
         HomGarHubDevice.__init__(self, hub_info)
-        self._attr_unique_id = f"homgar_hub_{hub_info.get('hid', 'unknown')}_channel"
+        self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_channel"
         self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} RF Channel"
         self._attr_options = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"]
         # Channel 7 from your hub data
@@ -137,7 +137,7 @@ class HomGarHubBroadcastSwitch(CoordinatorEntity, SwitchEntity, HomGarHubDevice)
     def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
         CoordinatorEntity.__init__(self, coordinator)
         HomGarHubDevice.__init__(self, hub_info)
-        self._attr_unique_id = f"homgar_hub_{hub_info.get('hid', 'unknown')}_broadcast"
+        self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_broadcast"
         self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} Automatic Broadcast"
         self._attr_is_on = True  # Default to on
 
