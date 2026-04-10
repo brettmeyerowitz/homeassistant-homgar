@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.2] - 2026-04-10
+
+### 🐛 BUG FIXES
+
+- **HCS008FRF Flow Meter decoder** (fixes #27) — completely rewritten based on Shaun's Excel formulas:
+  - Fixed byte positions for all flow metrics: Current/Last/Todays flow (3-byte LE), Durations (3-byte LE), Total (3-byte LE)
+  - Corrected Total field offset (bytes 51-53 instead of 48-51) to avoid 0xFF DP marker corruption
+  - Values decoded from mL to liters (÷1000)
+
 ## [2.1.1] - 2026-04-10
 
 ### 🐛 BUG FIXES

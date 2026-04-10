@@ -7,7 +7,16 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def decode_hcs008frf(raw: str) -> dict:
-    """Decode HCS008FRF (flow meter) using RainPoint TLV protocol."""
+    """Decode HCS008FRF (flow meter) using fixed byte positions.
+    
+    Based on Excel formulas from Shaun (issue #27), with correction for Total field:
+    - Current Water Usage: bytes 22-24 (3 bytes, little-endian)
+    - Current Duration: bytes 27-29 (3 bytes, little-endian)
+    - Last Water Usage: bytes 32-34 (3 bytes, little-endian)
+    - Last Duration: bytes 38-40 (3 bytes, little-endian)
+    - Total Today: bytes 43-45 (3 bytes, little-endian)
+    - Total: bytes 51-53 (3 bytes, little-endian) - corrected from 48-51 to avoid 0xFF DP marker
+    """
     from ...const import debug_with_version
 
     _LOGGER.debug(debug_with_version("Decoding HCS008FRF: %s"), raw)
@@ -23,40 +32,34 @@ def decode_hcs008frf(raw: str) -> dict:
         "flowtotal": None,
         "flowbatt": None,
         "rssi_dbm": None,
-        "decoder": "rainpoint_tlv",
+        "decoder": "fixed_position",
     }
 
     try:
         b = _parse_homgar_payload(raw)
-        if not b or len(b) < 2:
+        if not b or len(b) < 52:
+            _LOGGER.warning(debug_with_version("HCS008FRF payload too short: %d bytes"), len(b) if b else 0)
             return result
 
         result["rssi_dbm"] = _extract_rssi(b)
 
-        i = 0
-        dp_entries = {}
-        while i < len(b) - 1:
-            dp_id = b[i]
-            b9 = b[i + 1]
-            type_len = (b9 >> 2) & 31
-            if type_len > 0 and i + 2 + type_len <= len(b):
-                value_bytes = b[i+2:i+2+type_len]
-                if type_len == 4:
-                    dp_entries[dp_id] = int.from_bytes(value_bytes, 'little')
-                elif type_len == 2:
-                    dp_entries[dp_id] = int.from_bytes(value_bytes, 'little')
-                elif type_len == 1:
-                    dp_entries[dp_id] = value_bytes[0]
-                i += 2 + type_len
-            else:
-                i += 2
+        # Fixed byte positions from Shaun's Excel formulas (issue #27)
+        # All values are little-endian, in milliliters (divide by 1000 for liters)
+        result["flowcurrentused"] = int.from_bytes(b[22:25], 'little') / 1000.0
+        result["flowcurrenduration"] = int.from_bytes(b[27:30], 'little')  # seconds
+        result["flowlastused"] = int.from_bytes(b[32:35], 'little') / 1000.0
+        result["flowlastusedduration"] = int.from_bytes(b[38:41], 'little')  # seconds
+        result["flowtotaltoday"] = int.from_bytes(b[43:46], 'little') / 1000.0
+        # Total: 3 bytes at 51-53 (byte 48-51 includes 0xFF DP marker, corrupting 4-byte read)
+        result["flowtotal"] = int.from_bytes(b[51:54], 'little') / 1000.0
+        result["flowbatt"] = 100  # Battery level not in payload, assume 100%
 
-        if 255 in dp_entries:
-            result["flowcurrentused"] = dp_entries[255] / 1000.0
-
-        result["flowbatt"] = 100
-
-        _LOGGER.info(debug_with_version("HCS008FRF DP entries: %s"), dp_entries)
+        _LOGGER.info(
+            debug_with_version("HCS008FRF decoded: current=%.3fL, today=%.3fL, total=%.3fL"),
+            result["flowcurrentused"],
+            result["flowtotaltoday"],
+            result["flowtotal"]
+        )
 
     except Exception as e:
         _LOGGER.error(debug_with_version("Error in HCS008FRF decoder: %s"), e)
