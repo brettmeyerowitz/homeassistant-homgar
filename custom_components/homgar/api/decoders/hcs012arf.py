@@ -13,13 +13,30 @@ def decode_hcs012arf(raw: str) -> dict:
     EU format fields: last_hour_mm10, last_24h_mm10, last_7d_mm10[, total_mm10]
     """
     # EU ASCII format: e.g. "1,0,1;0(0/0/1),0(0/0/1),0(0/0/1),0(0/0/1)"
+    # Alternative format: "1,0,1;R=4870(10/20/430)" (single total rain value with R= prefix)
     fields, battery_code, rssi_dbm = _parse_ascii_sensor_payload(raw)
     if fields is not None:
         try:
-            last_hour_raw, _, _ = _parse_stats(fields[0]) if len(fields) > 0 else (0, None, None)
-            last_24h_raw, _, _ = _parse_stats(fields[1]) if len(fields) > 1 else (0, None, None)
-            last_7d_raw, _, _ = _parse_stats(fields[2]) if len(fields) > 2 else (0, None, None)
-            total_raw, _, _ = _parse_stats(fields[3]) if len(fields) > 3 else (0, None, None)
+            # Handle R= prefix format: field like "R=4870(10/20/430)"
+            processed_fields = []
+            for f in fields:
+                if f.startswith('R='):
+                    # Extract just the numeric part after R=
+                    processed_fields.append(f[2:])  # Remove "R=" prefix
+                else:
+                    processed_fields.append(f)
+            
+            # Handle single-field R= format (total rain only) vs multi-field format
+            if len(processed_fields) == 1 and fields[0].startswith('R='):
+                # Single R= field means total rain only
+                total_raw, _, _ = _parse_stats(processed_fields[0])
+                last_hour_raw = last_24h_raw = last_7d_raw = 0
+            else:
+                # Multi-field format: hour, 24h, 7d, total
+                last_hour_raw, _, _ = _parse_stats(processed_fields[0]) if len(processed_fields) > 0 else (0, None, None)
+                last_24h_raw, _, _ = _parse_stats(processed_fields[1]) if len(processed_fields) > 1 else (0, None, None)
+                last_7d_raw, _, _ = _parse_stats(processed_fields[2]) if len(processed_fields) > 2 else (0, None, None)
+                total_raw, _, _ = _parse_stats(processed_fields[3]) if len(processed_fields) > 3 else (0, None, None)
             return {
                 "type": "rain",
                 "rssi_dbm": rssi_dbm or 0,

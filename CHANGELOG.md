@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.4] - 2026-04-10
+
+### 🐛 BUG FIXES
+
+- **MQTT hub MID extraction** (fixes #27 follow-up) — Fixed 6-digit to 5-digit MID normalization for hub lookups. MQTT uses `583580` format while API uses `58358` — now correctly stripped.
+- **MQTT generic device support** — Handler was valve-centric (assumed `zones` dict). Now supports all device types: valves, CO2 sensors, flow meters, moisture sensors, etc.
+- **HCS012ARF R= prefix** (fixes #30) — Added support for `R=4870(10/20/430)` payload format where rain value has `R=` prefix.
+- **Decoder type handling** — Added defensive `bytes`→`str` conversion in HCS008FRF and HCS0530THO decoders.
+
+### 📚 DOCUMENTATION
+
+- Added MQTT Real-time Updates section to README with device support matrix
+- Added generic troubleshooting instructions (not Docker-specific)
+
+### 🔍 ENHANCED LOGGING
+
+- Hub MID extraction debug logging
+- Available hubs list when lookup fails
+- Sub-device model lookup tracking
+- Sensor key diagnostics
+- Device-type-specific status messages
+
 ## [2.1.3] - 2026-04-10
 
 ### 🐛 BUG FIXES

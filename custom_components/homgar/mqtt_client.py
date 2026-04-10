@@ -253,9 +253,28 @@ class HomGarMQTTClient:
                 _LOGGER.warning("HomGar MQTT message invalid format: %s", param_str[:100])
                 return
             
-            # Extract hub MID: last 6 chars of prefix e.g. "#P260409210202000016772081235522" -> "235522"
-            raw_mid = parts[0][-6:]
-            hub_mid = raw_mid.lstrip("0") or raw_mid
+            # Extract hub MID: last 6 chars of prefix, then normalize
+            # Format varies: "...001583580" -> "583580" -> "58358" (strip trailing 0)
+            #                "...000158358" -> "158358" -> "58358" (strip leading 1)
+            prefix_full = parts[0]
+            last6 = prefix_full[-6:]
+            raw_mid = last6.lstrip("0") or "0"
+            
+            # Handle 6-digit encoding: strip trailing 0 or leading 1 to get 5-digit MID
+            if len(raw_mid) == 6:
+                if raw_mid.endswith("0"):
+                    hub_mid = raw_mid[:-1]  # "583580" -> "58358"
+                elif raw_mid.startswith("1"):
+                    hub_mid = raw_mid[1:]   # "158358" -> "58358"
+                else:
+                    hub_mid = raw_mid
+            else:
+                hub_mid = raw_mid
+            
+            _LOGGER.debug(
+                "HomGar MQTT hub MID extraction: prefix_last6=%s raw_mid=%s -> hub_mid=%s",
+                last6, raw_mid, hub_mid
+            )
             rest = parts[1]
             
             # Extract device updates (before final | separators)

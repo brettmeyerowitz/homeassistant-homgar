@@ -1,4 +1,7 @@
-"""MQTT integration for HomGar coordinator - handles real-time valve updates."""
+"""MQTT integration for HomGar coordinator - handles real-time device updates.
+
+Supports all device types: valves, sensors, flow meters, CO2 monitors, etc.
+"""
 import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -40,8 +43,21 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
             break
     
     if not target_hub:
-        _LOGGER.debug("HomGar MQTT: Hub mid=%s not found in coordinator data", hub_mid)
+        # Log available hubs for debugging
+        available_mids = [str(h.get("mid")) for h in hubs]
+        _LOGGER.warning(
+            "HomGar MQTT: Hub mid=%s not found. Available hubs: %s",
+            hub_mid,
+            available_mids
+        )
         return
+    
+    _LOGGER.debug(
+        "HomGar MQTT: Found hub mid=%s model=%s sub_devices=%d",
+        hub_mid,
+        target_hub.get("model"),
+        len(target_hub.get("subDevices", []))
+    )
     
     # Extract address from device_key (D01 -> addr 1, D02 -> addr 2, etc.)
     try:
@@ -51,7 +67,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         return
     
     _LOGGER.info(
-        "HomGar MQTT: Processing valve update for hub_mid=%s addr=%d model=%s",
+        "HomGar MQTT: Processing update for hub_mid=%s addr=%d model=%s",
         hub_mid,
         addr,
         target_hub.get("model"),
@@ -67,6 +83,13 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         if sub.get("addr") == addr:
             sub_model = sub.get("model")
             break
+    
+    _LOGGER.debug(
+        "HomGar MQTT: Sub-device lookup addr=%d found=%s sub_model=%s",
+        addr,
+        sub_model is not None,
+        sub_model
+    )
 
     # Fall back to hub model if no sub-device match
     model = sub_model or target_hub.get("model")
@@ -78,8 +101,10 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
     
     try:
         decoded = decoder(payload)
+        device_type = decoded.get("type", "unknown")
         _LOGGER.info(
-            "HomGar MQTT: Decoded valve state for hub_mid=%s addr=%d: %s",
+            "HomGar MQTT: Decoded %s for hub_mid=%s addr=%d: %s",
+            device_type,
             hub_mid,
             addr,
             decoded,
@@ -99,17 +124,38 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
             decoded_sensors[sensor_key]["data"] = decoded
             decoded_sensors[sensor_key]["raw_status"]["value"] = payload
             
-            valve_open = decoded.get("zones", {}).get(1, {}).get("open", False)
+            # Determine status message based on device type
+            if "zones" in decoded:
+                # Valve device
+                valve_open = decoded.get("zones", {}).get(1, {}).get("open", False)
+                status_msg = f"valve state: {'OPEN' if valve_open else 'CLOSED'}"
+            elif "co2" in decoded:
+                status_msg = f"CO2: {decoded.get('co2')} PPM"
+            elif "flowtotal" in decoded:
+                status_msg = f"Total flow: {decoded.get('flowtotal')} L"
+            elif "moisture_percent" in decoded:
+                status_msg = f"Moisture: {decoded.get('moisture_percent')}%"
+            elif "tempcurrent" in decoded:
+                status_msg = f"Temp: {decoded.get('tempcurrent')}°C"
+            else:
+                status_msg = "data updated"
+            
             _LOGGER.info(
-                "HomGar MQTT: Updated sensor %s with real-time data (valve state: %s)",
+                "HomGar MQTT: Updated sensor %s with real-time data (%s)",
                 sensor_key,
-                "OPEN" if valve_open else "CLOSED",
+                status_msg,
             )
             
             # Trigger coordinator update to notify entities
             coordinator.async_set_updated_data(coordinator.data)
         else:
-            _LOGGER.debug("HomGar MQTT: Sensor key %s not found in coordinator data", sensor_key)
+            # Log available sensor keys for debugging
+            available_keys = list(decoded_sensors.keys())
+            _LOGGER.warning(
+                "HomGar MQTT: Sensor key %s not found. Available keys: %s",
+                sensor_key,
+                available_keys
+            )
     
     except Exception as e:
-        _LOGGER.error("HomGar MQTT: Failed to decode valve payload: %s", e, exc_info=True)
+        _LOGGER.error("HomGar MQTT: Failed to decode payload: %s", e, exc_info=True)

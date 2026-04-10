@@ -146,6 +146,63 @@ Each account creates unique entities based on the app selection:
 
 ---
 
+## MQTT Real-time Updates
+
+The integration supports **real-time MQTT updates** for compatible devices. This provides instant state changes rather than waiting for the 30-second polling cycle.
+
+### How It Works
+- MQTT connects at the **hub level** using virtual device credentials
+- All sub-device updates (D01, D02, etc.) come through a single connection
+- Format: `#P{timestamp}|{hub_mid}|{D01: {...}, D02: {...}}|...`
+
+### Device MQTT Support
+
+| Device Type | Real-time MQTT | Pattern | Notes |
+|-------------|----------------|---------|-------|
+| **Valves** (HTV113FRF, HTV213FRF, etc.) | ✅ Yes | Event-driven | Instant on open/close |
+| **CO2 Sensors** (HCS0530THO) | ✅ Yes | ~45s periodic | Regular updates |
+| **Flow Meters** (HCS008FRF) | ✅ Yes | Event-driven | When water flows |
+| **Moisture Sensors** (HCS021FRF, HCS026FRF) | ❓ Unknown | Likely REST-only | 30s polling |
+| **Temp/Humidity** (HCS014ARF) | ❓ Unknown | Likely REST-only | 30s polling |
+| **Rain Sensors** (HCS012ARF) | ❓ Unknown | Likely REST-only | 30s polling |
+
+### Troubleshooting MQTT
+
+If MQTT updates aren't appearing, check the Home Assistant logs:
+
+**Via Home Assistant UI:**
+- Settings → System → Logs → Search for "HomGar MQTT"
+
+**Via command line (Docker):**
+```bash
+docker logs <container_name> 2>&1 | grep "HomGar MQTT"
+```
+
+**Via command line (HAOS/Core):**
+```bash
+# HAOS: Use the SSH/Terminal add-on
+ha logs | grep "HomGar MQTT"
+
+# Home Assistant Core:
+tail -f /config/home-assistant.log | grep "HomGar MQTT"
+```
+
+**What to look for:**
+```
+✅ "HomGar MQTT connected successfully" - Connection established
+✅ "HomGar MQTT: Found hub mid=XXXXX" - Hub recognized
+✅ "HomGar MQTT: Updated sensor X with real-time data" - Working!
+
+⚠️ "Hub mid=XXXXX not found" - MID mismatch or hub not loaded
+⚠️ "Sensor key X not found" - Device not discovered yet (wait for REST poll)
+```
+
+Common issues:
+- **Hub MID mismatch**: MQTT uses 6-digit encoding (e.g., `583580`) vs API 5-digit (`58358`) - handled automatically in v2.1.4+
+- **Sensor key not found**: Device not yet discovered via REST polling (restart integration or wait 30s)
+
+---
+
 ## How Brand Detection Works
 
 The integration automatically determines the device brand based on your app selection:
@@ -309,7 +366,7 @@ Below is the manifest file for this integration (as of version 2.0.18):
 {
     "domain": "homgar",
     "name": "HomGar/RainPoint Cloud",
-    "version": "2.1.3",
+    "version": "2.1.4",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "requirements": ["paho-mqtt>=1.6.0"],
