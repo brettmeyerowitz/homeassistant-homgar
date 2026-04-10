@@ -27,6 +27,11 @@ def decode_hcs0530tho(raw: str) -> dict:
     }
 
     try:
+        # Ensure raw is a string (handle bytes or other types)
+        if isinstance(raw, bytes):
+            raw = raw.decode('utf-8', errors='replace')
+        raw = str(raw)
+        
         b = _parse_homgar_payload(raw)
         if not b or len(b) < 2:
             return result
@@ -141,7 +146,10 @@ def decode_hcs0530tho(raw: str) -> dict:
             _LOGGER.debug(debug_with_version("Exact parsing failed, using TLV only: %s"), e)
 
     except Exception as e:
-        _LOGGER.error(debug_with_version("Error in HCS0530THO decoder: %s"), e)
+        _LOGGER.error(
+            debug_with_version("Error in HCS0530THO decoder: %s (raw=%r, type=%s)"),
+            e, raw, type(raw).__name__
+        )
         result["decoder"] = "error"
         result["error"] = str(e)
 

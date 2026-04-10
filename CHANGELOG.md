@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.3] - 2026-04-10
+
+### 🐛 BUG FIXES
+
+- **Decoder type handling** — added defensive type conversion (bytes→str) in HCS008FRF and HCS0530THO decoders to prevent "Payload missing '#' separator" errors when API returns unexpected types
+- **Improved error diagnostics** — decoders now log the actual raw value type and content on failure for easier debugging
+
 ## [2.1.2] - 2026-04-10
 
 ### 🐛 BUG FIXES

@@ -36,6 +36,13 @@ def decode_hcs008frf(raw: str) -> dict:
     }
 
     try:
+        # Ensure raw is a string (handle bytes or other types)
+        if isinstance(raw, bytes):
+            raw = raw.decode('utf-8', errors='replace')
+        raw = str(raw)
+        
+        _LOGGER.debug(debug_with_version("HCS008FRF normalized payload: %r"), raw)
+        
         b = _parse_homgar_payload(raw)
         if not b or len(b) < 52:
             _LOGGER.warning(debug_with_version("HCS008FRF payload too short: %d bytes"), len(b) if b else 0)
@@ -62,7 +69,10 @@ def decode_hcs008frf(raw: str) -> dict:
         )
 
     except Exception as e:
-        _LOGGER.error(debug_with_version("Error in HCS008FRF decoder: %s"), e)
+        _LOGGER.error(
+            debug_with_version("Error in HCS008FRF decoder: %s (raw=%r, type=%s)"),
+            e, raw, type(raw).__name__
+        )
         result["decoder"] = "error"
         result["error"] = str(e)
 
