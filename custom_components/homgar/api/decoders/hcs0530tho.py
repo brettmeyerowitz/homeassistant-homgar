@@ -1,6 +1,6 @@
 """Decoder for HCS0530THO CO2 + Temperature + Humidity sensor."""
 import logging
-from ..utils import _parse_homgar_payload
+from ..utils import _parse_homgar_payload, _parse_ascii_sensor_payload, _parse_stats
 from ..validators import _extract_rssi
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,6 +32,25 @@ def decode_hcs0530tho(raw: str) -> dict:
             raw = raw.decode('utf-8', errors='replace')
         raw = str(raw)
         
+        # Try ASCII format first: "1,0,1;728(737/705/1),51(54/47/1),C=B601DC05(...)"
+        fields, battery_code, rssi_dbm = _parse_ascii_sensor_payload(raw)
+        if fields is not None:
+            _LOGGER.debug(debug_with_version("HCS0530THO ASCII format: %d fields"), len(fields))
+            # Parse fields like "728(737/705/1)" = CO2 with stats
+            # and "C=B601DC05(...)" = CO2 related with C= prefix
+            co2_raw, _, _ = _parse_stats(fields[0]) if len(fields) > 0 else (None, None, None)
+            humidity_raw, _, _ = _parse_stats(fields[1]) if len(fields) > 1 else (None, None, None)
+            
+            if co2_raw:
+                result["co2"] = co2_raw / 10.0  # Raw is CO2*10
+            if humidity_raw:
+                result["co2humidity"] = humidity_raw
+            if rssi_dbm:
+                result["rssi_dbm"] = rssi_dbm
+            result["decoder"] = "hcs0530tho_ascii"
+            return result
+        
+        # Fall back to hex format: 10#...
         b = _parse_homgar_payload(raw)
         if not b or len(b) < 2:
             return result

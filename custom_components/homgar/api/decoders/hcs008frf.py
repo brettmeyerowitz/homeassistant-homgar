@@ -1,6 +1,6 @@
 """Decoder for HCS008FRF Flow Meter."""
 import logging
-from ..utils import _parse_homgar_payload
+from ..utils import _parse_homgar_payload, _parse_ascii_sensor_payload, _parse_stats
 from ..validators import _extract_rssi
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,6 +43,23 @@ def decode_hcs008frf(raw: str) -> dict:
         
         _LOGGER.debug(debug_with_version("HCS008FRF normalized payload: %r"), raw)
         
+        # Try ASCII format first: "1,-71,1;31A01419,28,5485,..."
+        fields, battery_code, rssi_dbm = _parse_ascii_sensor_payload(raw)
+        if fields is not None:
+            # ASCII format: fields after semicolon
+            # fields[0] might be hex status, fields[1+] are values
+            _LOGGER.debug(debug_with_version("HCS008FRF ASCII format: %d fields"), len(fields))
+            # For now, return basic info - TODO: parse ASCII flow values
+            # Battery not in ASCII payload, assume 100%
+            return {
+                "type": "flowmeter",
+                "device_model": "HCS008FRF",
+                "rssi_dbm": rssi_dbm or 0,
+                "flowbatt": 100,
+                "decoder": "hcs008frf_ascii_placeholder",
+            }
+        
+        # Fall back to hex format: 10#...
         b = _parse_homgar_payload(raw)
         if not b or len(b) < 52:
             _LOGGER.warning(debug_with_version("HCS008FRF payload too short: %d bytes"), len(b) if b else 0)

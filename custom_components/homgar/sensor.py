@@ -150,7 +150,7 @@ async def async_setup_entry(
             entities.append(HomGarFlowLastUsedDurationSensor(coordinator, key, info, base_slug))
             entities.append(HomGarFlowTotalTodaySensor(coordinator, key, info, base_slug))
             entities.append(HomGarFlowTotalSensor(coordinator, key, info, base_slug))
-            entities.append(HomGarFlowBatterySensor(coordinator, key, info, base_slug))
+            # Note: Battery sensor is provided by generic HomGarBatterySensor in diagnostic sensors
         elif model == MODEL_CO2:
             entities.append(HomGarCO2Sensor(coordinator, key, info, base_slug))
             entities.append(HomGarCO2LowSensor(coordinator, key, info, base_slug))
@@ -875,22 +875,6 @@ class HomGarFlowTotalSensor(HomGarSensorBase):
     def native_value(self):
         data = self._sensor_data
         return data.get("flowtotal") if data else None
-
-
-class HomGarFlowBatterySensor(HomGarSensorBase):
-    _attr_device_class = SensorDeviceClass.BATTERY
-    _attr_native_unit_of_measurement = "%"
-    _attr_state_class = SensorStateClass.MEASUREMENT
-
-    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
-        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        self._attr_unique_id = f"rainpoint_{base_slug}_flow_battery"
-        self._attr_name = f"{sensor_info.get('sub_name', 'Sensor')} Flow Battery"
-
-    @property
-    def native_value(self):
-        data = self._sensor_data
-        return data.get("flowbatt") if data else None
 
 
 # HCS0530THO (CO2/Temp/Humidity)

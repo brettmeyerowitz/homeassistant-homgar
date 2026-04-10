@@ -177,7 +177,8 @@ class HomGarBatterySensor(HomGarDiagnosticSensorBase):
     def native_value(self) -> int | None:
         data = self._sensor_data
         if data:
-            return data.get("battery_percent")
+            # Check for battery_percent first, then flowbatt for flow meters
+            return data.get("battery_percent") or data.get("flowbatt")
         return None
 
 

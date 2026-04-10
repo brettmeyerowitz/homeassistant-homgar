@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.5] - 2026-04-10
+
+### 🐛 BUG FIXES
+
+- **HCS008FRF/HCS0530THO ASCII format** — Added support for EU ASCII payload format (`1,-71,1;...`) in addition to 10# hex format. Fixes "Payload missing '#' separator" errors.
+- **Flow meter battery** — Removed duplicate battery sensor. Now uses single generic `HomGarBatterySensor` that checks both `battery_percent` and `flowbatt` fields.
+- **Flow meter battery category** — Battery sensor now correctly marked as `EntityCategory.DIAGNOSTIC`.
+
 ## [2.1.4] - 2026-04-10
 
 ### 🐛 BUG FIXES
