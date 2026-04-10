@@ -2,15 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.8] - 2026-04-10
+
+### ✨ NEW DEVICES
+
+- **HTP115FRF water pump support** — Added decoder for HTP115FRF pump device using TLV parsing. Supports work mode (idle/irrigation/mist/cycle/soak), duration, last water usage, battery, and RSSI.
+
 ## [2.1.7] - 2026-04-10
 
 ### 🐛 BUG FIXES
 
-- **HCS012ARF R= format time-windowed values** — Fixed parsing of rain values inside parentheses. Format `R=4870(0/20/430)` now correctly extracts:
-  - Total: 4870 / 10 = 487.0 mm
-  - Last hour: 0 / 10 = 0.0 mm
-  - Last 24h: 20 / 10 = 2.0 mm
-  - Last 7d: 430 / 10 = 43.0 mm
+- **HCS012ARF R= format time-windowed values** — Fixed parsing of rain values inside parentheses.
 
 ## [2.1.6] - 2026-04-10
 

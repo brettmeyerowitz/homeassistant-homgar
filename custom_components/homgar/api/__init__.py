@@ -46,6 +46,7 @@ from .decoders import (
     decode_hcs0600arf,
     decode_hic801w,
     decode_htv113frf,
+    decode_htp115frf,
 )
 
 from .validators import (
@@ -107,6 +108,7 @@ __all__ = [
     "decode_hcs0600arf",
     "decode_hic801w",
     "decode_htv113frf",
+    "decode_htp115frf",
     # Validators
     "_validate_payload",
     "_validate_tag",

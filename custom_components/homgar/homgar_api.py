@@ -52,6 +52,7 @@ from .api import (
     decode_hcs0600arf,
     decode_hic801w,
     decode_htv113frf,
+    decode_htp115frf,
     _validate_payload,
     _validate_tag,
     _extract_rssi,

@@ -38,6 +38,7 @@ from .hcs048b import decode_hcs048b
 from .hcs888arf_v1 import decode_hcs888arf_v1
 from .hcs0600arf import decode_hcs0600arf
 from .hic801w import decode_hic801w
+from .htp115frf import decode_htp115frf
 from .legacy import decode_soil, decode_temp_hum, decode_temp_hum_full, decode_display, decode_unknown
 
 __all__ = [
@@ -81,4 +82,5 @@ __all__ = [
     "decode_display",
     "decode_unknown",
     "decode_hic801w",
+    "decode_htp115frf",
 ]

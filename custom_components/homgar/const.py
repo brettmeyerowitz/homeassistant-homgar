@@ -116,6 +116,7 @@ MODEL_HTV245FRF = "HTV245FRF"        # Irrigation valve (similar to HTV0540FRF)
 MODEL_HTV0540FRF = "HTV0540FRF"      # Multi-zone valve hub (fully supported)
 MODEL_HTV0542FRF = "HTV0542FRF"      # 4-zone RF irrigation timer (v2.0.3)
 MODEL_HTV405FRF = "HTV405FRF"        # 4-zone RF valve controller
+MODEL_HTP115FRF = "HTP115FRF"        # Water pump device
 MODEL_HIC801W = "HIC801W"            # 8-zone WiFi irrigation controller
 
 # Legacy valve aliases

@@ -37,6 +37,7 @@ from .const import (
     MODEL_HTV0542FRF,  # HTV0542FRF 4-zone valve support (v2.0.3)
     MODEL_VALVE_113,  # HTV113FRF 1-zone timer
     MODEL_HTV405FRF,  # HTV405FRF 4-zone RF valve controller
+    MODEL_HTP115FRF,  # HTP115FRF water pump device
     MODEL_HIC801W,  # HIC801W 8-zone WiFi irrigation controller
     # New HCS sensor models
     MODEL_HCS005FRF,
@@ -80,6 +81,7 @@ from .homgar_api import (
     decode_hcs888arf_v1, decode_hcs0600arf,
     decode_hws019wrf_v2,
     decode_hic801w,
+    decode_htp115frf,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -102,6 +104,7 @@ DECODER_REGISTRY = {
     MODEL_HTV0542FRF: decode_htv0542frf,  # HTV0542FRF 4-zone valve (v2.0.3)
     MODEL_VALVE_113: decode_htv113frf,  # HTV113FRF 1-zone timer
     MODEL_HTV405FRF: decode_htv213frf,  # HTV405FRF 4-zone RF (same TLV format as HTV213FRF)
+    MODEL_HTP115FRF: decode_htp115frf,  # HTP115FRF water pump device (TLV format)
     MODEL_HIC801W: decode_hic801w,  # HIC801W 8-zone WiFi controller
     # HCS sensor models (v1.3.0)
     MODEL_HCS005FRF: decode_hcs005frf,
