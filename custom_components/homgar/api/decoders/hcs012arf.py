@@ -17,26 +17,32 @@ def decode_hcs012arf(raw: str) -> dict:
     fields, battery_code, rssi_dbm = _parse_ascii_sensor_payload(raw)
     if fields is not None:
         try:
-            # Handle R= prefix format: field like "R=4870(10/20/430)"
-            processed_fields = []
-            for f in fields:
-                if f.startswith('R='):
-                    # Extract just the numeric part after R=
-                    processed_fields.append(f[2:])  # Remove "R=" prefix
+            # Handle R= prefix format: field like "R=4870(0/20/430)"
+            # Format: R=total(last_hour/last_24h/last_7d) - all values in tenths of mm
+            if len(fields) == 1 and fields[0].startswith('R='):
+                r_field = fields[0][2:]  # Remove "R=" prefix
+                # Parse total and the values in parentheses
+                # Format: 4870(0/20/430)
+                if '(' in r_field and ')' in r_field:
+                    main_part, paren_part = r_field.split('(', 1)
+                    paren_part = paren_part.rstrip(')')
+                    total_raw = int(main_part.strip()) if main_part.strip().isdigit() else 0
+                    
+                    # Parse values inside parentheses: last_hour/last_24h/last_7d
+                    paren_values = paren_part.split('/')
+                    last_hour_raw = int(paren_values[0]) if len(paren_values) > 0 and paren_values[0].isdigit() else 0
+                    last_24h_raw = int(paren_values[1]) if len(paren_values) > 1 and paren_values[1].isdigit() else 0
+                    last_7d_raw = int(paren_values[2]) if len(paren_values) > 2 and paren_values[2].isdigit() else 0
                 else:
-                    processed_fields.append(f)
-            
-            # Handle single-field R= format (total rain only) vs multi-field format
-            if len(processed_fields) == 1 and fields[0].startswith('R='):
-                # Single R= field means total rain only
-                total_raw, _, _ = _parse_stats(processed_fields[0])
-                last_hour_raw = last_24h_raw = last_7d_raw = 0
+                    # Fallback: just total
+                    total_raw, _, _ = _parse_stats(r_field)
+                    last_hour_raw = last_24h_raw = last_7d_raw = 0
             else:
                 # Multi-field format: hour, 24h, 7d, total
-                last_hour_raw, _, _ = _parse_stats(processed_fields[0]) if len(processed_fields) > 0 else (0, None, None)
-                last_24h_raw, _, _ = _parse_stats(processed_fields[1]) if len(processed_fields) > 1 else (0, None, None)
-                last_7d_raw, _, _ = _parse_stats(processed_fields[2]) if len(processed_fields) > 2 else (0, None, None)
-                total_raw, _, _ = _parse_stats(processed_fields[3]) if len(processed_fields) > 3 else (0, None, None)
+                last_hour_raw, _, _ = _parse_stats(fields[0]) if len(fields) > 0 else (0, None, None)
+                last_24h_raw, _, _ = _parse_stats(fields[1]) if len(fields) > 1 else (0, None, None)
+                last_7d_raw, _, _ = _parse_stats(fields[2]) if len(fields) > 2 else (0, None, None)
+                total_raw, _, _ = _parse_stats(fields[3]) if len(fields) > 3 else (0, None, None)
             return {
                 "type": "rain",
                 "rssi_dbm": rssi_dbm or 0,
