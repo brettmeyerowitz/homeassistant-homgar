@@ -8,14 +8,14 @@ _LOGGER = logging.getLogger(__name__)
 
 def decode_hcs008frf(raw: str) -> dict:
     """Decode HCS008FRF (flow meter) using fixed byte positions.
-    
-    Based on Excel formulas from Shaun (issue #27), with correction for Total field:
+
+    Based on Excel formulas from Shaun (issue #27), with correction for Total field (v2.1.6):
     - Current Water Usage: bytes 22-24 (3 bytes, little-endian)
     - Current Duration: bytes 27-29 (3 bytes, little-endian)
     - Last Water Usage: bytes 32-34 (3 bytes, little-endian)
     - Last Duration: bytes 38-40 (3 bytes, little-endian)
     - Total Today: bytes 43-45 (3 bytes, little-endian)
-    - Total: bytes 51-53 (3 bytes, little-endian) - corrected from 48-51 to avoid 0xFF DP marker
+    - Total: bytes 47-50 (4 bytes, little-endian) / 10 - before FF 0F DP marker
     """
     from ...const import debug_with_version
 
@@ -61,7 +61,7 @@ def decode_hcs008frf(raw: str) -> dict:
         
         # Fall back to hex format: 10#...
         b = _parse_homgar_payload(raw)
-        if not b or len(b) < 52:
+        if not b or len(b) < 54:
             _LOGGER.warning(debug_with_version("HCS008FRF payload too short: %d bytes"), len(b) if b else 0)
             return result
 
@@ -74,8 +74,9 @@ def decode_hcs008frf(raw: str) -> dict:
         result["flowlastused"] = int.from_bytes(b[32:35], 'little') / 1000.0
         result["flowlastusedduration"] = int.from_bytes(b[38:41], 'little')  # seconds
         result["flowtotaltoday"] = int.from_bytes(b[43:46], 'little') / 1000.0
-        # Total: 3 bytes at 51-53 (byte 48-51 includes 0xFF DP marker, corrupting 4-byte read)
-        result["flowtotal"] = int.from_bytes(b[51:54], 'little') / 1000.0
+        # Total: 4 bytes at 47-50 (before FF 0F DP marker) / 10 (not 1000)
+        # Verified with Shaun's payload: 98586 -> 9858.6 L
+        result["flowtotal"] = int.from_bytes(b[47:51], 'little') / 10.0
         result["flowbatt"] = 100  # Battery level not in payload, assume 100%
 
         _LOGGER.info(

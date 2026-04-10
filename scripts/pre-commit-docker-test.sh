@@ -194,7 +194,7 @@ temp_high = result.get('temp_high_c')
 hum_low = result.get('humidity_low')
 
 expected_temp = round((781/10.0 - 32.0)*5.0/9.0, 1)
-expected_press = round(10213/100.0, 1)
+expected_press = round(10213/10.0, 1)
 
 if temp == expected_temp and hum == 52 and press == expected_press and temp_high is not None and hum_low is not None:
     print('DISPLAY_HUB_TEST:PASS')

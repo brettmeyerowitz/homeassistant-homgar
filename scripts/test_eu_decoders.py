@@ -37,7 +37,7 @@ from custom_components.homgar.api.decoders.hws019wrf_v2 import decode_hws019wrf_
 r = decode_hws019wrf_v2('1,136;781(781/723/1),52(64/50/1),P=10213(10222/10205/1),')
 check('DisplayHub US temp_current_c', r.get('temp_current_c'), round((781/10-32)*5/9, 1))
 check('DisplayHub US humidity_current', r.get('humidity_current'), 52)
-check('DisplayHub US pressure_current_hpa', r.get('pressure_current_hpa'), round(10213/100, 1))
+check('DisplayHub US pressure_current_hpa', r.get('pressure_current_hpa'), round(10213/10, 1))
 check('DisplayHub US temp_high_c', r.get('temp_high_c'), round((781/10-32)*5/9, 1))
 check('DisplayHub US temp_low_c', r.get('temp_low_c'), round((723/10-32)*5/9, 1))
 check('DisplayHub US humidity_high', r.get('humidity_high'), 64)
@@ -47,7 +47,7 @@ check('DisplayHub US humidity_low', r.get('humidity_low'), 50)
 r = decode_hws019wrf_v2('1,0,1;816(816/816/1),31(31/31/1),P=10294(10294/10294/1),')
 check('DisplayHub EU temp_current_c', r.get('temp_current_c'), round((816/10-32)*5/9, 1))
 check('DisplayHub EU humidity_current', r.get('humidity_current'), 31)
-check('DisplayHub EU pressure_current_hpa', r.get('pressure_current_hpa'), round(10294/100, 1))
+check('DisplayHub EU pressure_current_hpa', r.get('pressure_current_hpa'), round(10294/10, 1))
 
 
 # --- HCS014ARF Temperature/Humidity ---

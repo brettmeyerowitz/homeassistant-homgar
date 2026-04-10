@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.6] - 2026-04-10
+
+### 🐛 BUG FIXES
+
+- **HCS008FRF Total flow calculation** — Fixed byte position for Total flow value. Changed from bytes 51-53 (3-byte, /1000) to bytes 47-50 (4-byte LE, /10) based on Shaun's analysis. Total now correctly shows ~9858.6 L instead of 528.4 L.
+- **Display Hub pressure** — Fixed division factor from 100 to 10. Pressure now correctly shows 986.8 hPa (or 28.9 inHg) instead of 98.7 hPa (or 2.89 inHg).
+
 ## [2.1.5] - 2026-04-10
 
 ### 🐛 BUG FIXES

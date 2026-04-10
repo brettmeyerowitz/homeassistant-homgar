@@ -89,11 +89,12 @@ def decode_hws019wrf_v2(raw: str) -> dict:
                 result["humidity_low"] = hum_low
 
         if press is not None:
-            result["pressure_current_hpa"] = round(press / 100.0, 1)
+            # Pressure is in tenths of hPa (e.g., 9868 = 986.8 hPa)
+            result["pressure_current_hpa"] = round(press / 10.0, 1)
             if press_high is not None:
-                result["pressure_high_hpa"] = round(press_high / 100.0, 1)
+                result["pressure_high_hpa"] = round(press_high / 10.0, 1)
             if press_low is not None:
-                result["pressure_low_hpa"] = round(press_low / 100.0, 1)
+                result["pressure_low_hpa"] = round(press_low / 10.0, 1)
 
         _LOGGER.debug("decode_hws019wrf_v2 result: %r", result)
         return result
