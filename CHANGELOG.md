@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.9] - 2026-04-11
+
+### 🌐 Community & Discoverability
+- HACS name updated to **HomGar/RainPoint Cloud** — now searchable by either brand name
+- Country filter removed — integration now visible globally in HACS
+- Discord community server added to README
+
+---
+
 ## [3.0.8] - 2026-04-11
 
 ### 🐛 Bug Fixes
