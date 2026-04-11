@@ -292,7 +292,7 @@ class HomGarMQTTClient:
                 _LOGGER.warning("HomGar MQTT failed to parse device updates: %s", d_updates_raw[:100])
                 return
             
-            _LOGGER.info(
+            _LOGGER.debug(
                 "HomGar MQTT update for hub_mid=%s: %d device(s)",
                 hub_mid,
                 len(d_updates),

@@ -23,7 +23,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
     device_key = data.get("device_key")  # e.g., "D01", "D02"
     payload = data.get("payload")  # e.g., "11#00..."
     
-    _LOGGER.info(
+    _LOGGER.debug(
         "HomGar MQTT update received: hub_mid=%s device_key=%s payload=%s",
         hub_mid,
         device_key,
@@ -66,7 +66,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         _LOGGER.warning("HomGar MQTT: Invalid device_key format: %s", device_key)
         return
     
-    _LOGGER.info(
+    _LOGGER.debug(
         "HomGar MQTT: Processing update for hub_mid=%s addr=%d model=%s",
         hub_mid,
         addr,
@@ -99,7 +99,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
             _LOGGER.debug("HomGar MQTT: No decoder for model=%s (sub_model=%s)", model, sub_model)
             return
         top_fields = [k for k in decoded if not k.startswith("port_") and k not in ("port_number", "dp_flag")]
-        _LOGGER.info(
+        _LOGGER.debug(
             "HomGar MQTT: Decoded model=%s for hub_mid=%s addr=%d fields=%s",
             model,
             hub_mid,
@@ -112,6 +112,18 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         decoded_sensors = coordinator.data.get("sensors", {})
         
         if sensor_key in decoded_sensors:
+            # Skip update if decoded data is identical to what's already stored
+            existing = decoded_sensors[sensor_key].get("data") or {}
+            _SKIP_KEYS = {"device_timestamp", "timestamp_source"}
+            existing_cmp = {k: v for k, v in existing.items() if k not in _SKIP_KEYS}
+            decoded_cmp = {k: v for k, v in decoded.items() if k not in _SKIP_KEYS}
+            if existing_cmp == decoded_cmp:
+                _LOGGER.debug(
+                    "HomGar MQTT: No change in data for sensor %s — skipping update",
+                    sensor_key,
+                )
+                return
+
             # Stamp with current time and mark as MQTT-sourced
             now_iso = datetime.now(timezone.utc).isoformat()
             decoded["device_timestamp"] = now_iso
@@ -139,7 +151,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
             else:
                 status_msg = "data updated"
             
-            _LOGGER.info(
+            _LOGGER.debug(
                 "HomGar MQTT: Updated sensor %s with real-time data (%s)",
                 sensor_key,
                 status_msg,

@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.11] - 2026-04-11
+
+### 🔧 Internal
+- **Suppress spurious state-change events** — coordinator now compares decoded sensor data before pushing updates; if values are identical (excluding timestamps) the update is skipped, preventing unnecessary `"changed to X"` log entries when nothing actually changed (REST + MQTT paths)
+- **Removed `homgar_api.py` shim** — imports consolidated directly through `api/` subpackage
+- **Log level cleanup** — per-poll and per-MQTT-message log calls demoted from `info` to `debug`; `info` level now reserved for significant one-time events (connect, login, setup). Reduces noise in default HA logs
+- **Decoder regression test suite** — `scripts/test_decoders.py` added with 74 tests covering real payloads from GitHub issues: HCS0530THO, HCS014ARF, HCS021FRF, HCS008FRF, HTV113FRF, HTV213FRF (TLV + ASCII), HTV245FRF, HTV0537FRF, HIC801W, HTP115FRF, HCS012ARF, F→C conversion regression guard
+
+---
+
 ## [3.0.10] - 2026-04-11
 
 ### 🐛 Bug Fixes

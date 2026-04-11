@@ -24,7 +24,7 @@ from .const import (
     APP_TYPE_RAINPOINT,
 )
 from .country_codes import get_default_country_code
-from .homgar_api import HomGarClient, HomGarApiError
+from .api import HomGarClient, HomGarApiError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,13 +55,13 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
 
             session = async_get_clientsession(self.hass)
-            _LOGGER.info("Creating client with app_type: %s", app_type)
+            _LOGGER.debug("Creating client with app_type: %s", app_type)
             client = HomGarClient(area_code, email, password, session, app_type)
 
             try:
                 await client.ensure_logged_in()
                 homes = await client.list_homes()
-                _LOGGER.info("Found %d homes for app_type %s", len(homes), app_type)
+                _LOGGER.debug("Found %d homes for app_type %s", len(homes), app_type)
                 _LOGGER.debug("Homes data: %s", homes)
             except HomGarApiError:
                 _LOGGER.exception("Error logging in to HomGar")
@@ -107,7 +107,7 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         home_options = {str(h["hid"]): h["homeName"] for h in self._homes}
-        _LOGGER.info("Available homes: %s", home_options)
+        _LOGGER.debug("Available homes: %s", home_options)
 
         if user_input is not None:
             selected = user_input.get(CONF_HIDS)
@@ -115,7 +115,7 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "select_at_least_one"
             else:
                 hids = [int(h) for h in selected]
-                _LOGGER.info("Selected home IDs: %s", hids)
+                _LOGGER.debug("Selected home IDs: %s", hids)
 
                 token_data = self._client.export_tokens()
 
@@ -190,7 +190,7 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 await client.ensure_logged_in()
                 homes = await client.list_homes()
-                _LOGGER.info("Found %d homes for reconfigure", len(homes))
+                _LOGGER.debug("Found %d homes for reconfigure", len(homes))
             except HomGarApiError:
                 _LOGGER.exception("Error logging in to HomGar during reconfigure")
                 return self.async_show_form(

@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_APP_TYPE, CONF_HIDS
 from .coordinator import HomGarCoordinator
 from .decoder import _MODELS  # noqa: F401 — imported here to trigger eager file load in executor
-from .homgar_api import HomGarClient
+from .api import HomGarClient
 from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
 
 _LOGGER = logging.getLogger(__name__)

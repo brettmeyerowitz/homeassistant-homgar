@@ -20,7 +20,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
-from .homgar_api import HomGarClient, HomGarApiError
+from .api import HomGarClient, HomGarApiError
 from .decoder import decode_payload, get_valve_ports
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
         try:
             homes = self._hids
             hubs: list[dict] = []
-            _LOGGER.info("Updating data for HIDs: %s", homes)
+            _LOGGER.debug("Updating data for HIDs: %s", homes)
 
             # Build hid -> homeName map from the homes list
             home_name_by_hid: dict[int, str] = {}
@@ -69,7 +69,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
 
             for hid in homes:
                 devices = await self._client.get_devices_by_hid(hid)
-                _LOGGER.info("Found %d devices for HID %s: %s", len(devices), hid, [d.get('model', 'unknown') for d in devices])
+                _LOGGER.debug("Found %d devices for HID %s: %s", len(devices), hid, [d.get('model', 'unknown') for d in devices])
                 for hub in devices:
                     hub_copy = dict(hub)
                     hub_copy["hid"] = hid
@@ -217,19 +217,27 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         except (ValueError, TypeError, OSError):
                             pass
                     
-                    decoded_sensors[sensor_key] = {
-                        "hid": hub["hid"],
-                        "mid": mid,
-                        "addr": addr,
-                        "home_name": hub.get("homeName"),
-                        "hub_name": hub.get("name", "Hub"),
-                        "sub_name": sub.get("name"),
-                        "model": sub.get("model"),
-                        "firmware_version": sub.get("softVer"),
-                        "raw_status": s,
-                        "data": decoded,
-                        "type_flag": sub.get("typeFlag", 0),
-                    }
+                    # Only update data if decoded values have actually changed
+                    _SKIP_KEYS = {"device_timestamp", "timestamp_source"}
+                    prev_data = (decoded_sensors.get(sensor_key) or {}).get("data") or {}
+                    prev_cmp = {k: v for k, v in prev_data.items() if k not in _SKIP_KEYS}
+                    new_cmp = {k: v for k, v in (decoded or {}).items() if k not in _SKIP_KEYS}
+                    if prev_cmp == new_cmp and sensor_key in decoded_sensors:
+                        decoded_sensors[sensor_key]["raw_status"] = s
+                    else:
+                        decoded_sensors[sensor_key] = {
+                            "hid": hub["hid"],
+                            "mid": mid,
+                            "addr": addr,
+                            "home_name": hub.get("homeName"),
+                            "hub_name": hub.get("name", "Hub"),
+                            "sub_name": sub.get("name"),
+                            "model": sub.get("model"),
+                            "firmware_version": sub.get("softVer"),
+                            "raw_status": s,
+                            "data": decoded,
+                            "type_flag": sub.get("typeFlag", 0),
+                        }
 
                     _LOGGER.debug("Sensor entity key=%s info=%s", sensor_key, decoded_sensors[sensor_key])
 
@@ -260,7 +268,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                                 }
                                 _LOGGER.debug("Registered hub-as-device sensor key=%s model=%s", sensor_key, hub_model)
 
-            _LOGGER.info("Coordinator update complete: %d hubs, %d sensors", len(hubs), len(decoded_sensors))
+            _LOGGER.debug("Coordinator update complete: %d hubs, %d sensors", len(hubs), len(decoded_sensors))
             _LOGGER.debug("Final data: hubs=%s, sensors=%s", hubs, list(decoded_sensors.keys()))
             
             # Update MQTT diagnostics

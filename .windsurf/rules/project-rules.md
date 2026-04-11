@@ -9,16 +9,13 @@ trigger: always_on
 - Never run Python test scripts directly on the host machine
 - After copying files to Docker, always restart the container to clear `.pyc` cache
 - Run `bash scripts/pre-commit-docker-test.sh` before every commit
+- **NEVER use `docker exec ha-test python3 -c "..."` inline text blocks — ALWAYS write the script to `/tmp/script.py` first, then `docker cp /tmp/script.py ha-test:/tmp/script.py && docker exec ha-test python3 /tmp/script.py`. No exceptions.**
 
 ## GitHub
 - Use `gh` CLI for all GitHub operations (releases, issue comments, PRs) — never instruct the user to do it manually in the browser
 - For GitHub releases: `gh release create "vX.X.X" --title "vX.X.X" --notes "..."`
 - For issue comments: `gh issue comment <number> --body "..."`
 - When writing multi-line content for `gh` commands, write it to a temp file first, then pass with `--notes-file` or `--body-file` — never use inline heredocs or text blocks which break in zsh
-
-## File operations
-- Write scripts and test content to temp files (e.g. `/tmp/test_xyz.py`) rather than passing as inline text blocks to shell commands
-- Use `docker cp <file> ha-test:/tmp/<file>` then `docker exec ha-test python3 /tmp/<file>` for running test scripts in Docker
 
 ## MQTT rules
 - MQTT uses `securemode=2` with a fresh HMAC-SHA1 timestamp generated on every connect/reconnect — never reuse stale credentials
@@ -31,16 +28,14 @@ trigger: always_on
 - Credentials are stored in the HA config entries inside the `ha-test` Docker container — retrieve with:
   `docker exec ha-test cat /config/.storage/core.config_entries | python3 -m json.tool | grep -A5 homgar`
 - Virtual MQTT product key and host are returned by the `subscribeStatus` API call at runtime — do not hardcode
-- Never mix HomGar and RainPoint credentials between accounts
 
 ## README maintenance
-- When adding a new supported device, update the device compatibility table in `README.md`
-- When bumping the version, update the `manifest.json` code snippet version in `README.md`
-- When adding new entities for a device, update the entities column in the device table
+- When adding a new supported device model, add it to the flat model list in the `## Supported Devices` section of `README.md`
+- When adding new decoded sensor fields, add them to the entities table in `README.md`
 - The pre-commit script checks README version matches manifest — it will fail if out of sync
 
 ## Code style
-- `DECODER_REGISTRY` in `coordinator.py` is the single source of truth for model→decoder mappings — both REST poll and MQTT paths use it
-- New device support requires: decoder file → export chain → `const.py` constant → `DECODER_REGISTRY` entry → sensor entities
+- Decoding is data-driven via `product_models.json` — `decode_payload(model, payload)` in `decoder.py` is used by both REST poll (`coordinator.py`) and MQTT (`coordinator_mqtt.py`)
+- New device support typically only requires an entry in `product_models.json` — no separate decoder file needed unless the device has a completely custom format (e.g. HIC801W)
 - Valve sub-device models are looked up by `addr` from `hub["subDevices"]` at MQTT decode time
 
