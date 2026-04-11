@@ -4,6 +4,8 @@ from datetime import timedelta
 
 import voluptuous as vol
 
+from homeassistant import config_entries
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -42,11 +44,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # If MQTT credentials weren't stored, do a fresh login to obtain them
     from .const import CONF_MQTT_PRODUCT_KEY
     if not entry.data.get(CONF_MQTT_PRODUCT_KEY):
-        await client.login()
+        try:
+            await client.login()
+        except Exception as err:
+            raise ConfigEntryNotReady(f"HomGar [{entry.title}]: login failed: {err}") from err
 
     coordinator = HomGarCoordinator(hass, client, entry)
 
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception as err:
+        raise ConfigEntryNotReady(f"HomGar [{entry.title}]: initial data fetch failed: {err}") from err
 
     # Persist MQTT credentials to config entry if freshly obtained via login
     mqtt_creds = client.get_mqtt_credentials()

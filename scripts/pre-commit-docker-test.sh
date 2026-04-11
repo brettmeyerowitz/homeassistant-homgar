@@ -8,15 +8,14 @@ set -e
 echo "🔍 Running pre-commit Docker testing..."
 
 # ── Version consistency check ──────────────────────────────────────────────
-echo "🔍 Checking manifest and const.py versions match..."
+echo "🔍 Checking manifest version..."
 MANIFEST_VERSION=$(grep '"version"' custom_components/homgar/manifest.json | sed 's/.*"version": "\(.*\)".*/\1/')
-CONST_VERSION=$(grep '^VERSION = ' custom_components/homgar/const.py | sed 's/VERSION = "\(.*\)"/\1/')
 
-if [ "$MANIFEST_VERSION" != "$CONST_VERSION" ]; then
-    echo "❌ ERROR: const.py VERSION ($CONST_VERSION) doesn't match manifest version ($MANIFEST_VERSION)"
+if [ -z "$MANIFEST_VERSION" ]; then
+    echo "❌ ERROR: Could not read version from manifest.json"
     exit 1
 fi
-echo "✅ Version consistent: $MANIFEST_VERSION"
+echo "✅ Version: $MANIFEST_VERSION"
 
 # ── Docker container check ─────────────────────────────────────────────────
 if ! docker ps | grep -q "ha-test"; then

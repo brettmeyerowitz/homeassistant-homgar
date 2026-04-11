@@ -1,12 +1,5 @@
-# Display Hub model constant
 DOMAIN = "homgar"
 NAME = "HomGar/RainPoint Cloud"
-VERSION = "3.0.2"
-
-# Helper function for debug messages with version
-def debug_with_version(message: str) -> str:
-    """Format debug message with integration version."""
-    return f"[HomGar v{VERSION}] {message}"
 
 CONF_AREA_CODE = "area_code"
 CONF_EMAIL = "email"

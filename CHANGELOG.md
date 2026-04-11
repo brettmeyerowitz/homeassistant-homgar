@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.3] - 2026-04-11
+
+### 🐛 Bug Fixes
+- **Fixed "Config entry was never loaded!" error on unload** — if the initial login or data fetch failed during setup, HA would crash with `ValueError: Config entry was never loaded!` when trying to unload the entry. Setup failures now correctly raise `ConfigEntryNotReady` so HA retries setup gracefully instead.
+
+---
+
 ## [3.0.2] - 2026-04-11
 
 ### 🐛 Bug Fixes
