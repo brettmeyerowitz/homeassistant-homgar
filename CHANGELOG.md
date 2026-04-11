@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.4] - 2026-04-11
+
+### 🐛 Bug Fixes
+- **Multi-port valve state decoding** — legacy ASCII payloads for HTV213FRF, HTV245FRF and similar 2-zone valves now correctly decode per-port `valve_state`, `is_watering`, and `current_session_duration` from the pipe-separated format (`port1_fields|port2_fields`).
+- **Battery level for legacy payloads** — `_p1_bat_or_rssi` was being unconditionally mapped to `battery_level`, causing negative RSSI values (e.g. `-70`) to appear as battery. Now correctly assigned to `signal_strength` when the value is negative.
+- **Removed stale sensor classes** — `HomGarBatterySensor` and `HomGarRSSISensor` were reading v2 field names (`battery_percent`, `rssi_dbm`) that no longer exist; removed from instantiation and import.
+
+---
+
 ## [3.0.3] - 2026-04-11
 
 ### 🐛 Bug Fixes

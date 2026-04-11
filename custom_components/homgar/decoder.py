@@ -312,6 +312,8 @@ def _parse_legacy(status_param: str) -> dict:
     out["_leg_today_water_raw"] = p2i(6)
     out["_leg_total_water_raw"] = p2i(7)
     out["_leg_reset_water_raw"] = p2i(8)
+
+    out["_leg_port_sections"] = [s.strip() for s in p2_raw.split("|")]
     return out
 
 
@@ -327,7 +329,59 @@ def _leg_temp_display(raw, temp_unit):
     return _temp_from_raw(raw, temp_unit)
 
 
-def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str) -> dict:
+_WORK_MODE_TO_VALVE_STATE = {
+    0: "idle",
+    1: "irrigation",
+    2: "mist",
+    3: "cycle",
+    7: "soak",
+}
+
+
+def _decode_legacy_port_section(section: str, unit: str) -> dict:
+    """Decode one pipe-separated port section from a legacy multi-port valve payload.
+
+    Field layout (comma-separated within the section):
+      [0] valve_state_code  — integer; lower nibble = work mode
+                              0=idle, 1=irrigation, 2=mist, 3=cycle, 7=soak
+                              The app checks != 0 for is_watering
+      [1] duration_minutes  — current session duration in minutes
+      [2] unknown
+      [3] event_time        — Unix timestamp (last event)
+      [4] total_duration    — total programmed duration in seconds
+      [5] unknown
+    """
+    result: dict = {}
+    fields = section.split(",")
+
+    def fi(idx):
+        try:
+            v = fields[idx].strip()
+            if "(" in v:
+                v = v[:v.index("(")]
+            return int(v)
+        except (IndexError, ValueError):
+            return None
+
+    wk_raw = fi(0)
+    if wk_raw is not None:
+        wk = wk_raw & 0x0F
+        result["valve_state"] = _WORK_MODE_TO_VALVE_STATE.get(wk, str(wk))
+        result["is_watering"] = wk != 0
+
+    dur_min = fi(1)
+    if dur_min is not None:
+        result["current_session_duration"] = dur_min * 60
+
+    ev_time = fi(3)
+    if ev_time is not None:
+        result["event_time_raw"] = ev_time
+
+    return result
+
+
+def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
+                          port_number: int = 1) -> dict:
     result: dict = {}
 
     if "_leg_temp_raw" in leg:
@@ -372,12 +426,22 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str) -> dict:
     if leg.get("_leg_cur_duration") is not None:
         result["current_session_duration"] = leg["_leg_cur_duration"]
 
-    bat = leg.get("_p1_bat_or_rssi")
+    bat_or_rssi = leg.get("_p1_bat_or_rssi")
     rssi = leg.get("_p1_rssi")
-    if bat is not None:
-        result["battery_level"] = bat
+    if bat_or_rssi is not None:
+        if bat_or_rssi < 0:
+            result["signal_strength"] = bat_or_rssi
+        else:
+            result["battery_level"] = bat_or_rssi
     if rssi is not None:
         result["signal_strength"] = rssi
+
+    port_sections = leg.get("_leg_port_sections", [])
+    if port_number > 1 and len(port_sections) >= port_number:
+        for p in range(1, port_number + 1):
+            section = port_sections[p - 1]
+            if section:
+                result[f"port_{p}"] = _decode_legacy_port_section(section, unit)
 
     return result
 
@@ -764,7 +828,7 @@ def decode_payload(model: str, status_param: str,
     try:
         if _is_legacy(status_param):
             leg = _parse_legacy(status_param)
-            sensor_data = _decode_legacy_fields(leg, unit, temp_unit)
+            sensor_data = _decode_legacy_fields(leg, unit, temp_unit, port_number)
             if model.upper() in SOIL_MOISTURE_MODELS and "humidity" in sensor_data:
                 sensor_data["soil_moisture"] = sensor_data.pop("humidity")
         else:
