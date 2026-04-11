@@ -11,8 +11,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113, MODEL_HTV405FRF, MODEL_HIC801W
+from .const import DOMAIN
 from .coordinator import HomGarCoordinator
+from .decoder import get_valve_ports
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,19 +36,17 @@ async def async_setup_entry(
 
     for key, info in sensors_cfg.items():
         model = info.get("model")
-        if model not in [MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113, MODEL_HTV405FRF, MODEL_HIC801W]:
+        valve_ports = get_valve_ports(model) if model else []
+        if not valve_ports:
             continue
 
-        decoded = info.get("data") or {}
-        zones: dict = decoded.get("zones", {})
-
-        for zone_num in sorted(zones.keys()):
+        for port in valve_ports:
             entities.append(
-                HomGarZoneDurationNumber(coordinator, key, info, zone_num)
+                HomGarZoneDurationNumber(coordinator, key, info, port)
             )
             _LOGGER.debug(
-                "Creating duration number entity: key=%s zone=%s",
-                key, zone_num,
+                "Creating duration number entity: key=%s port=%s",
+                key, port,
             )
 
     if entities:

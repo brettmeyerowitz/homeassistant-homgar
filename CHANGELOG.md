@@ -2,6 +2,69 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.0] - 2026-04-11
+
+### ⚠️ BREAKING CHANGE — Clean Install Strongly Recommended
+
+v3.0.0 is a full decoder architecture overhaul. Entity unique IDs have changed (field-name-based instead of type-name-based), so existing entities will be orphaned on upgrade. A clean remove + re-add of the integration is strongly recommended.
+
+### 🚀 MAJOR: V3 Decoder Architecture
+
+- **Single unified decoder** (`decoder.py`) replaces 37 separate per-model decoder files
+- **`product_models.json`** drives all decoding — 106 device models supported, up from ~20 previously hardcoded
+- **Any new model added to `product_models.json` is automatically supported** — no code changes required
+- Decoding uses the RainPoint dp[] identity system (TLV + legacy formats) from the official app's decoders
+- Removed `api/decoders/` directory (37 files, ~8,000 lines of hand-written per-model code)
+- Removed all `MODEL_*` constants from `const.py`
+
+### 🚀 MAJOR: Generic Sensor Entity Architecture
+
+- **`HomGarGenericSensor`** replaces 30+ model-specific sensor classes
+- `sensor.py` reduced from 1,257 lines to 370 lines (−71%)
+- Sensor attributes (device class, unit, state class, entity category, icon) driven by `FIELD_SENSOR_MAP` in `sensor_defs.py`
+- Multi-port devices (valves, multi-zone controllers) handled generically via `port_N` sub-dicts
+- TIMESTAMP fields (`event_time`) automatically parsed from ISO string to `datetime` object
+
+### 🚀 MAJOR: Dynamic Valve Detection
+
+- `valve.py` and `number.py` no longer contain a hardcoded list of valve model strings
+- Valve detection uses `get_valve_ports(model)` — any model with `CTL_WATER` or `CTL_BT_WATER` dp entries is automatically a valve
+- Port count read from `product_models.json` dp[] — covers all current and future valve models
+
+### 🐛 BUG FIXES
+
+- **CO2 decoding** — fixed packed U32 read (was reading full 4 bytes; now reads bytes [1:3] as U16 LE)
+- **Soil moisture vs humidity** — models with `STA_RH` identity now correctly emit `soil_moisture` instead of `humidity`
+- **`today_water_volume`** — was missing from flow meter decoder; now extracted via `STA_TOTAL_TODAY`
+- **`event_time` ISO conversion** — event timestamps now returned as ISO datetime strings and parsed to `datetime` for HA TIMESTAMP device class
+
+### � ADDITIONAL BUG FIXES
+
+- **Battery sensor** — `STA_BAT` raw byte is a 4-level ordinal (0=full→100%, 1→75%, 2→50%, 3→25%, 4→10%), not a direct percentage. `_dec_bat` now maps correctly via `_BAT_LEVEL_TO_PCT`. Previously reported `1%` (raw ordinal value).
+- **Duplicate battery/RSSI entities** — Removed legacy `HomGarBatterySensor` and `HomGarRSSISensor` diagnostic sensor classes that read stale pre-v3 field names (`battery_percent`, `flowbatt`, `rssi_dbm`) and always showed Unknown. `HomGarGenericSensor` via `FIELD_SENSOR_MAP` handles `battery_level` and `signal_strength` correctly.
+- **Water volume state_class** — `last_water_volume` and `current_water_volume` changed from `MEASUREMENT` to `TOTAL` to satisfy HA's `WATER` device class constraint (was generating HA warnings on startup).
+- **MQTT subscription expiry** — `subscribeStatus` `expire` timestamp is now read; integration proactively reloads 60 seconds before expiry to prevent silent MQTT gaps.
+- **MQTT logging** — All MQTT log lines now include the integration entry title (e.g. `HomGar MQTT [HomGar/RainPoint (user@example.com)]`) to distinguish accounts in multi-account setups. Credentials (device secret, HMAC sign) are no longer logged.
+
+### �🔧 INTERNAL CHANGES
+
+- `decoder.py` loaded eagerly at module import time (executor thread) — eliminates "Detected blocking call to open" HA warning
+- `coordinator.py` and `coordinator_mqtt.py` both use `decode_payload(model, payload)` — single code path for REST and MQTT
+- `homgar_api.py` shim stripped to `HomGarClient` + `HomGarApiError` only
+- `api/__init__.py` exports only `HomGarClient`
+- `sensor_defs.py` added — `FIELD_SENSOR_MAP` is the single source of truth for sensor entity metadata
+- Removed dead `debug.py` (debug data submission switch — never wired up)
+- Removed dead `device.py` (`HomGarHubDevice`, `HomGarSubDevice` — superseded by inline `device_info` properties)
+- Removed dead `mqtt_diagnostics.py` (MQTT connection sensor entities — never instantiated)
+- Removed `HomGarLastUpdatedSensor` — HA entity metadata shows last-updated natively
+- MQTT decoded payload log now shows `model=X fields=[...]` instead of misleading `type=unknown`
+
+### 📊 SUPPORTED MODELS (106 total via product_models.json)
+
+BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HCS012ARF, HCS014ARF, HCS015ARF, HCS015ARF+, HCS016ARF, HCS021FRF, HCS024FRF, HCS026FRF, HCS027ARF, HCS030FRF, HCS044FRF, HCS048B, HCS0528ARF, HCS0530THO, HCS0565ARF, HCS0600ARF, HCS596WB, HCS596WB-V4, HCS666FRF-X, HCS701B, HCS702B, HCS702B-V1, HCS706ARF, HCS802ARF, HCS888ARF-V1, HIC1200W, HIC1204W, HIC1208W, HIC1604W, HIC1608W, HIC1612W, HIC406B, HIC801W, HIC819W-4, HIC819W-6, HIC819W-8, HIS019WRF-V2, HIS019WRF-V3, HIS019WRF-V4, HPS551WRF, HTP115FRF, HTP137FRF, HTP142FRF, HTP149FRF, HTP149W, HTP159W, HTP160FRF, HTV0535FRF, HTV0537FRF, HTV0540FRF, HTV0542FRF, HTV102B, HTV103FRF, HTV107B, HTV107FRF, HTV113FRF, HTV113FRF-V4, HTV124B, HTV124FRF, HTV143WRFE, HTV145FRF, HTV157B, HTV203FRF, HTV210B, HTV213FRF, HTV214FRF, HTV224B, HTV224FRF, HTV245FRF, HTV311FRF, HTV345FRF, HTV405FRF, HTV445FRF, HWG004WBRF-V2, HWG004WRF, HWG007SRF, HWG007WRF, HWG007WRF-V2, HWG009WB, HWG023WBRF-V2, HWG023WRF, HWG023WRF-V6, HWG023WRF-V8, HWG040WLBRF, HWG043WB, HWG0538WRF, HWS019WRF-V2, HWS388WRF-V13, HWS388WRF-V7, HWS397WRF-V12, HWS397WRF-V8, HWS578WRF, HWS616WRF, WG03, WT-07W, WT-09W, WT-11W, WT-13W, WT-15R
+
+---
+
 ## [2.1.8] - 2026-04-10
 
 ### ✨ NEW DEVICES

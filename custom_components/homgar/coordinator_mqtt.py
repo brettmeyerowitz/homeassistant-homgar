@@ -73,8 +73,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         target_hub.get("model"),
     )
     
-    # Use the shared DECODER_REGISTRY — same decoders as the REST poll path
-    from .coordinator import DECODER_REGISTRY
+    from .decoder import decode_payload
 
     # Find sub-device model by addr in hub's subDevices list
     sub_devices = target_hub.get("subDevices", [])
@@ -88,26 +87,24 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         "HomGar MQTT: Sub-device lookup addr=%d found=%s sub_model=%s",
         addr,
         sub_model is not None,
-        sub_model
+        sub_model,
     )
 
     # Fall back to hub model if no sub-device match
     model = sub_model or target_hub.get("model")
 
-    decoder = DECODER_REGISTRY.get(model)
-    if not decoder:
-        _LOGGER.debug("HomGar MQTT: No decoder for model=%s (sub_model=%s)", model, sub_model)
-        return
-    
     try:
-        decoded = decoder(payload)
-        device_type = decoded.get("type", "unknown")
+        decoded = decode_payload(model, payload)
+        if "error" in decoded:
+            _LOGGER.debug("HomGar MQTT: No decoder for model=%s (sub_model=%s)", model, sub_model)
+            return
+        top_fields = [k for k in decoded if not k.startswith("port_") and k not in ("port_number", "dp_flag")]
         _LOGGER.info(
-            "HomGar MQTT: Decoded %s for hub_mid=%s addr=%d: %s",
-            device_type,
+            "HomGar MQTT: Decoded model=%s for hub_mid=%s addr=%d fields=%s",
+            model,
             hub_mid,
             addr,
-            decoded,
+            top_fields,
         )
         
         # Update the sensor data in coordinator
@@ -124,19 +121,18 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
             decoded_sensors[sensor_key]["data"] = decoded
             decoded_sensors[sensor_key]["raw_status"]["value"] = payload
             
-            # Determine status message based on device type
-            if "zones" in decoded:
-                # Valve device
-                valve_open = decoded.get("zones", {}).get(1, {}).get("open", False)
-                status_msg = f"valve state: {'OPEN' if valve_open else 'CLOSED'}"
-            elif "co2" in decoded:
-                status_msg = f"CO2: {decoded.get('co2')} PPM"
-            elif "flowtotal" in decoded:
-                status_msg = f"Total flow: {decoded.get('flowtotal')} L"
-            elif "moisture_percent" in decoded:
-                status_msg = f"Moisture: {decoded.get('moisture_percent')}%"
-            elif "tempcurrent" in decoded:
-                status_msg = f"Temp: {decoded.get('tempcurrent')}°C"
+            # Determine status message based on decoded fields (v3 field names)
+            port1 = decoded.get("port_1", {})
+            if port1.get("valve_state") is not None:
+                status_msg = f"valve state: {port1.get('valve_state', 'unknown')}"
+            elif "carbon_dioxide" in decoded:
+                status_msg = f"CO2: {decoded.get('carbon_dioxide')} ppm"
+            elif "total_water_volume" in decoded:
+                status_msg = f"Total flow: {decoded.get('total_water_volume')} L"
+            elif "soil_moisture" in decoded:
+                status_msg = f"Moisture: {decoded.get('soil_moisture')}%"
+            elif "temperature" in decoded:
+                status_msg = f"Temp: {decoded.get('temperature')}°C"
             else:
                 status_msg = "data updated"
             

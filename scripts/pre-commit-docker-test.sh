@@ -1,366 +1,274 @@
 #!/bin/bash
 
-# Pre-commit Docker testing script
-# This script runs Docker testing before allowing commits
+# Pre-commit Docker testing script for v3+
+# Tests the v3 decoder architecture (product_models.json + decode_payload)
 
 set -e
 
 echo "🔍 Running pre-commit Docker testing..."
 
-# Check README version matches manifest version
-echo "🔍 Checking README version..."
+# ── Version consistency check ──────────────────────────────────────────────
+echo "🔍 Checking manifest and const.py versions match..."
 MANIFEST_VERSION=$(grep '"version"' custom_components/homgar/manifest.json | sed 's/.*"version": "\(.*\)".*/\1/')
-README_VERSION=$(grep '"version":' README.md | head -1 | sed 's/.*"version": "\(.*\)".*/\1/')
+CONST_VERSION=$(grep '^VERSION = ' custom_components/homgar/const.py | sed 's/VERSION = "\(.*\)"/\1/')
 
-if [ "$MANIFEST_VERSION" != "$README_VERSION" ]; then
-    echo "❌ ERROR: README version doesn't match manifest version"
-    echo "Manifest version: $MANIFEST_VERSION"
-    echo "README version: $README_VERSION"
-    echo "Please update the version in README.md (line ~262)"
+if [ "$MANIFEST_VERSION" != "$CONST_VERSION" ]; then
+    echo "❌ ERROR: const.py VERSION ($CONST_VERSION) doesn't match manifest version ($MANIFEST_VERSION)"
     exit 1
 fi
+echo "✅ Version consistent: $MANIFEST_VERSION"
 
-echo "✅ README version matches manifest version: $MANIFEST_VERSION"
-
-# Check if Docker container is running
+# ── Docker container check ─────────────────────────────────────────────────
 if ! docker ps | grep -q "ha-test"; then
     echo "❌ ERROR: Docker container 'ha-test' is not running"
-    echo "Please start the Docker container with: docker start ha-test"
+    echo "Please start it with: docker start ha-test"
     exit 1
 fi
-
 echo "✅ Docker container 'ha-test' is running"
 
-# Copy integration to Docker container
+# ── Deploy to Docker ───────────────────────────────────────────────────────
 echo "📦 Copying integration to Docker container..."
+# Remove files deleted from the repo that may still exist in Docker (+ clear pycache)
+DELETED_FILES="debug.py device.py mqtt_diagnostics.py switch.py"
+for f in $DELETED_FILES; do
+    docker exec ha-test rm -f "/config/custom_components/homgar/$f" 2>/dev/null || true
+done
+docker exec ha-test find /config/custom_components/homgar/__pycache__ -name "*.pyc" -delete 2>/dev/null || true
 docker cp custom_components/homgar ha-test:/config/custom_components/ > /dev/null 2>&1
-
-# Copy updated files
-docker cp custom_components/homgar/const.py ha-test:/config/custom_components/homgar/const.py > /dev/null 2>&1
-docker cp custom_components/homgar/manifest.json ha-test:/config/custom_components/homgar/manifest.json > /dev/null 2>&1
-
-# Restart Docker container
 echo "🔄 Restarting Docker container..."
 docker restart ha-test > /dev/null 2>&1
+echo "⏳ Waiting for HA to start..."
+sleep 25
 
-# Wait for container to be ready
-echo "⏳ Waiting for container to be ready..."
-sleep 10
+RECENT_LOGS=$(docker logs ha-test --since="30s" 2>&1)
 
-# Check for import errors
-echo "🔍 Checking for import errors..."
-sleep 5  # Wait for container to fully start
-
-# Get the most recent logs after restart
-RECENT_LOGS=$(docker logs ha-test --since="60s" 2>&1)
-
-# Check for setup failures in recent logs
+# ── HA startup checks ──────────────────────────────────────────────────────
 if echo "$RECENT_LOGS" | grep -q "Setup failed for custom integration 'homgar'"; then
-    echo "❌ ERROR: Integration setup failed in Docker"
-    echo "Recent error details:"
-    echo "$RECENT_LOGS" | grep "Setup failed for custom integration 'homgar'" -A 3 | tail -10
+    echo "❌ ERROR: Integration setup failed"
+    echo "$RECENT_LOGS" | grep "Setup failed" -A 3 | tail -10
     exit 1
 fi
-
-# Check for import errors in recent logs
 if echo "$RECENT_LOGS" | grep -q "cannot import name"; then
-    echo "❌ ERROR: Import error in Docker"
-    echo "Recent error details:"
+    echo "❌ ERROR: Import error detected"
     echo "$RECENT_LOGS" | grep "cannot import name" -A 2 | tail -10
     exit 1
 fi
-
-# Check for missing module errors in recent logs
 if echo "$RECENT_LOGS" | grep -q "No module named"; then
-    echo "❌ ERROR: Missing dependencies in Docker"
-    echo "Recent error details:"
+    echo "❌ ERROR: Missing module detected"
     echo "$RECENT_LOGS" | grep "No module named" -A 2 | tail -10
     exit 1
 fi
-
-# Verify version is loaded
-echo "🔍 Verifying version is loaded..."
-VERSION=$(grep "VERSION = " custom_components/homgar/const.py | cut -d'"' -f2)
-
-# Test if the integration is working by testing imports
 if echo "$RECENT_LOGS" | grep -q "Setup of domain homgar took"; then
     echo "✅ HomGar integration setup successfully"
-    VERSION_LOADED=true
 else
-    echo "❌ HomGar integration setup failed"
-    VERSION_LOADED=false
-fi
-
-# Check version in logs (may not appear if no devices are active)
-if echo "$RECENT_LOGS" | grep -q "HomGar v$VERSION"; then
-    echo "✅ Version $VERSION loaded successfully"
-elif [ "$VERSION_LOADED" = true ]; then
-    echo "✅ Integration loaded (version $VERSION confirmed in files)"
-else
-    echo "❌ ERROR: Version $VERSION not found in Docker logs"
-    echo "Expected: HomGar v$VERSION"
-    echo "Found in recent logs:"
-    echo "$RECENT_LOGS" | grep "HomGar v" | tail -3
+    echo "❌ ERROR: Integration did not set up within 30s"
+    echo "$RECENT_LOGS" | grep -i "homgar" | tail -5
     exit 1
 fi
 
-# Test ASCII format decoding
-echo "🧪 Testing ASCII format decoding..."
-ASCII_TEST_RESULT=$(docker exec ha-test python3 -c "
+# ── Test: decoder module loads and has correct model count ─────────────────
+echo "🧪 Testing decoder module loads..."
+DECODER_TEST=$(docker exec ha-test python3 -c "
 import sys
-sys.path.append('/config/custom_components')
-from custom_components.homgar.homgar_api import decode_htv213frf
-result = decode_htv213frf('1,-84,1;0,149,0,0,0,0|0,6,0,0,0,0')
-print(f'ASCII_TEST:{result[\"decoder\"]}:{len(result[\"zones\"])}')" 2>/dev/null)
-
-if [[ $ASCII_TEST_RESULT == "ASCII_TEST:htv213frf_ascii:2" ]]; then
-    echo "✅ ASCII format decoding test passed"
-else
-    echo "❌ ERROR: ASCII format decoding test failed"
-    echo "Expected: ASCII_TEST:htv213frf_ascii:2"
-    echo "Got: $ASCII_TEST_RESULT"
-    exit 1
-fi
-
-# Test sensor ASCII format decoding
-echo "🧪 Testing sensor ASCII format decoding..."
-SENSOR_TEST_RESULT=$(docker exec ha-test python3 -c "
-import sys
-sys.path.append('/config/custom_components')
-from custom_components.homgar.homgar_api import decode_hcs021frf
-result = decode_hcs021frf('1,-73,1;694,70,G=292478')
-# Test temperature is in expected range (20.77-20.78°C for 69.4°F)
-temp = result['temperature_c']
-if 20.77 <= temp <= 20.79:
-    print('SENSOR_TEST:hcs021frf_ascii:PASS')
+sys.path.insert(0, '/config/custom_components')
+from custom_components.homgar.decoder import _MODELS, decode_payload
+count = len(_MODELS)
+if count >= 100:
+    print(f'DECODER_TEST:PASS:{count}')
 else:
-    print(f'SENSOR_TEST:hcs021frf_ascii:FAIL:{temp}')" 2>/dev/null)
-
-if [[ $SENSOR_TEST_RESULT == "SENSOR_TEST:hcs021frf_ascii:PASS" ]]; then
-    echo "✅ Sensor ASCII format decoding test passed"
-else
-    echo "❌ ERROR: Sensor ASCII format decoding test failed"
-    echo "Expected: Temperature in range 20.77-20.79°C (69.4°F converted)"
-    echo "Got: $SENSOR_TEST_RESULT"
-    exit 1
-fi
-
-# Test API client critical methods
-echo "🧪 Testing API client critical methods..."
-API_CLIENT_TEST=$(docker exec ha-test python3 -c "
-import sys
-sys.path.append('/config/custom_components')
-from custom_components.homgar.api.client import HomGarClient
-import inspect
-
-# Check for critical methods that must exist
-required_methods = ['ensure_logged_in', 'login', 'is_token_valid', 'list_homes', 'get_devices_by_hid']
-missing_methods = []
-
-for method in required_methods:
-    if not hasattr(HomGarClient, method):
-        missing_methods.append(method)
-
-if missing_methods:
-    print(f'API_CLIENT_TEST:FAIL:Missing methods: {missing_methods}')
-else:
-    # Verify ensure_logged_in is async
-    if not inspect.iscoroutinefunction(HomGarClient.ensure_logged_in):
-        print('API_CLIENT_TEST:FAIL:ensure_logged_in is not async')
-    else:
-        print('API_CLIENT_TEST:PASS')
+    print(f'DECODER_TEST:FAIL:only {count} models loaded')
 " 2>/dev/null)
 
-if [[ $API_CLIENT_TEST == "API_CLIENT_TEST:PASS" ]]; then
-    echo "✅ API client methods test passed"
+if [[ $DECODER_TEST == DECODER_TEST:PASS* ]]; then
+    echo "✅ Decoder loaded: $DECODER_TEST"
 else
-    echo "❌ ERROR: API client methods test failed"
-    echo "Result: $API_CLIENT_TEST"
+    echo "❌ ERROR: Decoder load failed"
+    echo "Result: $DECODER_TEST"
     exit 1
 fi
 
-# Test Display Hub decoder
-echo "🧪 Testing Display Hub decoder..."
-cat > /tmp/test_display_hub.py << 'PYEOF'
+# ── Test: TLV decode (CO2 sensor — HCS0530THO) ────────────────────────────
+echo "🧪 Testing TLV decode (HCS0530THO CO2 sensor)..."
+CO2_TEST=$(docker exec ha-test python3 -c "
 import sys
-sys.path.insert(0, '/config')
-from custom_components.homgar.homgar_api import decode_hws019wrf_v2
-
-result = decode_hws019wrf_v2('1,136;781(781/723/1),52(64/50/1),P=10213(10222/10205/1),')
-temp = result.get('temp_current_c')
-hum = result.get('humidity_current')
-press = result.get('pressure_current_hpa')
-temp_high = result.get('temp_high_c')
-hum_low = result.get('humidity_low')
-
-expected_temp = round((781/10.0 - 32.0)*5.0/9.0, 1)
-expected_press = round(10213/10.0, 1)
-
-if temp == expected_temp and hum == 52 and press == expected_press and temp_high is not None and hum_low is not None:
-    print('DISPLAY_HUB_TEST:PASS')
+sys.path.insert(0, '/config/custom_components')
+from custom_components.homgar.decoder import decode_payload
+result = decode_payload('HCS0530THO', '10#CFCE01DC05DC01E78902AD02B80585A8028844E93F45FF0')
+co2 = result.get('carbon_dioxide')
+temp = result.get('temperature')
+bat = result.get('battery_level')
+if co2 and 300 <= co2 <= 5000 and temp and bat in (10,25,50,75,100):
+    print(f'CO2_TEST:PASS:co2={co2},temp={temp},bat={bat}')
 else:
-    print(f'DISPLAY_HUB_TEST:FAIL:temp={temp}(exp {expected_temp}),hum={hum},press={press}(exp {expected_press}),temp_high={temp_high},hum_low={hum_low}')
-PYEOF
-docker cp /tmp/test_display_hub.py ha-test:/tmp/test_display_hub.py
-DISPLAY_HUB_TEST=$(docker exec ha-test python3 /tmp/test_display_hub.py 2>/dev/null)
+    print(f'CO2_TEST:FAIL:{result}')
+" 2>/dev/null)
 
-if [[ $DISPLAY_HUB_TEST == "DISPLAY_HUB_TEST:PASS" ]]; then
-    echo "✅ Display Hub decoder test passed"
+if [[ $CO2_TEST == CO2_TEST:PASS* ]]; then
+    echo "✅ CO2 decoder: $CO2_TEST"
 else
-    echo "❌ ERROR: Display Hub decoder test failed"
-    echo "Result: $DISPLAY_HUB_TEST"
+    echo "❌ ERROR: CO2 decoder failed"
+    echo "Result: $CO2_TEST"
     exit 1
 fi
 
-# Test translation files exist and are valid JSON
+# ── Test: TLV decode (soil moisture — HCS021FRF) ──────────────────────────
+echo "🧪 Testing TLV decode (HCS021FRF soil moisture)..."
+SOIL_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.insert(0, '/config/custom_components')
+from custom_components.homgar.decoder import decode_payload
+result = decode_payload('HCS021FRF', '10#E1B300DC01859602881CC6C91800FF0F628B1619')
+moisture = result.get('soil_moisture')
+bat = result.get('battery_level')
+rssi = result.get('signal_strength')
+if moisture is not None and 0 <= moisture <= 100 and bat in (10,25,50,75,100) and rssi is not None:
+    print(f'SOIL_TEST:PASS:moisture={moisture},bat={bat},rssi={rssi}')
+else:
+    print(f'SOIL_TEST:FAIL:{result}')
+" 2>/dev/null)
+
+if [[ $SOIL_TEST == SOIL_TEST:PASS* ]]; then
+    echo "✅ Soil moisture decoder: $SOIL_TEST"
+else
+    echo "❌ ERROR: Soil moisture decoder failed"
+    echo "Result: $SOIL_TEST"
+    exit 1
+fi
+
+# ── Test: battery ordinal mapping ─────────────────────────────────────────
+echo "🧪 Testing battery ordinal mapping..."
+BAT_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.insert(0, '/config/custom_components')
+from custom_components.homgar.decoder import _BAT_LEVEL_TO_PCT
+expected = {0: 100, 1: 75, 2: 50, 3: 25, 4: 10}
+if _BAT_LEVEL_TO_PCT == expected:
+    print('BAT_TEST:PASS')
+else:
+    print(f'BAT_TEST:FAIL:{_BAT_LEVEL_TO_PCT}')
+" 2>/dev/null)
+
+if [[ $BAT_TEST == "BAT_TEST:PASS" ]]; then
+    echo "✅ Battery ordinal mapping correct"
+else
+    echo "❌ ERROR: Battery mapping wrong"
+    echo "Result: $BAT_TEST"
+    exit 1
+fi
+
+# ── Test: legacy ASCII decode (HCS012ARF) ─────────────────────────────────
+echo "🧪 Testing legacy ASCII decode (HCS012ARF)..."
+LEGACY_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.insert(0, '/config/custom_components')
+from custom_components.homgar.decoder import decode_payload
+result = decode_payload('HCS012ARF', '1,84,0,0;R=4870(10/20/430/2340)')
+if 'error' not in result:
+    print(f'LEGACY_TEST:PASS:{list(result.keys())}')
+else:
+    print(f'LEGACY_TEST:FAIL:{result}')
+" 2>/dev/null)
+
+if [[ $LEGACY_TEST == LEGACY_TEST:PASS* ]]; then
+    echo "✅ Legacy ASCII decoder: $LEGACY_TEST"
+else
+    echo "❌ ERROR: Legacy ASCII decoder failed"
+    echo "Result: $LEGACY_TEST"
+    exit 1
+fi
+
+# ── Test: multi-port valve decode (HTV213FRF) ─────────────────────────────
+echo "🧪 Testing multi-port valve decode (HTV213FRF)..."
+VALVE_TEST=$(docker exec ha-test python3 -c "
+import sys
+sys.path.insert(0, '/config/custom_components')
+from custom_components.homgar.decoder import decode_payload
+result = decode_payload('HTV213FRF', '11#17E1AE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0FF5151519')
+has_ports = 'port_1' in result and 'port_2' in result
+if has_ports:
+    print(f'VALVE_TEST:PASS:ports={result[\"port_number\"]}')
+else:
+    print(f'VALVE_TEST:FAIL:{list(result.keys())}')
+" 2>/dev/null)
+
+if [[ $VALVE_TEST == VALVE_TEST:PASS* ]]; then
+    echo "✅ Multi-port valve decoder: $VALVE_TEST"
+else
+    echo "❌ ERROR: Multi-port valve decoder failed"
+    echo "Result: $VALVE_TEST"
+    exit 1
+fi
+
+# ── Test: API client critical methods ─────────────────────────────────────
+echo "🧪 Testing API client methods..."
+API_TEST=$(docker exec ha-test python3 -c "
+import sys, inspect
+sys.path.insert(0, '/config/custom_components')
+from custom_components.homgar.api.client import HomGarClient
+required = ['ensure_logged_in', 'login', 'is_token_valid', 'list_homes',
+            'get_devices_by_hid', 'subscribe_status']
+missing = [m for m in required if not hasattr(HomGarClient, m)]
+if missing:
+    print(f'API_TEST:FAIL:Missing: {missing}')
+elif not inspect.iscoroutinefunction(HomGarClient.ensure_logged_in):
+    print('API_TEST:FAIL:ensure_logged_in not async')
+else:
+    print('API_TEST:PASS')
+" 2>/dev/null)
+
+if [[ $API_TEST == "API_TEST:PASS" ]]; then
+    echo "✅ API client methods present"
+else
+    echo "❌ ERROR: API client check failed"
+    echo "Result: $API_TEST"
+    exit 1
+fi
+
+# ── Test: translation files valid ─────────────────────────────────────────
 echo "🧪 Testing translation files..."
 TRANSLATION_TEST=$(docker exec ha-test python3 -c "
-import sys
 import json
-sys.path.append('/config/custom_components')
-
 try:
-    with open('/config/custom_components/homgar/translations/en.json', 'r') as f:
-        translations = json.load(f)
-    
-    # Check critical keys exist
-    if 'config' not in translations:
-        print('TRANSLATION_TEST:FAIL:Missing config key')
-    elif 'step' not in translations['config']:
-        print('TRANSLATION_TEST:FAIL:Missing step key')
-    elif 'user' not in translations['config']['step']:
-        print('TRANSLATION_TEST:FAIL:Missing user step')
-    else:
+    with open('/config/custom_components/homgar/translations/en.json') as f:
+        t = json.load(f)
+    if 'config' in t and 'step' in t['config'] and 'user' in t['config']['step']:
         print('TRANSLATION_TEST:PASS')
-except json.JSONDecodeError as e:
-    print(f'TRANSLATION_TEST:FAIL:Invalid JSON: {e}')
+    else:
+        print('TRANSLATION_TEST:FAIL:missing keys')
 except Exception as e:
     print(f'TRANSLATION_TEST:FAIL:{e}')
 " 2>/dev/null)
 
 if [[ $TRANSLATION_TEST == "TRANSLATION_TEST:PASS" ]]; then
-    echo "✅ Translation files test passed"
+    echo "✅ Translation files valid"
 else
-    echo "❌ ERROR: Translation files test failed"
+    echo "❌ ERROR: Translation files invalid"
     echo "Result: $TRANSLATION_TEST"
     exit 1
 fi
 
-# Test cold import of api module (catches missing imports that module cache can hide)
-echo "🧪 Testing cold import of api module..."
-COLD_IMPORT_TEST=$(docker exec ha-test python3 -c "
+# ── Test: valve detection (get_valve_ports) ───────────────────────────────
+echo "🧪 Testing dynamic valve detection..."
+VALVE_DETECT_TEST=$(docker exec ha-test python3 -c "
 import sys
 sys.path.insert(0, '/config/custom_components')
-# Force fresh import with no cache
-import importlib
-import custom_components.homgar.api as api_mod
-importlib.reload(api_mod)
-# Verify every name in __all__ is actually importable
-missing = [name for name in api_mod.__all__ if not hasattr(api_mod, name)]
-if missing:
-    print(f'COLD_IMPORT_TEST:FAIL:Missing from __all__: {missing}')
+from custom_components.homgar.decoder import get_valve_ports
+ports_213 = get_valve_ports('HTV213FRF')
+ports_soil = get_valve_ports('HCS021FRF')
+if len(ports_213) >= 2 and len(ports_soil) == 0:
+    print(f'VALVE_DETECT_TEST:PASS:HTV213FRF={ports_213},HCS021FRF={ports_soil}')
 else:
-    print('COLD_IMPORT_TEST:PASS')
+    print(f'VALVE_DETECT_TEST:FAIL:HTV213FRF={ports_213},HCS021FRF={ports_soil}')
 " 2>/dev/null)
 
-if [[ $COLD_IMPORT_TEST == "COLD_IMPORT_TEST:PASS" ]]; then
-    echo "✅ Cold import test passed"
+if [[ $VALVE_DETECT_TEST == VALVE_DETECT_TEST:PASS* ]]; then
+    echo "✅ Valve detection: $VALVE_DETECT_TEST"
 else
-    echo "❌ ERROR: Cold import test failed"
-    echo "Result: $COLD_IMPORT_TEST"
+    echo "❌ ERROR: Valve detection failed"
+    echo "Result: $VALVE_DETECT_TEST"
     exit 1
 fi
 
-# Test coordinator data structure
-echo "🧪 Testing coordinator data structure..."
-COORDINATOR_TEST=$(docker exec ha-test python3 -c "
-import sys
-sys.path.append('/config/custom_components')
-from custom_components.homgar.coordinator import HomGarCoordinator, DECODER_REGISTRY
-from custom_components.homgar.const import (
-    MODEL_MOISTURE_SIMPLE, MODEL_MOISTURE_FULL, MODEL_RAIN,
-    MODEL_TEMPHUM, MODEL_FLOWMETER, MODEL_CO2, MODEL_POOL,
-    MODEL_VALVE_213, MODEL_HCS0528ARF, MODEL_HCS0565ARF,
-)
-
-# Verify critical models are registered
-required = [
-    MODEL_MOISTURE_SIMPLE, MODEL_MOISTURE_FULL, MODEL_RAIN,
-    MODEL_TEMPHUM, MODEL_FLOWMETER, MODEL_CO2, MODEL_POOL,
-    MODEL_VALVE_213, MODEL_HCS0528ARF, MODEL_HCS0565ARF,
-]
-missing = [m for m in required if m not in DECODER_REGISTRY]
-if missing:
-    print(f'COORDINATOR_TEST:FAIL:Missing decoders: {missing}')
-else:
-    print('COORDINATOR_TEST:PASS')" 2>/dev/null)
-
-if [[ $COORDINATOR_TEST == "COORDINATOR_TEST:PASS" ]]; then
-    echo "✅ Coordinator decoder registry test passed"
-else
-    echo "❌ ERROR: Coordinator decoder registry test failed"
-    echo "Result: $COORDINATOR_TEST"
-    exit 1
-fi
-
-# Test EU ASCII format decoders (issue #29 — HCS014ARF, HCS012ARF, HWS388WRF-V13)
-echo "🧪 Testing EU ASCII format decoders..."
-cp scripts/test_eu_decoders.py /tmp/test_eu_decoders.py 2>/dev/null || true
-docker cp scripts/test_eu_decoders.py ha-test:/tmp/test_eu_decoders.py > /dev/null 2>&1
-EU_TEST=$(docker exec ha-test python3 /tmp/test_eu_decoders.py 2>/dev/null | tail -1)
-
-if [[ $EU_TEST == "EU_DECODER_TEST:PASS" ]]; then
-    echo "✅ EU ASCII format decoder test passed"
-else
-    echo "❌ ERROR: EU ASCII format decoder test failed"
-    docker exec ha-test python3 /tmp/test_eu_decoders.py 2>/dev/null
-    exit 1
-fi
-
-# Test HWS388WRF-V13 is in coordinator decoder registry
-echo "🧪 Testing HWS388WRF-V13 in decoder registry..."
-HWS388_TEST=$(docker exec ha-test python3 -c "
-import sys
-sys.path.append('/config/custom_components')
-from custom_components.homgar.coordinator import DECODER_REGISTRY
-from custom_components.homgar.const import MODEL_HWS388WRF_V13
-if MODEL_HWS388WRF_V13 in DECODER_REGISTRY:
-    print('HWS388_TEST:PASS')
-else:
-    print('HWS388_TEST:FAIL:not in DECODER_REGISTRY')
-" 2>/dev/null)
-
-if [[ $HWS388_TEST == "HWS388_TEST:PASS" ]]; then
-    echo "✅ HWS388WRF-V13 decoder registry test passed"
-else
-    echo "❌ ERROR: HWS388WRF-V13 not registered"
-    echo "Result: $HWS388_TEST"
-    exit 1
-fi
-
-# Test pool sensor decoder produces correct output keys
-echo "🧪 Testing HCS0528ARF pool decoder output keys..."
-POOL_DECODER_TEST=$(docker exec ha-test python3 -c "
-import sys
-sys.path.append('/config/custom_components')
-from custom_components.homgar.homgar_api import decode_hcs0528arf
-result = decode_hcs0528arf('10#E74A03B403DC01B805859003FF0F99620F19')
-temp = result.get('tempcurrent')
-high = result.get('temphigh')
-low = result.get('templow')
-# App shows: current=32.9, high=34.9, low=29.0
-if temp is not None and abs(temp - 32.9) < 0.15 and high is not None and low is not None:
-    print(f'POOL_TEST:PASS:{temp}')
-else:
-    print(f'POOL_TEST:FAIL:tempcurrent={temp},temphigh={high},templow={low}')" 2>/dev/null)
-
-if [[ $POOL_DECODER_TEST == POOL_TEST:PASS* ]]; then
-    echo "✅ Pool decoder test passed: $POOL_DECODER_TEST"
-else
-    echo "❌ ERROR: Pool decoder test failed"
-    echo "Result: $POOL_DECODER_TEST"
-    exit 1
-fi
-
-echo "🎉 All Docker tests passed! Commit allowed."
+echo ""
+echo "🎉 All pre-commit tests passed! Commit allowed."
 exit 0

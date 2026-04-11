@@ -19,120 +19,13 @@ from .const import (
     CONF_TOKEN_EXPIRES_AT,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
-    MODEL_MOISTURE_SIMPLE,
-    MODEL_MOISTURE_FULL,
-    MODEL_RAIN,
-    MODEL_TEMPHUM,
-    MODEL_FLOWMETER,
-    MODEL_CO2,
-    MODEL_POOL,
-    MODEL_POOL_PLUS,
-    MODEL_DISPLAY_HUB,
-    MODEL_HWS388WRF_V13,
-    MODEL_HWG023WRF,  # Main hub V1
-    MODEL_HWG023WBRF_V2,  # Main hub V2
-    MODEL_VALVE_HUB,
-    MODEL_VALVE_213,  # HTV213FRF support
-    MODEL_VALVE_245,  # HTV245FRF support
-    MODEL_HTV0542FRF,  # HTV0542FRF 4-zone valve support (v2.0.3)
-    MODEL_VALVE_113,  # HTV113FRF 1-zone timer
-    MODEL_HTV405FRF,  # HTV405FRF 4-zone RF valve controller
-    MODEL_HTP115FRF,  # HTP115FRF water pump device
-    MODEL_HIC801W,  # HIC801W 8-zone WiFi irrigation controller
-    # New HCS sensor models
-    MODEL_HCS005FRF,
-    MODEL_HCS003FRF,
-    MODEL_HCS024FRF_V1,
-    MODEL_HCS014ARF,
-    MODEL_HCS0530THO,
-    MODEL_HCS0565ARF,
-    MODEL_HCS0528ARF,
-    MODEL_HCS027ARF,
-    MODEL_HCS016ARF,
-    MODEL_HCS044FRF,
-    MODEL_HCS666FRF,
-    MODEL_HCS666RFR_P,
-    MODEL_HCS999FRF,
-    MODEL_HCS999FRF_P,
-    MODEL_HCS666FRF_X,
-    MODEL_HCS701B,
-    MODEL_HCS596WB,
-    MODEL_HCS596WB_V4,
-    MODEL_HCS706ARF,
-    MODEL_HCS802ARF,
-    MODEL_HCS048B,
-    MODEL_HCS888ARF_V1,
-    MODEL_HCS0600ARF,
-    MODEL_HCS015ARF,
     VERSION,
     debug_with_version,
 )
-from .homgar_api import (
-    HomGarClient, HomGarApiError,
-    decode_hcs026frf, decode_hcs021frf, decode_hcs012arf,
-    decode_hcs008frf, decode_hcs0530tho, decode_pool_plus,
-    decode_valve_hub, decode_htv213frf, decode_htv0542frf, decode_htv113frf,
-    # New HCS decoder functions
-    decode_hcs005frf, decode_hcs003frf, decode_hcs024frf_v1,
-    decode_hcs014arf, decode_hcs015arf, decode_hcs0528arf, decode_hcs0565arf, decode_hcs027arf, decode_hcs016arf,
-    decode_hcs044frf, decode_hcs666frf, decode_hcs666rfr_p, decode_hcs999frf,
-    decode_hcs999frf_p, decode_hcs666frf_x, decode_hcs701b, decode_hcs596wb,
-    decode_hcs596wb_v4, decode_hcs706arf, decode_hcs802arf, decode_hcs048b,
-    decode_hcs888arf_v1, decode_hcs0600arf,
-    decode_hws019wrf_v2,
-    decode_hic801w,
-    decode_htp115frf,
-)
+from .homgar_api import HomGarClient, HomGarApiError
+from .decoder import decode_payload
 
 _LOGGER = logging.getLogger(__name__)
-
-# Decoder registry - maps device models to their decoder functions
-DECODER_REGISTRY = {
-    MODEL_MOISTURE_SIMPLE: decode_hcs026frf,
-    MODEL_MOISTURE_FULL: decode_hcs021frf,
-    MODEL_RAIN: decode_hcs012arf,
-    MODEL_TEMPHUM: decode_hcs014arf,
-    MODEL_FLOWMETER: decode_hcs008frf,
-    MODEL_CO2: decode_hcs0530tho,
-    MODEL_POOL: decode_hcs0528arf,
-    MODEL_POOL_PLUS: decode_pool_plus,
-    MODEL_HWG023WRF: decode_valve_hub,  # V1 hub uses valve_hub decoder
-    MODEL_HWG023WBRF_V2: decode_valve_hub,  # V2 hub uses valve_hub decoder
-    MODEL_VALVE_HUB: decode_valve_hub,
-    MODEL_VALVE_213: decode_htv213frf,
-    MODEL_VALVE_245: decode_htv213frf,
-    MODEL_HTV0542FRF: decode_htv0542frf,  # HTV0542FRF 4-zone valve (v2.0.3)
-    MODEL_VALVE_113: decode_htv113frf,  # HTV113FRF 1-zone timer
-    MODEL_HTV405FRF: decode_htv213frf,  # HTV405FRF 4-zone RF (same TLV format as HTV213FRF)
-    MODEL_HTP115FRF: decode_htp115frf,  # HTP115FRF water pump device (TLV format)
-    MODEL_HIC801W: decode_hic801w,  # HIC801W 8-zone WiFi controller
-    # HCS sensor models (v1.3.0)
-    MODEL_HCS005FRF: decode_hcs005frf,
-    MODEL_HCS003FRF: decode_hcs003frf,
-    MODEL_HCS024FRF_V1: decode_hcs024frf_v1,
-    MODEL_HCS014ARF: decode_hcs014arf,
-    MODEL_HCS015ARF: decode_hcs015arf,
-    MODEL_HCS0528ARF: decode_hcs0528arf,
-    MODEL_HCS0565ARF: decode_hcs0565arf,
-    MODEL_HCS027ARF: decode_hcs027arf,
-    MODEL_HCS016ARF: decode_hcs016arf,
-    MODEL_HCS044FRF: decode_hcs044frf,
-    MODEL_HCS666FRF: decode_hcs666frf,
-    MODEL_HCS666RFR_P: decode_hcs666rfr_p,
-    MODEL_HCS999FRF: decode_hcs999frf,
-    MODEL_HCS999FRF_P: decode_hcs999frf_p,
-    MODEL_HCS666FRF_X: decode_hcs666frf_x,
-    MODEL_HCS701B: decode_hcs701b,
-    MODEL_HCS596WB: decode_hcs596wb,
-    MODEL_HCS596WB_V4: decode_hcs596wb_v4,
-    MODEL_HCS706ARF: decode_hcs706arf,
-    MODEL_HCS802ARF: decode_hcs802arf,
-    MODEL_HCS048B: decode_hcs048b,
-    MODEL_HCS888ARF_V1: decode_hcs888arf_v1,
-    MODEL_HCS0600ARF: decode_hcs0600arf,
-    MODEL_DISPLAY_HUB: decode_hws019wrf_v2,
-    MODEL_HWS388WRF_V13: decode_hws019wrf_v2,
-}
 
 
 class HomGarCoordinator(DataUpdateCoordinator):
@@ -266,44 +159,39 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         try:
                             _LOGGER.debug(debug_with_version("Decoding payload for model=%s mid=%s addr=%s: %s"), model, mid, addr, raw_value)
                             
-                            # Use decoder registry for all models
-                            if True:
-                                decoder_func = DECODER_REGISTRY.get(model)
-                                if decoder_func:
-                                    decoded = decoder_func(raw_value)
-                                else:
-                                    # Unknown model - store raw data for reporting
-                                    decoded = {
-                                        "type": "unknown",
-                                        "model": model,
-                                        "raw_value": raw_value,
-                                    }
-                                    _LOGGER.warning(
-                                        "="*60 + "\n"
-                                        "UNSUPPORTED SENSOR MODEL DETECTED\n"
-                                        "Please report this to: https://github.com/brettmeyerowitz/homeassistant-homgar/issues\n"
-                                        "Include the following information:\n"
-                                        "  Model: %s\n"
-                                        "  Device ID (mid): %s\n"
-                                        "  Address: %s\n"
-                                        "  Raw Payload: %s\n"
-                                        + "="*60,
-                                        model, mid, addr, raw_value
+                            decoded = decode_payload(model, raw_value)
+                            if "error" in decoded:
+                                # Model not found in product_models.json
+                                decoded = {
+                                    "type": "unknown",
+                                    "model": model,
+                                    "raw_value": raw_value,
+                                }
+                                _LOGGER.warning(
+                                    "="*60 + "\n"
+                                    "UNSUPPORTED SENSOR MODEL DETECTED\n"
+                                    "Please report this to: https://github.com/brettmeyerowitz/homeassistant-homgar/issues\n"
+                                    "Include the following information:\n"
+                                    "  Model: %s\n"
+                                    "  Device ID (mid): %s\n"
+                                    "  Address: %s\n"
+                                    "  Raw Payload: %s\n"
+                                    + "="*60,
+                                    model, mid, addr, raw_value
+                                )
+                                if model and model not in self._notified_unknown_models:
+                                    self._notified_unknown_models.add(model)
+                                    async_create(
+                                        self.hass,
+                                        f"HomGar detected an unsupported sensor model: **{model}**\n\n"
+                                        f"To help add support for this sensor, please open an issue at:\n"
+                                        f"https://github.com/brettmeyerowitz/homeassistant-homgar/issues\n\n"
+                                        f"Include the following raw payload data:\n"
+                                        f"```\n{raw_value}\n```\n\n"
+                                        f"You can also find this data in the sensor's attributes in Home Assistant.",
+                                        title="HomGar: Unsupported Sensor Detected",
+                                        notification_id=f"homgar_unsupported_{model}",
                                     )
-                                    # Send persistent notification (once per model)
-                                    if model and model not in self._notified_unknown_models:
-                                        self._notified_unknown_models.add(model)
-                                        async_create(
-                                            self.hass,
-                                            f"HomGar detected an unsupported sensor model: **{model}**\n\n"
-                                            f"To help add support for this sensor, please open an issue at:\n"
-                                            f"https://github.com/brettmeyerowitz/homeassistant-homgar/issues\n\n"
-                                            f"Include the following raw payload data:\n"
-                                            f"```\n{raw_value}\n```\n\n"
-                                            f"You can also find this data in the sensor's attributes in Home Assistant.",
-                                            title="HomGar: Unsupported Sensor Detected",
-                                            notification_id=f"homgar_unsupported_{model}",
-                                        )
                             _LOGGER.debug(debug_with_version("Decoded data for mid=%s addr=%s: %s"), mid, addr, decoded)
                         except Exception as ex:  # noqa: BLE001
                             _LOGGER.warning(

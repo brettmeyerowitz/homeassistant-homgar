@@ -40,10 +40,8 @@ def _build_aliyun_auth(product_key: str, device_name: str, device_secret: str) -
     username = f"{device_name}&{product_key}"
     
     _LOGGER.debug(
-        "HomGar MQTT auth: client_id=%s username=%s sign=%s",
-        client_id,
-        username,
-        sign[:16] + "...",
+        "HomGar MQTT auth: client_id=<redacted> username=%s",
+        username.split("&")[0][:8] + "...",  # device name prefix only, no product key
     )
     
     return client_id, username, sign
@@ -60,6 +58,7 @@ class HomGarMQTTClient:
         mqtt_host: str,
         on_message_callback: Callable[[dict], None],
         mqtt_port: int = 1883,
+        entry_title: str = "",
     ):
         """Initialize MQTT client."""
         if not PAHO_AVAILABLE:
@@ -71,6 +70,7 @@ class HomGarMQTTClient:
         self._mqtt_host = mqtt_host
         self._mqtt_port = mqtt_port
         self._on_message_callback = on_message_callback
+        self._entry_title = entry_title
         
         self._client = None
         self._connected = False
@@ -94,13 +94,18 @@ class HomGarMQTTClient:
             for t in TOPICS_TEMPLATE
         ]
         
+        label = f" [{entry_title}]" if entry_title else ""
         _LOGGER.info(
-            "HomGar MQTT client initialized: host=%s port=%d topics=%d",
+            "HomGar MQTT%s client initialized: host=%s port=%d topics=%d",
+            label,
             mqtt_host,
             mqtt_port,
             len(self._topics),
         )
     
+    def _label(self) -> str:
+        return f" [{self._entry_title}]" if self._entry_title else ""
+
     def connect(self) -> bool:
         """Connect to MQTT broker."""
         try:
@@ -109,12 +114,12 @@ class HomGarMQTTClient:
             self._connect_client()
             return self._wait_for_connection()
         except Exception as e:
-            _LOGGER.error("HomGar MQTT connect error: %s", e, exc_info=True)
+            _LOGGER.error("HomGar MQTT%s connect error: %s", self._label(), e, exc_info=True)
             return False
     
     def disconnect(self):
         """Disconnect from MQTT broker."""
-        _LOGGER.info("HomGar MQTT disconnect requested")
+        _LOGGER.info("HomGar MQTT%s disconnect requested", self._label())
         self._shutdown_requested = True
         with self._client_lock:
             if self._client:
@@ -155,7 +160,7 @@ class HomGarMQTTClient:
                     _LOGGER.debug("HomGar MQTT disconnect failed before reconnect", exc_info=True)
             
             self._client = self._build_client()
-            _LOGGER.info("HomGar MQTT connecting to %s:%d", self._mqtt_host, self._mqtt_port)
+            _LOGGER.info("HomGar MQTT%s connecting to %s:%d", self._label(), self._mqtt_host, self._mqtt_port)
             self._client.connect(self._mqtt_host, self._mqtt_port, 60)
             self._client.loop_start()
     
@@ -163,10 +168,11 @@ class HomGarMQTTClient:
         """Wait for MQTT connection to establish."""
         for i in range(20):
             if self._connected:
-                _LOGGER.info("HomGar MQTT connection established after %d attempts", i + 1)
+                _LOGGER.info(
+                    "HomGar MQTT%s connection established after %d attempts", self._label(), i + 1)
                 return True
             time.sleep(0.5)
-        _LOGGER.error("HomGar MQTT connection timeout after 10 seconds")
+        _LOGGER.error("HomGar MQTT%s connection timeout after 10 seconds", self._label())
         return False
     
     def _on_connect(self, client, userdata, flags, rc):
@@ -176,18 +182,18 @@ class HomGarMQTTClient:
             self._last_connect_time = time.time()
             for topic in self._topics:
                 client.subscribe(topic, qos=0)
-            _LOGGER.info("HomGar MQTT connected successfully, subscribed to %d topics", len(self._topics))
+            _LOGGER.info("HomGar MQTT%s connected successfully, subscribed to %d topics", self._label(), len(self._topics))
         else:
-            _LOGGER.error("HomGar MQTT connect failed with rc=%s", rc)
+            _LOGGER.error("HomGar MQTT%s connect failed with rc=%s", self._label(), rc)
     
     def _on_disconnect(self, client, userdata, rc):
         """Handle MQTT disconnection event."""
         self._connected = False
         if self._shutdown_requested:
-            _LOGGER.info("HomGar MQTT disconnected cleanly (shutdown requested)")
+            _LOGGER.info("HomGar MQTT%s disconnected cleanly (shutdown requested)", self._label())
             return
         
-        _LOGGER.warning("HomGar MQTT disconnected unexpectedly (rc=%s) - will attempt reconnect", rc)
+        _LOGGER.warning("HomGar MQTT%s disconnected unexpectedly (rc=%s) - will attempt reconnect", self._label(), rc)
         if rc != 0:
             self._start_reconnect_thread()
     
@@ -199,7 +205,7 @@ class HomGarMQTTClient:
             _LOGGER.debug("HomGar MQTT reconnect thread already running")
             return
         
-        _LOGGER.info("HomGar MQTT starting reconnect thread")
+        _LOGGER.info("HomGar MQTT%s starting reconnect thread", self._label())
         self._reconnect_thread = threading.Thread(target=self._reconnect_loop, daemon=True)
         self._reconnect_thread.start()
     
@@ -211,19 +217,19 @@ class HomGarMQTTClient:
                 return
             
             delay = min(30 * attempt, 300)
-            _LOGGER.info("HomGar MQTT reconnect attempt %d in %d seconds", attempt, delay)
+            _LOGGER.info("HomGar MQTT%s reconnect attempt %d in %d seconds", self._label(), attempt, delay)
             time.sleep(delay)
             
             try:
                 self._connect_client()
                 if self._wait_for_connection():
-                    _LOGGER.info("HomGar MQTT reconnected successfully on attempt %d", attempt)
+                    _LOGGER.info("HomGar MQTT%s reconnected successfully on attempt %d", self._label(), attempt)
                     return
                 raise RuntimeError("MQTT reconnect timed out")
             except Exception as e:
-                _LOGGER.error("HomGar MQTT reconnect attempt %d failed: %s", attempt, e)
+                _LOGGER.error("HomGar MQTT%s reconnect attempt %d failed: %s", self._label(), attempt, e)
         
-        _LOGGER.error("HomGar MQTT reconnect exhausted after 5 attempts")
+        _LOGGER.error("HomGar MQTT%s reconnect exhausted after 5 attempts", self._label())
     
     def _on_message(self, client, userdata, msg):
         """Handle incoming MQTT message."""

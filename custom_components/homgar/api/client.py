@@ -387,6 +387,56 @@ class HomGarClient:
                 raise HomGarApiError(f"Set device state API error: {data.get('msg')}")
             return True
 
+    async def get_product_models(self, version: int = 0) -> list[dict]:
+        """Get full product model list from API.
+        
+        Returns list of all device models supported by the platform.
+        """
+        await self.ensure_logged_in()
+        url = f"{self._base_url}/app/common/core/productModel"
+        params = {"version": version}
+        
+        _LOGGER.debug("API call: get_product_models URL=%s params=%s", url, params)
+        async with self._session.get(url, headers=self._auth_headers(), params=params) as resp:
+            if resp.status != 200:
+                raise HomGarApiError(f"2026-04-10 21:22:21.337 DEBUG (MainThread) [custom_components.homgar.api.client] API call: get_product_models URL=https://region3.homgarus.com/app/common/core/productModel params={'version': 0} HTTP {resp.status}")
+            data = await resp.json()
+        
+        _LOGGER.warning("API response: get_product_models received, code=%s", data.get('code'))
+        
+        # Log full response to file for inspection
+        try:
+            with open('/tmp/product_models.json', 'w') as f:
+                import json
+                json.dump(data, f, indent=2)
+            _LOGGER.warning("Full product models written to /tmp/product_models.json")
+        except Exception as e:
+            _LOGGER.warning("Could not write product models to file: %s", e)
+        
+        # Handle unexpected response format
+        if not isinstance(data, dict):
+            _LOGGER.warning("Unexpected product_models response type: %s", type(data))
+            return []
+        
+        if data.get("code") != 0:
+            _LOGGER.warning("get_product_models API error: %s", data)
+            return []
+        
+        # Extract models from data['data']['models'] structure
+        data_section = data.get("data", {})
+        if isinstance(data_section, dict):
+            result = data_section.get("models", [])
+        else:
+            result = []
+        
+        _LOGGER.warning("Extracted %d product models", len(result))
+        
+        if not isinstance(result, list):
+            _LOGGER.warning("Unexpected product_models data type: %s", type(result))
+            return []
+        
+        return result
+
     async def control_work_mode(
         self,
         mid: int,
@@ -443,8 +493,3 @@ class HomGarClient:
                 "controlWorkMode returned code 4 (busy/already in state), treating as non-fatal: %s",
                 data
             )
-        elif code != 0:
-            raise HomGarApiError(f"controlWorkMode failed: {data}")
-            
-        # Return the updated state payload so caller can apply it immediately
-        return data.get("data", {}).get("state")

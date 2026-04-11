@@ -1,15 +1,10 @@
 """Diagnostic sensors for HomGar devices."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 
-from homeassistant.components.sensor import (
-    SensorEntity,
-    SensorDeviceClass,
-    SensorStateClass,
-)
-from homeassistant.const import EntityCategory, SIGNAL_STRENGTH_DECIBELS_MILLIWATT, PERCENTAGE
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .coordinator import HomGarCoordinator
@@ -137,50 +132,6 @@ class HomGarDeviceIDSensor(HomGarDiagnosticSensorBase):
         return None
 
 
-class HomGarRSSISensor(HomGarDiagnosticSensorBase):
-    """RSSI diagnostic sensor."""
-
-    _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
-    _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_icon = "mdi:wifi"
-
-    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
-        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"rainpoint_{base_slug}_rssi"
-        self._attr_name = f"{sub_name} Signal Strength"
-
-    @property
-    def native_value(self) -> int | None:
-        data = self._sensor_data
-        if data:
-            return data.get("rssi_dbm")
-        return None
-
-
-class HomGarBatterySensor(HomGarDiagnosticSensorBase):
-    """Battery diagnostic sensor."""
-
-    _attr_device_class = SensorDeviceClass.BATTERY
-    _attr_native_unit_of_measurement = PERCENTAGE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_icon = "mdi:battery"
-
-    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
-        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"rainpoint_{base_slug}_battery"
-        self._attr_name = f"{sub_name} Battery"
-
-    @property
-    def native_value(self) -> int | None:
-        data = self._sensor_data
-        if data:
-            # Check for battery_percent first, then flowbatt for flow meters
-            return data.get("battery_percent") or data.get("flowbatt")
-        return None
-
 
 class HomGarFirmwareVersionSensor(HomGarDiagnosticSensorBase):
     """Firmware version diagnostic sensor."""
@@ -201,26 +152,3 @@ class HomGarFirmwareVersionSensor(HomGarDiagnosticSensorBase):
             return info.get("firmware_version")
         return None
 
-
-class HomGarLastUpdatedSensor(HomGarDiagnosticSensorBase):
-    """Last updated timestamp diagnostic sensor."""
-
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _attr_icon = "mdi:clock-outline"
-
-    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
-        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
-        sub_name = sensor_info.get("sub_name") or "Sensor"
-        self._attr_unique_id = f"rainpoint_{base_slug}_last_updated"
-        self._attr_name = f"{sub_name} Last Updated"
-
-    @property
-    def native_value(self) -> datetime | None:
-        data = self._sensor_data
-        if data and "device_timestamp" in data:
-            try:
-                # Parse ISO format timestamp
-                return datetime.fromisoformat(data["device_timestamp"].replace('Z', '+00:00'))
-            except (ValueError, AttributeError):
-                pass
-        return None

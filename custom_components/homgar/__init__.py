@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import timedelta
 
 import voluptuous as vol
@@ -9,12 +10,14 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_APP_TYPE, CONF_HIDS
+from .coordinator import HomGarCoordinator
+from .decoder import _MODELS  # noqa: F401 — imported here to trigger eager file load in executor
 from .homgar_api import HomGarClient
 from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[str] = ["sensor", "valve", "number", "switch"]
+PLATFORMS: list[str] = ["sensor", "valve", "number"]
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -41,9 +44,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not entry.data.get(CONF_MQTT_PRODUCT_KEY):
         await client.login()
 
-    # Simple: one coordinator per config entry
-    from .coordinator import HomGarCoordinator
-
     coordinator = HomGarCoordinator(hass, client, entry)
 
     await coordinator.async_config_entry_first_refresh()
@@ -64,7 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if PAHO_AVAILABLE:
             mqtt_creds = client.get_mqtt_credentials()
             if mqtt_creds.get("product_key") and mqtt_creds.get("device_name"):
-                _LOGGER.info("HomGar: Initializing MQTT for real-time valve updates")
+                _LOGGER.info("HomGar [%s]: Initializing MQTT for real-time device updates", entry.title)
 
                 # Call subscribeStatus to get fresh per-session virtual credentials
                 # (these rotate each session — do not use stored ones)
@@ -75,13 +75,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     try:
                         sub_creds = await client.subscribe_status(hids[0], hubs)
                         _LOGGER.info(
-                            "HomGar: subscribeStatus returned device=%s productKey=%s host=%s",
+                            "HomGar [%s]: subscribeStatus returned device=%s productKey=%s host=%s",
+                            entry.title,
                             sub_creds.get("deviceName"),
                             sub_creds.get("productKey"),
                             sub_creds.get("mqttHostUrl"),
                         )
                     except Exception as sub_e:
-                        _LOGGER.warning("HomGar: subscribeStatus failed, falling back to stored creds: %s", sub_e)
+                        _LOGGER.warning("HomGar [%s]: subscribeStatus failed, falling back to stored creds: %s", entry.title, sub_e)
+
+                # Schedule MQTT renewal before expire timestamp
+                expire_ms = sub_creds.get("expire") if sub_creds else None
+                if expire_ms:
+                    try:
+                        expire_ts = int(expire_ms) / 1000.0
+                        renew_in = max(60, expire_ts - time.time() - 60)
+                        _LOGGER.info(
+                            "HomGar [%s]: MQTT subscription expires in %.0fs, scheduling renewal in %.0fs",
+                            entry.title,
+                            expire_ts - time.time(),
+                            renew_in,
+                        )
+                        async def _renew_subscription(hass=hass, entry=entry):
+                            _LOGGER.info("HomGar [%s]: Renewing MQTT subscription (pre-expire renewal)", entry.title)
+                            await async_reload_entry(hass, entry)
+                        hass.loop.call_later(renew_in, lambda: hass.async_create_task(_renew_subscription()))
+                    except Exception as renew_e:
+                        _LOGGER.warning("HomGar [%s]: Failed to schedule MQTT renewal: %s", entry.title, renew_e)
 
                 # Use fresh creds from subscribeStatus if available, else fall back to stored
                 if sub_creds.get("deviceName") and sub_creds.get("deviceSecret"):
@@ -114,9 +134,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     mqtt_host=mqtt_host,
                     on_message_callback=on_mqtt_message,
                     mqtt_port=mqtt_port,
+                    entry_title=entry.title,
                 )
             else:
-                _LOGGER.warning("HomGar: MQTT credentials not available, using polling only")
+                _LOGGER.warning("HomGar [%s]: MQTT credentials not available, using polling only", entry.title)
         else:
             _LOGGER.info("HomGar: paho-mqtt not installed, using polling only")
     except Exception as e:
@@ -135,9 +156,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if mqtt_client is not None:
         try:
             await hass.async_add_executor_job(mqtt_client.connect)
-            _LOGGER.info("HomGar: MQTT client connected successfully")
+            _LOGGER.info("HomGar [%s]: MQTT client connected successfully", entry.title)
         except Exception as e:
-            _LOGGER.warning("HomGar: MQTT connect failed, using polling only: %s", e)
+            _LOGGER.warning("HomGar [%s]: MQTT connect failed, using polling only: %s", entry.title, e)
             hass.data[DOMAIN][entry.entry_id]["mqtt_client"] = None
 
     # Set up services
@@ -215,7 +236,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry_data = hass.data[DOMAIN].get(entry.entry_id, {})
         mqtt_client = entry_data.get("mqtt_client")
         if mqtt_client:
-            _LOGGER.info("HomGar: Disconnecting MQTT client")
+            _LOGGER.info("HomGar [%s]: Disconnecting MQTT client", entry.title)
             await hass.async_add_executor_job(mqtt_client.disconnect)
         
         hass.data[DOMAIN].pop(entry.entry_id, None)

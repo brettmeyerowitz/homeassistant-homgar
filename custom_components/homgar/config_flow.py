@@ -59,6 +59,21 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 await client.ensure_logged_in()
+                
+                # Fetch and log product model list for device discovery
+                _LOGGER.warning("FETCHING product models for %s...", app_type)
+                try:
+                    product_models = await client.get_product_models()
+                    _LOGGER.warning("Product models available: %d devices", len(product_models))
+                    for pm in product_models:
+                        _LOGGER.warning("  - %s: %s (key: %s, type: %s)", 
+                                    pm.get('productName'), 
+                                    pm.get('deviceType'),
+                                    pm.get('productKey'),
+                                    pm.get('productType'))
+                except Exception as pm_err:
+                    _LOGGER.warning("Could not fetch product models: %s", pm_err)
+                
                 homes = await client.list_homes()
                 _LOGGER.info("Found %d homes for app_type %s", len(homes), app_type)
                 _LOGGER.debug("Homes data: %s", homes)
@@ -188,6 +203,21 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 await client.ensure_logged_in()
+                
+                # Fetch and log product model list for device discovery
+                _LOGGER.warning("FETCHING product models for %s...", app_type)
+                try:
+                    product_models = await client.get_product_models()
+                    _LOGGER.warning("Product models available: %d devices", len(product_models))
+                    for pm in product_models:
+                        _LOGGER.warning("  - %s: %s (key: %s, type: %s)", 
+                                    pm.get('productName'), 
+                                    pm.get('deviceType'),
+                                    pm.get('productKey'),
+                                    pm.get('productType'))
+                except Exception as pm_err:
+                    _LOGGER.warning("Could not fetch product models: %s", pm_err)
+                
                 homes = await client.list_homes()
                 _LOGGER.info("Found %d homes for reconfigure", len(homes))
             except HomGarApiError:
