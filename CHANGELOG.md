@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.5] - 2026-04-11
+
+### 🐛 Bug Fixes
+- **Fixed MQTT renewal crash** — `_renew_subscription` was calling `async_setup_entry` directly via `async_reload_entry`, which fails with `ConfigEntryError` because `async_config_entry_first_refresh` can only be called when the entry is in `SETUP_IN_PROGRESS` state. `async_reload_entry` now correctly uses `hass.config_entries.async_reload()` which properly transitions entry state.
+
+---
+
 ## [3.0.4] - 2026-04-11
 
 ### 🐛 Bug Fixes
