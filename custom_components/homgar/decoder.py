@@ -397,7 +397,7 @@ def _temp_from_raw(raw: float, temp_unit: str) -> float:
     f_val = raw / 10.0
     if temp_unit == "F":
         return round(f_val, 1)
-    return round(f_val - 32.0, 1)
+    return round((f_val - 32.0) * 5.0 / 9.0, 1)
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.2] - 2026-04-11
+
+### 🐛 Bug Fixes
+- **Temperature decoding fix** — all temperature sensors were reading ~12°C too high. The raw value is stored as tenths of °F and the F→C conversion was missing the `× 5/9` factor (was `raw/10 - 32` instead of `(raw/10 - 32) × 5/9`). Affects 19 models: HCS014ARF, HCS021FRF, HCS005FRF, HCS015ARF, HCS015ARF+, HCS0528ARF, HCS0530THO, HCS0600ARF, HCS596WB, HCS596WB-V4, HCS666FRF-X, HCS701B, HCS702B, HCS702B-V1, HCS706ARF, HCS802ARF, HCS888ARF-V1, HWS578WRF, HWS616WRF.
+
+---
+
 ## [3.0.1] - 2026-04-11
 
 ### 🐛 Bug Fixes

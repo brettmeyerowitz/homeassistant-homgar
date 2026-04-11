@@ -1,7 +1,7 @@
 # Display Hub model constant
 DOMAIN = "homgar"
 NAME = "HomGar/RainPoint Cloud"
-VERSION = "3.0.1"
+VERSION = "3.0.2"
 
 # Helper function for debug messages with version
 def debug_with_version(message: str) -> str:
