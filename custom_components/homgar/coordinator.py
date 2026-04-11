@@ -21,7 +21,7 @@ from .const import (
     DOMAIN,
 )
 from .homgar_api import HomGarClient, HomGarApiError
-from .decoder import decode_payload
+from .decoder import decode_payload, get_valve_ports
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -228,6 +228,33 @@ class HomGarCoordinator(DataUpdateCoordinator):
                     }
 
                     _LOGGER.debug("Sensor entity key=%s info=%s", sensor_key, decoded_sensors[sensor_key])
+
+                # Handle WiFi hub-as-device (e.g. HIC801W): the hub itself is a
+                # controllable device whose status arrives as D00 in subDeviceStatus.
+                # It never appears in subDevices[], so the loop above skips it.
+                hub_model = hub.get("model") or hub.get("displayModel")
+                if hub_model:
+                    if get_valve_ports(hub_model):
+                        d00 = sub_status.get("D00") or sub_status.get("D0")
+                        if d00:
+                            raw_value = d00.get("value")
+                            decoded = decode_payload(hub_model, raw_value) if raw_value else None
+                            sensor_key = f"{mid}_0"
+                            if sensor_key not in decoded_sensors:
+                                decoded_sensors[sensor_key] = {
+                                    "hid": hub["hid"],
+                                    "mid": mid,
+                                    "addr": 0,
+                                    "home_name": hub.get("homeName"),
+                                    "hub_name": hub.get("name", "Hub"),
+                                    "sub_name": hub.get("name", hub_model),
+                                    "model": hub_model,
+                                    "firmware_version": hub.get("softVer"),
+                                    "raw_status": d00,
+                                    "data": decoded,
+                                    "type_flag": 0,
+                                }
+                                _LOGGER.debug("Registered hub-as-device sensor key=%s model=%s", sensor_key, hub_model)
 
             _LOGGER.info("Coordinator update complete: %d hubs, %d sensors", len(hubs), len(decoded_sensors))
             _LOGGER.debug("Final data: hubs=%s, sensors=%s", hubs, list(decoded_sensors.keys()))

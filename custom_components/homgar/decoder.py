@@ -321,6 +321,29 @@ def _parse_legacy(status_param: str) -> dict:
         except (ValueError, TypeError):
             pass
 
+    # Positional temp/humidity fallback (HCS014ARF, HWS019WRF-V2 etc.)
+    # These use p2[0]=temp_raw, p2[1]=rh when no named T=/H= keys are present.
+    if "_leg_temp_raw" not in out and p2i(0) is not None:
+        out["_leg_temp_raw"] = p2i(0)
+        try:
+            t_tok = p2[0]
+            if "(" in t_tok and ")" in t_tok:
+                inner = t_tok[t_tok.index("(") + 1:t_tok.index(")")].split("/")
+                out["_leg_temp_max_raw"] = int(inner[0]) if len(inner) > 0 else None
+                out["_leg_temp_min_raw"] = int(inner[1]) if len(inner) > 1 else None
+        except (IndexError, ValueError):
+            pass
+    if "_leg_rh" not in out and p2i(1) is not None:
+        out["_leg_rh"] = p2i(1)
+        try:
+            h_tok = p2[1]
+            if "(" in h_tok and ")" in h_tok:
+                inner = h_tok[h_tok.index("(") + 1:h_tok.index(")")].split("/")
+                out["_leg_rh_max"] = int(inner[0]) if len(inner) > 0 else None
+                out["_leg_rh_min"] = int(inner[1]) if len(inner) > 1 else None
+        except (IndexError, ValueError):
+            pass
+
     out["_leg_last_water_cons_raw"] = p2i(1)
     out["_leg_cur_water_raw"] = p2i(2)
     out["_leg_cur_duration"] = p2i(3)
@@ -858,9 +881,15 @@ def decode_payload(model: str, status_param: str,
                 "signal_strength": _dec_rssi(entries, dp_index),
             }.items() if v is not None}
 
-            if port_number <= 1 or not z8:
+            is_bitmask_hub = (port_number > 1 and not z8 and any(
+                dp.get("identity") == "STA_WATER_ZONES"
+                for dp in model_dict.get("dp", [])
+            ))
+            if port_number <= 1 or (not z8 and not is_bitmask_hub):
                 port_data = _decode_port(entries, dp_index, None, unit, temp_unit, model)
                 sensor_data = {**shared, **port_data}
+            elif is_bitmask_hub:
+                sensor_data = dict(shared)
             else:
                 sensor_data = dict(shared)
                 for p in range(1, port_number + 1):

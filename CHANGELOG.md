@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.7] - 2026-04-11
+
+### 🐛 Bug Fixes
+- **HCS014ARF / HWS019WRF-V2 temp & humidity missing** — legacy ASCII payloads using positional p2 fields (no `T=`/`H=` named keys) were not decoded. Added positional fallback: `p2[0]` = temperature, `p2[1]` = humidity. These models were never decoded in v2 either.
+- **HIC801W valve entities not triggering API calls** — hub-as-device (WiFi hubs whose own model has valve ports) was never registered as a sensor entry because it doesn't appear in `subDevices[]`. Coordinator now registers hub `D00` status as a sensor when the hub model has valve ports.
+- **HIC801W spurious top-level sensors** — bitmask hubs were producing erroneous top-level `humidity` and `valve_state` fields. Bitmask hub path now skips the single-port decode entirely.
+
+---
+
 ## [3.0.6] - 2026-04-11
 
 ### 🐛 Bug Fixes
