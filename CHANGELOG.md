@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.6] - 2026-04-11
+
+### 🐛 Bug Fixes
+- **HIC801W / bitmask hub valve entities** — WiFi irrigation controllers (HIC801W, HIC1200W, HIC1204W, HIC406B) now correctly expose valve entities for each zone. Two bugs fixed: `get_valve_ports()` was ignoring models with a global `CTL_WATER` at `dpPort=0`; and the `STA_WATER_ZONES` bitmask lookup was unreachable for `z8=False` payloads. Both now handled correctly.
+- **Bogus "Last Event Time" timestamps** — `event_time` and `event_time2` sensors were showing 1970 dates due to small non-zero raw values. Now filtered: only timestamps after year 2001 (Unix > 1,000,000,000) are exposed.
+
+---
+
 ## [3.0.5] - 2026-04-11
 
 ### 🐛 Bug Fixes

@@ -69,15 +69,32 @@ def get_valve_ports(model: str) -> list[int]:
     Return a list of port numbers that have CTL_WATER or CTL_BT_WATER entries.
     Empty list means the model is not a valve/controllable device.
     Used by valve.py to determine how many ValveEntity objects to create.
+
+    Two layouts are handled:
+      - Per-port: CTL_WATER dp entries each have dpPort > 0 (e.g. HTV113FRF).
+        Returns the explicit dpPort values.
+      - Bitmask hub: single CTL_WATER with dpPort=0 and portNumber > 1
+        (e.g. HIC801W). Returns [1, 2, ..., portNumber].
     """
     info = get_model_info(model)
     if not info:
         return []
-    return [
+    per_port = [
         dp["dpPort"] for dp in info.get("dp", [])
         if dp.get("identity") in ("CTL_WATER", "CTL_BT_WATER")
         and dp.get("dpPort", 0) > 0
     ]
+    if per_port:
+        return per_port
+    has_global_ctl = any(
+        dp.get("identity") in ("CTL_WATER", "CTL_BT_WATER")
+        and dp.get("dpPort", 0) == 0
+        for dp in info.get("dp", [])
+    )
+    port_number = info.get("portNumber", 0) or 0
+    if has_global_ctl and port_number > 1:
+        return list(range(1, port_number + 1))
+    return []
 
 
 def _build_dp_index(model_dict: dict) -> dict[int, dict]:
@@ -374,7 +391,7 @@ def _decode_legacy_port_section(section: str, unit: str) -> dict:
         result["current_session_duration"] = dur_min * 60
 
     ev_time = fi(3)
-    if ev_time is not None:
+    if ev_time is not None and ev_time > 1_000_000_000:
         result["event_time_raw"] = ev_time
 
     return result
@@ -726,11 +743,11 @@ def _decode_port(entries: list[dict], dp_index: dict[int, dict],
         result["last_water_volume"] = lu
 
     et = _dec_event_time(entries, dp_index, port)
-    if et is not None and et > 0:
+    if et is not None and et > 1_000_000_000:
         result["event_time"] = datetime.fromtimestamp(et, tz=timezone.utc).isoformat()
 
     et2 = _dec_event_time2(entries, dp_index, port)
-    if et2 is not None and et2 > 0:
+    if et2 is not None and et2 > 1_000_000_000:
         result["event_time2"] = datetime.fromtimestamp(et2, tz=timezone.utc).isoformat()
 
     alarm = _dec_alarm(entries, dp_index, port)
@@ -851,6 +868,28 @@ def decode_payload(model: str, status_param: str,
                     port_data = _decode_port(port_entries, dp_index, p, unit, temp_unit, model)
                     if port_data:
                         sensor_data[f"port_{p}"] = port_data
+
+            # Bitmask hub (e.g. HIC801W): STA_WATER_ZONES byte encodes zone states.
+            # These devices have z8=False so the per-port branch above is skipped;
+            # handle them here regardless of z8.
+            if port_number > 1:
+                wz_dpcode = next((
+                    dp["dpCode"] for dp in model_dict.get("dp", [])
+                    if dp.get("identity") == "STA_WATER_ZONES"
+                ), None)
+                if wz_dpcode is not None:
+                    wz_entries = [e for e in entries if e["type_code"] == wz_dpcode]
+                    if wz_entries:
+                        bitmask = wz_entries[0]["type_value"][0] & 0xFF
+                        for p in range(1, port_number + 1):
+                            port_key = f"port_{p}"
+                            active = bool(bitmask & (1 << (p - 1)))
+                            if port_key not in sensor_data:
+                                sensor_data[port_key] = {}
+                            if "is_watering" not in sensor_data[port_key]:
+                                sensor_data[port_key]["is_watering"] = active
+                            if "valve_state" not in sensor_data[port_key]:
+                                sensor_data[port_key]["valve_state"] = "irrigation" if active else "idle"
 
     except Exception as exc:
         _LOGGER.exception("decode_payload error for model=%s: %s", model, exc)
