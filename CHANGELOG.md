@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.1] - 2026-04-11
+
+### 🐛 Bug Fixes
+- Fixed spurious WARNING-level log spam during login (product model fetch logs were incorrectly set to WARNING instead of INFO)
+
+### ✨ Improvements
+- **Reconfigure flow**: Added "Remove all existing devices and entities before reloading" checkbox on the home selection step — enables a clean registry wipe without needing to fully delete and re-add the integration. Useful when upgrading from v2.x or resolving orphaned/duplicate devices.
+
+---
+
 ## [3.0.0] - 2026-04-11
 
 ### ⚠️ BREAKING CHANGE — Clean Install Strongly Recommended

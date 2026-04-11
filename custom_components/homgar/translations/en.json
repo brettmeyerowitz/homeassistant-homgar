@@ -38,7 +38,11 @@
                 "title": "Select Homes",
                 "description": "Choose which homes to use with this integration. You can select multiple.",
                 "data": {
-                    "hids": "Homes"
+                    "hids": "Homes",
+                    "clean_registry": "Remove all existing devices and entities before reloading"
+                },
+                "data_description": {
+                    "clean_registry": "Use this when upgrading from v2.x or if you have duplicate/orphaned devices. All sensor history will be lost."
                 }
             }
         },

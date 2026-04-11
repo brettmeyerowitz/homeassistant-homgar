@@ -46,7 +46,13 @@ Unofficial Home Assistant integration for RainPoint Smart+ devices via the HomGa
 
 v3.0.0 changes entity unique IDs (now field-name-based: `rainpoint_{mid}_{addr}_temperature`). All existing entities will appear orphaned after upgrading. **A clean remove + re-add is required** — there is no in-place migration path.
 
-**Steps:**
+**Option A — Reconfigure with registry wipe (recommended):**
+1. **Settings → Devices & Services → HomGar/RainPoint Cloud → three-dot menu → Reconfigure**
+2. Enter your credentials and proceed to home selection
+3. Check **"Remove all existing devices and entities before reloading"**
+4. Submit — the integration will clear the old registry entries and reload fresh
+
+**Option B — Full delete and re-add:**
 1. **Settings → Devices & Services → HomGar/RainPoint Cloud → three-dot menu → Delete**
 2. Confirm deletion (sensor history will be lost)
 3. **+ Add Integration → HomGar/RainPoint Cloud** — set up fresh

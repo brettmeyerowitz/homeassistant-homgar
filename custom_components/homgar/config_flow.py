@@ -11,6 +11,7 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import (
     DOMAIN,
@@ -59,21 +60,6 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 await client.ensure_logged_in()
-                
-                # Fetch and log product model list for device discovery
-                _LOGGER.warning("FETCHING product models for %s...", app_type)
-                try:
-                    product_models = await client.get_product_models()
-                    _LOGGER.warning("Product models available: %d devices", len(product_models))
-                    for pm in product_models:
-                        _LOGGER.warning("  - %s: %s (key: %s, type: %s)", 
-                                    pm.get('productName'), 
-                                    pm.get('deviceType'),
-                                    pm.get('productKey'),
-                                    pm.get('productType'))
-                except Exception as pm_err:
-                    _LOGGER.warning("Could not fetch product models: %s", pm_err)
-                
                 homes = await client.list_homes()
                 _LOGGER.info("Found %d homes for app_type %s", len(homes), app_type)
                 _LOGGER.debug("Homes data: %s", homes)
@@ -203,21 +189,6 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 await client.ensure_logged_in()
-                
-                # Fetch and log product model list for device discovery
-                _LOGGER.warning("FETCHING product models for %s...", app_type)
-                try:
-                    product_models = await client.get_product_models()
-                    _LOGGER.warning("Product models available: %d devices", len(product_models))
-                    for pm in product_models:
-                        _LOGGER.warning("  - %s: %s (key: %s, type: %s)", 
-                                    pm.get('productName'), 
-                                    pm.get('deviceType'),
-                                    pm.get('productKey'),
-                                    pm.get('productType'))
-                except Exception as pm_err:
-                    _LOGGER.warning("Could not fetch product models: %s", pm_err)
-                
                 homes = await client.list_homes()
                 _LOGGER.info("Found %d homes for reconfigure", len(homes))
             except HomGarApiError:
@@ -259,17 +230,29 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_select_homes_reconfigure(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle home selection during reconfiguration."""
         errors: dict[str, str] = {}
-        
+
         home_options = {str(h["hid"]): h["homeName"] for h in self._homes}
         current_entry = self._get_reconfigure_entry()
         current_hids = current_entry.data.get(CONF_HIDS, [])
-        
+
         if user_input is not None:
             selected = user_input.get(CONF_HIDS)
             if not selected:
                 errors["base"] = "select_at_least_one"
             else:
                 hids = [int(h) for h in selected]
+
+                if user_input.get("clean_registry"):
+                    _LOGGER.info("Reconfigure: removing all existing devices and entities for entry %s", current_entry.entry_id)
+                    ent_reg = er.async_get(self.hass)
+                    dev_reg = dr.async_get(self.hass)
+                    entity_entries = er.async_entries_for_config_entry(ent_reg, current_entry.entry_id)
+                    for entity_entry in entity_entries:
+                        ent_reg.async_remove(entity_entry.entity_id)
+                    device_entries = dr.async_entries_for_config_entry(dev_reg, current_entry.entry_id)
+                    for device_entry in device_entries:
+                        dev_reg.async_remove_device(device_entry.id)
+                    _LOGGER.info("Reconfigure: removed %d entities and %d devices", len(entity_entries), len(device_entries))
 
                 token_data = self._client.export_tokens()
 
@@ -290,10 +273,11 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Pre-select currently configured homes
         current_selected = {str(h) for h in current_hids}
-        
+
         data_schema = vol.Schema(
             {
-                vol.Required(CONF_HIDS, default=current_selected): cv.multi_select(home_options)
+                vol.Required(CONF_HIDS, default=current_selected): cv.multi_select(home_options),
+                vol.Optional("clean_registry", default=False): bool,
             }
         )
 
