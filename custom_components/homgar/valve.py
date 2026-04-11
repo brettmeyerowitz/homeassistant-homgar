@@ -12,10 +12,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113, MODEL_HTV405FRF, MODEL_HIC801W
+from .const import DOMAIN
 from .coordinator import HomGarCoordinator
-from .api.decoders import decode_valve_hub
-# build_valve_open_command / build_valve_close_command retained in homgar_api for reference
+from .decoder import get_valve_ports
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,22 +36,18 @@ async def async_setup_entry(
 
     for key, info in sensors_cfg.items():
         model = info.get("model")
-        if model not in [MODEL_VALVE_HUB, MODEL_VALVE_213, MODEL_VALVE_245, MODEL_HTV0542FRF, MODEL_VALVE_113, MODEL_HTV405FRF, MODEL_HIC801W]:
+        valve_ports = get_valve_ports(model) if model else []
+        if not valve_ports:
             continue
 
-        decoded = info.get("data") or {}
-        zones: dict = decoded.get("zones", {})
-
-        # Create one valve entity per zone that reported in the payload.
-        # Zones absent from the payload are not created - avoids phantom entities
-        # if the device reports fewer zones than the model name implies.
-        for zone_num in sorted(zones.keys()):
+        # Create one valve entity per port declared in product_models.json dp[]
+        for port in valve_ports:
             entities.append(
-                HomGarValveEntity(coordinator, key, info, zone_num)
+                HomGarValveEntity(coordinator, key, info, port)
             )
             _LOGGER.debug(
-                "Creating valve entity: key=%s zone=%s model=%s",
-                key, zone_num, info.get("model"),
+                "Creating valve entity: key=%s port=%s model=%s",
+                key, port, model,
             )
 
     if entities:
@@ -91,7 +86,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
     # ------------------------------------------------------------------
 
     @property
-    def _zone_data(self) -> dict | None:
+    def _port_data(self) -> dict | None:
         sensors = self.coordinator.data.get("sensors", {})
         info = sensors.get(self._sensor_key)
         if not info:
@@ -99,7 +94,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         decoded = info.get("data")
         if not decoded:
             return None
-        return decoded.get("zones", {}).get(self._zone_num)
+        return decoded.get(f"port_{self._zone_num}")
 
     # ------------------------------------------------------------------
     # Entity properties
@@ -114,24 +109,27 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         decoded = info.get("data")
         if not decoded:
             return False
-        return decoded.get("hub_online", False)
+        return decoded.get("hub_online", True)
 
     @property
     def is_closed(self) -> bool | None:
-        zone = self._zone_data
-        if zone is None or zone.get("open") is None:
+        port = self._port_data
+        if port is None:
             return None
-        return not zone["open"]
+        is_watering = port.get("is_watering")
+        if is_watering is None:
+            return None
+        return not is_watering
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         attrs: dict[str, Any] = {}
-        zone = self._zone_data
-        if zone:
-            dur = zone.get("duration_seconds")
+        port = self._port_data
+        if port:
+            dur = port.get("current_session_duration")
             if dur is not None:
                 attrs["duration_seconds"] = dur
-            attrs["state_raw"] = zone.get("state_raw")
+            attrs["valve_state"] = port.get("valve_state")
         
         # Add firmware version from sensor info
         sensors = self.coordinator.data.get("sensors", {})
@@ -205,13 +203,13 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
 
     def _apply_response_state(self, raw_state: str | None) -> None:
         """Decode the state string returned by controlWorkMode and inject it
-        into the coordinator data immediately, bypassing the poll cycle.
-        The API often returns a stale cached payload on the next poll so this
-        ensures HA reflects the actual device state without delay."""
+        into the coordinator data immediately, bypassing the poll cycle."""
         if not raw_state:
             return
-        decoded = decode_valve_hub(raw_state)
-        if not decoded:
+        from .decoder import decode_payload
+        model = self._sensor_info.get("model")
+        decoded = decode_payload(model, raw_state) if model else {}
+        if not decoded or "error" in decoded:
             return
         current = dict(self.coordinator.data)
         sensors = dict(current.get("sensors", {}))
@@ -261,8 +259,8 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         # OPTIMISTIC LOCAL UPDATE to prevent UI desync
         current = dict(self.coordinator.data)
         try:
-            current["sensors"][self._sensor_key]["data"]["zones"][self._zone_num]["open"] = True
-            current["sensors"][self._sensor_key]["data"]["zones"][self._zone_num]["duration_seconds"] = duration
+            current["sensors"][self._sensor_key]["data"][f"port_{self._zone_num}"]["is_watering"] = True
+            current["sensors"][self._sensor_key]["data"][f"port_{self._zone_num}"]["current_session_duration"] = duration
         except KeyError:
             pass
         self.coordinator.async_set_updated_data(current)
@@ -301,8 +299,8 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         # OPTIMISTIC LOCAL UPDATE to prevent UI desync
         current = dict(self.coordinator.data)
         try:
-            current["sensors"][self._sensor_key]["data"]["zones"][self._zone_num]["open"] = False
-            current["sensors"][self._sensor_key]["data"]["zones"][self._zone_num]["duration_seconds"] = 0
+            current["sensors"][self._sensor_key]["data"][f"port_{self._zone_num}"]["is_watering"] = False
+            current["sensors"][self._sensor_key]["data"][f"port_{self._zone_num}"]["current_session_duration"] = 0
         except KeyError:
             pass
         self.coordinator.async_set_updated_data(current)

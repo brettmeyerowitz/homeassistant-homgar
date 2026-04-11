@@ -7,11 +7,40 @@ from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.components.select import SelectEntity
 from homeassistant.const import EntityCategory
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import HomGarCoordinator
-from .device import HomGarHubDevice
+
+
+class HomGarHubDevice(Entity):
+    """Mixin providing device_info for HomGar hub entities."""
+
+    def __init__(self, hub_info: dict) -> None:
+        self._hub_info = hub_info
+        self._attr_unique_id = f"rainpoint_hub_{hub_info['mid']}"
+        self._attr_name = hub_info.get("name", "HomGar Hub")
+        self._attr_should_poll = False
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        mid = self._hub_info["mid"]
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"rainpoint_hub_{mid}")},
+            name=self._hub_info.get("name", "HomGar Hub"),
+            manufacturer="RainPoint",
+            model=self._hub_info.get("model", "Unknown"),
+            sw_version=self._hub_info.get("softVer"),
+            hw_version=self._hub_info.get("hardwareVersion"),
+            serial_number=self._hub_info.get("mac"),
+            suggested_area=self._hub_info.get("homeName"),
+        )
+
+    @property
+    def available(self) -> bool:
+        return True
 
 
 class HomGarHubSensorBase(CoordinatorEntity, SensorEntity, HomGarHubDevice):

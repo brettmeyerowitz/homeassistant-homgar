@@ -4,450 +4,162 @@
 [![License](https://img.shields.io/github/license/brettmeyerowitz/homeassistant-homgar.svg)](LICENSE)
 [![HACS](https://img.shields.io/badge/HACS-Default-blue.svg)](https://github.com/hacs/integration)
 
-Unofficial Home Assistant component for RainPoint Smart+ devices via HomGar cloud API.
+Unofficial Home Assistant integration for RainPoint Smart+ devices via the HomGar/RainPoint cloud API.
 
-**Important clarification:** HomGar is the mobile app/cloud platform, while RainPoint is the actual hardware manufacturer. All device models (HCS*, HTV*, etc.) are RainPoint hardware that can be accessed via either mobile app.
-
----
-
-## Compatibility
-
-This integration supports RainPoint Smart+ devices via HomGar cloud API. **Important clarification:**
-
-### **HomGar vs RainPoint:**
-- **HomGar**: The mobile app and cloud platform
-- **RainPoint**: The actual hardware manufacturer and device models
-
-**All device models (HCS*, HTV*, etc.) are RainPoint hardware** that can be accessed via either the HomGar or RainPoint mobile app.
-
-### Supported RainPoint Smart+ Devices
-
-#### 🌡️ Environmental Sensors
-
-| Device | Model(s) | Entities |
-|--------|----------|---------|
-| Soil Moisture + Temp + Light | HCS021FRF, HCS024FRF-V1, HCS044FRF, HCS666FRF, HCS666RFR-P, HCS999FRF, HCS999FRF-P, HCS666FRF-X | Moisture %, Temperature, Illuminance |
-| Soil Moisture (simple) | HCS026FRF, HCS005FRF, HCS003FRF | Moisture % |
-| Temperature + Humidity | HCS014ARF, HCS027ARF, HCS016ARF, HCS701B, HCS596WB, HCS596WB-V4, HCS706ARF, HCS802ARF, HCS048B, HCS888ARF-V1, HCS0600ARF | Temperature °C, Humidity % |
-| Rain Gauge | HCS012ARF | Rain last hour/24h/7d/total (mm) |
-| CO₂ + Temp + Humidity | HCS0530THO | CO₂ ppm (current/low/high), Temperature, Humidity, Battery |
-| Pool Temperature | HCS0528ARF, HCS015ARF | Temp current/daily high/daily low |
-| Pool Temperature (simple) | HCS0565ARF | Temperature current |
-| Pool Temp + Ambient | HCS015ARF+ | Pool temp (current/hi/lo), Ambient temp (current/hi/lo), Humidity (current/hi/lo) |
-| Flow Meter | HCS008FRF | Current flow, last used, total today, total lifetime, duration, battery |
-
-#### ☁️ Weather Station / Display Hub
-
-| Device | Model | Entities |
-|--------|-------|---------|
-| Irrigation Display Hub / Weather Station | HWS019WRF-V2, HWS388WRF-V13 | Temperature °C (current/daily high/low), Humidity % (current/daily high/low), Pressure hPa (current/daily high/low) |
-
-> **Note:** Both US and EU cloud backend payload formats are supported for display hubs and temperature/humidity sensors.
-
-#### 💧 Irrigation Valves & Timers
-
-| Device | Model(s) | Zones | Entities per zone |
-|--------|----------|-------|-------------------|
-| Multi-zone Valve Hub (RF, auto-detected) | HTV0540FRF | Up to 8 | Valve open/close, Duration (minutes) |
-| 2-zone Valve / Timer | HTV213FRF, HTV245FRF | 2 | Valve open/close, Duration (minutes) |
-| 4-zone RF Timer | HTV0542FRF | 4 | Valve open/close, Duration (minutes) |
-| 4-zone RF Valve Controller | HTV405FRF | 4 | Valve open/close, Duration (minutes) |
-| 1-zone Timer | HTV113FRF | 1 | Valve open/close, Duration (minutes) |
-| 8-zone WiFi Irrigation Controller | HIC801W | 8 | Valve open/close, Duration (minutes) |
-
-#### 🔌 Hubs (Gateway devices — no direct sensor entities)
-
-| Device | Model(s) |
-|--------|----------|
-| Main WiFi Hub V1 | HWG023WRF |
-| Main WiFi Hub V2 | HWG023WBRF-V2 |
-
-All devices communicate via the HomGar cloud backend (`region3.homgarus.com`).
-
----
-
-## Multiple Accounts & Sites
-
-### **⚠️ Important: API Login Conflict**
-**Logging in via this integration will log you out of the mobile app!** The HomGar/RainPoint API only allows one active session per account.
-
-### **Solutions:**
-1. **Separate API Account** (Recommended): Create a dedicated account for API access
-2. **Multiple Accounts**: Use different accounts for mobile app vs integration
-3. **Accept Limitation**: Re-login to mobile app after Home Assistant setup
-
-### **Creating a Separate API Account:**
-1. **Log out** from your main Homgar/RainPoint mobile app
-2. **Create new account** with different email address
-3. **Log back in** to your main account in mobile app
-4. **Go to 'Me' → 'Home management' → your home → 'Members'**
-5. **Invite the new API account** to your home
-6. **Log into API account** and accept the invitation
-7. **Use API account credentials** in Home Assistant
-
-### **Multiple Login Support:**
-You can add multiple HomGar/RainPoint accounts to Home Assistant, perfect for:
-
-- **Multiple properties**: Different homes/sites with separate accounts
-- **Both app types**: Use HomGar app for one site, RainPoint app for another
-- **Separate credentials**: Different email/password combinations for various locations
-
-### **Setup Multiple Accounts:**
-1. **First Integration**: Add your primary account as described above
-2. **Additional Accounts**: 
-   - Go to **Settings → Devices & Services → Add Integration**
-   - Search for **HomGar/RainPoint Cloud**
-   - Enter credentials for the second account
-   - Choose the appropriate app type for that account
-   - Select homes for that specific account
-
-### **Example Use Cases:**
-- **Home + Vacation House**: HomGar account for home, RainPoint account for vacation property
-- **Multiple Properties**: Separate RainPoint accounts for different rental properties
-- **App Testing**: Both HomGar and RainPoint apps for the same location (different accounts)
-
-### **Entity Naming with Multiple Accounts:**
-Each account creates unique entities based on the app selection:
-- `sensor.homgar_home_garden_moisture` (Homgar account)
-- `sensor.rainpoint_vacation_garden_moisture` (RainPoint account)
-- `sensor.homgar_rental1_soil_temperature` (Second Homgar account)
-
-**Note**: Each integration instance is independent with its own update schedule and error handling.
-
----
-
-## Features
-
-- **Dual App Support**: Choose between HomGar or RainPoint app during setup
-- **Optimized API Calls**: Efficient `multipleDeviceStatus` for all users
-- **Hybrid API Strategy**: Automatic fallback to individual calls if needed
-- Login with your HomGar/RainPoint account (email + area code)
-- Select which homes to include
-- Auto-discovers supported sub-devices
-- Exposes:
-  - Moisture %
-  - Temperature (where applicable)
-  - Illuminance (HCS021FRF and variants)
-  - Rain: last hour / 24h / 7d / total (HCS012ARF)
-  - Temperature/Humidity (HCS014ARF and variants)
-  - Flowmeter readings (HCS008FRF)
-  - CO2, temperature, humidity (HCS0530THO)
-  - Pool temperature (HCS0528ARF, HCS015ARF, HCS0565ARF)
-  - Pool + ambient temperature and humidity (HCS015ARF+)
-  - Weather station: temperature, humidity, pressure (HWS019WRF-V2, HWS388WRF-V13)
-  - Irrigation valve open/close + duration (HTV0540FRF, HTV213FRF, HTV245FRF, HTV0542FRF, HTV405FRF, HTV113FRF, HIC801W)
-  - **MQTT diagnostics** for WiFi hubs: connection status, messages received/sent, last message age (disabled by default, enable in device settings)
-- Attributes:
-  - `rssi_dbm`
-  - `battery_status_code`
-  - `last_updated` (cloud timestamp)
-- **Raw payload sensor** for each device (disabled by default) - useful for debugging
-- **Automatic brand detection** - Devices show as "HomGar" or "RainPoint" manufacturer based on your app selection
-
----
-
-## MQTT Real-time Updates
-
-The integration supports **real-time MQTT updates** for compatible devices. This provides instant state changes rather than waiting for the 30-second polling cycle.
-
-### How It Works
-- MQTT connects at the **hub level** using virtual device credentials
-- All sub-device updates (D01, D02, etc.) come through a single connection
-- Format: `#P{timestamp}|{hub_mid}|{D01: {...}, D02: {...}}|...`
-
-### Device MQTT Support
-
-| Device Type | Real-time MQTT | Pattern | Notes |
-|-------------|----------------|---------|-------|
-| **Valves** (HTV113FRF, HTV213FRF, etc.) | ✅ Yes | Event-driven | Instant on open/close |
-| **CO2 Sensors** (HCS0530THO) | ✅ Yes | ~45s periodic | Regular updates |
-| **Flow Meters** (HCS008FRF) | ✅ Yes | Event-driven | When water flows |
-| **Moisture Sensors** (HCS021FRF, HCS026FRF) | ❓ Unknown | Likely REST-only | 30s polling |
-| **Temp/Humidity** (HCS014ARF) | ❓ Unknown | Likely REST-only | 30s polling |
-| **Rain Sensors** (HCS012ARF) | ❓ Unknown | Likely REST-only | 30s polling |
-
-### Troubleshooting MQTT
-
-If MQTT updates aren't appearing, check the Home Assistant logs:
-
-**Via Home Assistant UI:**
-- Settings → System → Logs → Search for "HomGar MQTT"
-
-**Via command line (Docker):**
-```bash
-docker logs <container_name> 2>&1 | grep "HomGar MQTT"
-```
-
-**Via command line (HAOS/Core):**
-```bash
-# HAOS: Use the SSH/Terminal add-on
-ha logs | grep "HomGar MQTT"
-
-# Home Assistant Core:
-tail -f /config/home-assistant.log | grep "HomGar MQTT"
-```
-
-**What to look for:**
-```
-✅ "HomGar MQTT connected successfully" - Connection established
-✅ "HomGar MQTT: Found hub mid=XXXXX" - Hub recognized
-✅ "HomGar MQTT: Updated sensor X with real-time data" - Working!
-
-⚠️ "Hub mid=XXXXX not found" - MID mismatch or hub not loaded
-⚠️ "Sensor key X not found" - Device not discovered yet (wait for REST poll)
-```
-
-Common issues:
-- **Hub MID mismatch**: MQTT uses 6-digit encoding (e.g., `583580`) vs API 5-digit (`58358`) - handled automatically in v2.1.4+
-- **Sensor key not found**: Device not yet discovered via REST polling (restart integration or wait 30s)
-
----
-
-## How Brand Detection Works
-
-The integration automatically determines the device brand based on your app selection:
-
-### **Important Understanding:**
-- **HomGar**: Mobile app and cloud platform name
-- **RainPoint**: Hardware manufacturer and device models
-
-**All device models (HCS*, HTV*, etc.) are RainPoint hardware** that can be accessed via either mobile app.
-
-### **App Selection → Brand Mapping:**
-- **HomGar App** → Devices show as "HomGar" manufacturer in Home Assistant
-- **RainPoint App** → Devices show as "RainPoint" manufacturer in Home Assistant
-
-### **Technical Implementation:**
-- Brand is determined by the `app_type` selected during setup
-- Not based on device model detection (all models are RainPoint hardware)
-- Ensures consistent branding that matches your mobile app choice
-- Affects device names and entity IDs in Home Assistant
-
-### **Example:**
-If you select "RainPoint App" during setup:
-- Device appears as: `"RainPoint HCS026FRF"`
-- Entity ID: `sensor.rainpoint_92_cbd_garden_moisture`
-- Entity name: `Garden Moisture`
-
-If you select "HomGar App" during setup:
-- Device appears as: `"HomGar HCS026FRF"`  
-- Entity ID: `sensor.homgar_92_cbd_garden_moisture`
-- Entity name: `Garden Moisture`
-
-### **Entity Naming Pattern:**
-**Format**: `sensor.{brand}_{home_name}_{device_name}`
-
-**Components:**
-- **{brand}**: `homgar` or `rainpoint` (from app selection)
-- **{home_name}**: Slugified home name (e.g., `92_cbd`)
-- **{device_name}**: Slugified device name (e.g., `garden_moisture`)
-
-**Slugification Process:**
-- Converts to lowercase
-- Replaces non-alphanumeric characters with underscores
-- Removes multiple consecutive underscores
-- Ensures valid Home Assistant entity IDs
-
-**Examples:**
-- `sensor.homgar_my_home_garden_moisture`
-- `sensor.rainpoint_vacation_house_rain_sensor`
-- `sensor.homgar_greenhouse_temperature_humidity`
-
-This ensures unique, descriptive entity IDs that reflect your app choice and home/device names.
-
----
-
-## Upgrading to 2.1.0
-
-### ⚠️ IMPORTANT: Clean Install Required for Some Upgraders
-
-**If you are upgrading from any version before 2.1.0**, you may see duplicate devices in Home Assistant — particularly if you have a WiFi-only controller like the HIC801W ("8 Zone Wifi Irrigation Controller"). **This is a known issue and is not a bug in 2.1.0 itself** — it results from how older versions stored device identifiers.
-
-#### Why this happens
-
-Version 2.1.0 made two significant structural changes to how devices are tracked internally:
-
-1. **Multi-home support** — Hub device identifiers were changed from `{hid}_{mid}` (home-ID + module-ID) to `rainpoint_hub_{mid}` (module-ID only). This was necessary because using the home ID (`hid`) as part of a device identifier caused collisions when multiple hubs were in the same home, and made migration between homes impossible. Devices that existed under the old identifier format remain in Home Assistant's device registry as orphans alongside the newly registered ones.
-
-2. **WiFi self-contained controllers** — Devices like the HIC801W that act as both hub and sensor were previously registered as two separate HA devices (one hub + one sub-device). In 2.1.0, all entities are consolidated under a single hub device. If the old sub-device entry is still in the registry, HA will display both the old (stale) device and the new consolidated one.
-
-An automatic migration runs on startup that attempts to reconcile these, but if the old device entries are deeply cached in your HA instance's registry they may persist across restarts.
-
-#### Recommended solution: delete and re-add the integration
-
-The cleanest fix is to remove and re-add the integration:
-
-1. Go to **Settings → Devices & Services**
-2. Find **HomGar/RainPoint Cloud** and click the three-dot menu → **Delete**
-3. Confirm deletion (this removes all HomGar entities and devices from HA — **your sensor history is lost**)
-4. Click **+ Add Integration**, search for **HomGar/RainPoint Cloud**, and set it up fresh
-
-After a clean install, all devices and entities will be correctly structured from the start.
-
-#### If you want to preserve sensor history
-
-If losing history is not acceptable:
-- Go to **Settings → Devices & Services → HomGar**
-- Open each duplicate/stale device and use **Delete Device** to manually remove the old one
-- The surviving device (with the correct `rainpoint_hub_{mid}` identifier) will retain its entities and history
-
-#### Verifying your setup is correct
-
-After upgrading or reinstalling, each physical hub should appear as **exactly one device** in Home Assistant. For a setup with:
-- 1× RainPoint hub (HWG023WRF) → 1 HA device
-- 1× HIC801W 8-zone WiFi controller → 1 HA device (hub + zones consolidated)
-
-If you see two devices with the same name, a stale old-format device is still present. Delete it manually.
-
----
-
-## Previous Version Migration
-
-### For users upgrading from v1.x
-
-Unique IDs were migrated automatically from the `homgar_` prefix to the `rainpoint_` prefix. Entity IDs (e.g. `sensor.front_garden_moisture_percent`) and history are preserved as long as you do not delete and re-add the integration.
+**HomGar** is the mobile app and cloud platform. **RainPoint** is the hardware manufacturer. All device models (HCS\*, HTV\*, HWG\*, etc.) are RainPoint hardware accessible via either mobile app.
 
 ---
 
 ## Installation
 
-### Easy Installation via HACS
-
-You can quickly add this repository to HACS by clicking the button below:
+### Via HACS (recommended)
 
 [![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=brettmeyerowitz&repository=homeassistant-homgar&category=integration)
 
-#### Manual Installation
+1. Click the button above, or in HACS search for **HomGar/RainPoint Cloud**
+2. Install the integration
+3. Restart Home Assistant
+4. Go to **Settings → Devices & Services → Add Integration**, search for **HomGar/RainPoint Cloud**
 
-1. Copy the `custom_components/homgar` folder into your Home Assistant `config/custom_components/` directory.
-2. Restart Home Assistant.
+### Manual installation
 
----
-
-## Configuration
-
-### Setup Process
-
-1. Go to **Settings → Devices & Services → Add Integration**
-2. Search for **HomGar/RainPoint Cloud**
-3. **Select your app type**:
-   - **HomGar App**: For HomGar app users
-   - **RainPoint App**: For RainPoint Smart+ app users (recommended)
-4. Enter your account credentials (email and area code)
-5. Select which homes to include
-6. Complete the setup
-
-**⚠️ Important**: API login will log you out of the mobile app. Consider creating a separate API account for continuous mobile app access.
-
-**Important**: The app selection determines which home/hub you get access to. Choose the app you actually use on your phone.
+1. Copy the `custom_components/homgar` folder to your `config/custom_components/` directory
+2. Restart Home Assistant
+3. Go to **Settings → Devices & Services → Add Integration**, search for **HomGar/RainPoint Cloud**
 
 ---
 
-## Performance Optimizations
+## Setup
 
-### Efficient API Calls
-- **Optimized endpoint**: Uses `multipleDeviceStatus` to get all device statuses in a single request
-- **Reduced server load**: Single API call instead of multiple individual calls
-- **Faster updates**: All sensors update simultaneously
-- **Universal compatibility**: Works for both HomGar and RainPoint users
+1. Go to **Settings → Devices & Services → Add Integration → HomGar/RainPoint Cloud**
+2. Select your app type — **HomGar** or **RainPoint Smart+** (choose whichever you use on your phone)
+3. Enter your account credentials (email and country code)
+4. Select which homes to include
 
-### Hybrid Strategy
-The integration automatically tries the optimized `multipleDeviceStatus` API first and falls back to individual calls if needed, ensuring maximum compatibility and efficiency.
-
-**Note**: Both HomGar and RainPoint users benefit from the same efficient API calls. The app selection only determines which account credentials are used.
+> **⚠️ API session conflict:** Logging in via this integration will log you out of the mobile app. The API only supports one active session per account. **Create a dedicated API account** (invite it as a home member) to avoid this — see [Multiple Accounts](#multiple-accounts--sites) below.
 
 ---
 
-## Example manifest.json
+## Upgrading from v2.x
 
-Below is the manifest file for this integration (as of version 2.0.18):
+### ⚠️ Clean install required
 
-```json
-{
-    "domain": "homgar",
-    "name": "HomGar/RainPoint Cloud",
-    "version": "2.1.8",
-    "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
-    "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
-    "requirements": ["paho-mqtt>=1.6.0"],
-    "codeowners": [
-        "@brettmeyerowitz"
-    ],
-    "config_flow": true,
-    "iot_class": "cloud_push",
-    "integration_type": "hub",
-    "loggers": [
-        "custom_components.homgar"
-    ]
-}
+v3.0.0 changes entity unique IDs (now field-name-based: `rainpoint_{mid}_{addr}_temperature`). All existing entities will appear orphaned after upgrading. **A clean remove + re-add is required** — there is no in-place migration path.
+
+**Steps:**
+1. **Settings → Devices & Services → HomGar/RainPoint Cloud → three-dot menu → Delete**
+2. Confirm deletion (sensor history will be lost)
+3. **+ Add Integration → HomGar/RainPoint Cloud** — set up fresh
+
+> If preserving history is critical, do not upgrade — pin your current version in HACS.
+
+---
+
+## Supported Devices
+
+Device support is data-driven via `product_models.json` — **106 models** are currently supported. Any model in the file is automatically decoded with no code changes required.
+
+BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HCS012ARF, HCS014ARF, HCS015ARF, HCS015ARF+, HCS016ARF, HCS021FRF, HCS024FRF, HCS026FRF, HCS027ARF, HCS030FRF, HCS044FRF, HCS048B, HCS0528ARF, HCS0530THO, HCS0565ARF, HCS0600ARF, HCS596WB, HCS596WB-V4, HCS666FRF-X, HCS701B, HCS702B, HCS702B-V1, HCS706ARF, HCS802ARF, HCS888ARF-V1, HIC1200W, HIC1204W, HIC1208W, HIC1604W, HIC1608W, HIC1612W, HIC406B, HIC801W, HIC819W-4, HIC819W-6, HIC819W-8, HIS019WRF-V2, HIS019WRF-V3, HIS019WRF-V4, HPS551WRF, HTP115FRF, HTP137FRF, HTP142FRF, HTP149FRF, HTP149W, HTP159W, HTP160FRF, HTV0535FRF, HTV0537FRF, HTV0540FRF, HTV0542FRF, HTV102B, HTV103FRF, HTV107B, HTV107FRF, HTV113FRF, HTV113FRF-V4, HTV124B, HTV124FRF, HTV143WRFE, HTV145FRF, HTV157B, HTV203FRF, HTV210B, HTV213FRF, HTV214FRF, HTV224B, HTV224FRF, HTV245FRF, HTV311FRF, HTV345FRF, HTV405FRF, HTV445FRF, HWG004WBRF-V2, HWG004WRF, HWG007SRF, HWG007WRF, HWG007WRF-V2, HWG009WB, HWG023WBRF-V2, HWG023WRF, HWG023WRF-V6, HWG023WRF-V8, HWG040WLBRF, HWG043WB, HWG0538WRF, HWS019WRF-V2, HWS388WRF-V13, HWS388WRF-V7, HWS397WRF-V12, HWS397WRF-V8, HWS578WRF, HWS616WRF, WG03, WT-07W, WT-09W, WT-11W, WT-13W, WT-15R
+
+### Entities created (where reported by the device)
+
+| Sensor field | Device class | Unit |
+|---|---|---|
+| temperature | Temperature | °C |
+| humidity | Humidity | % |
+| soil_moisture | Moisture | % |
+| carbon_dioxide | CO₂ | ppm |
+| illuminance | Illuminance | lx |
+| air_pressure | Atmospheric pressure | hPa |
+| wind_speed | Wind speed | m/s |
+| battery_level | Battery | % |
+| signal_strength | Signal strength | dBm |
+| total_water_volume | Water | L |
+| last_water_volume | Water | L |
+| today_water_volume | Water | L |
+| flow_rate | Volume flow rate | L/min |
+| current_session_duration | Duration | s |
+| precipitation_total / _1h / _24h / _7d | Precipitation | mm |
+| event_time / event_time2 | Timestamp | — |
+
+Valve devices additionally get a **valve open/close** entity and a **duration (minutes)** number entity per zone.
+
+---
+
+## MQTT Real-time Updates
+
+Where supported, the integration receives **real-time MQTT pushes** from the cloud rather than waiting for the 2-minute polling cycle. MQTT connects at the hub level — all sub-device updates flow through a single connection per hub.
+
+The MQTT session is renewed automatically before it expires (based on the `expire` timestamp from the cloud).
+
+### Known device MQTT behaviour
+
+| Device type | MQTT updates | Pattern |
+|---|---|---|
+| Valves (HTV\*, HIC\*) | ✅ Yes | Event-driven on open/close |
+| CO₂ sensors (HCS0530THO) | ✅ Yes | ~45 s periodic |
+| Soil moisture (HCS021FRF, HCS026FRF) | ✅ Yes | ~45 s periodic |
+| Flow meters (HCS008FRF) | ✅ Yes | Event-driven when water flows |
+| Rain sensors (HCS012ARF) | ✅ Yes | Periodic |
+| Temp/humidity (HCS014ARF) | ✅ Yes | Periodic |
+| Weather stations (HWS\*) | ✅ Yes | Periodic |
+
+All other models fall back to 2-minute REST polling.
+
+### Troubleshooting MQTT
+
+Check **Settings → System → Logs** and filter for `HomGar MQTT`. Key log lines:
+
+```
+✅ HomGar MQTT [account] connected successfully
+✅ HomGar MQTT: Decoded model=HCS021FRF … fields=[…]
+✅ HomGar MQTT: Updated sensor … with real-time data
+⚠️ HomGar MQTT: Hub mid=XXXXX not found in coordinator data
 ```
 
 ---
 
-## Debugging with Raw Payload Sensor
+## Multiple Accounts & Sites
 
-Each device has a **Raw Payload** sensor (disabled by default) that shows the original hex data from the API. This is useful for debugging and troubleshooting.
+You can add multiple HomGar/RainPoint accounts to a single Home Assistant instance — useful for multiple properties or if you use both apps.
 
-### To enable the raw payload sensor:
+Each instance is independent with its own polling schedule. Go to **Settings → Devices & Services → Add Integration** and add the integration again with a different account.
 
-1. Go to **Settings → Devices & Services → HomGar**
-2. Click on a device
-3. Find the "Raw Payload" sensor (it will be grayed out/disabled)
-4. Click on it and select **Enable**
-5. The sensor will now show the hex payload (e.g., `10#E1C600DC01881AFF...`)
+### Creating a dedicated API account (recommended)
 
-This feature is particularly helpful when:
-- Troubleshooting sensor values
-- Reporting issues with new sensor models
-- Comparing decoded values with the raw API data
+To avoid being logged out of the mobile app:
+
+1. Create a new account with a different email address
+2. In the mobile app: **Me → Home management → your home → Members → Invite**
+3. Accept the invitation on the new account
+4. Use the new account's credentials in Home Assistant
 
 ---
 
-## Reporting Unsupported Sensors
+## Reporting an Unsupported Device
 
-If you have a HomGar/RainPoint sensor that isn't supported yet, the integration will:
+If your device model isn't in the supported list, the integration will log a warning. To request support:
 
-1. **Show a persistent notification** in Home Assistant with the sensor model and raw payload data
-2. **Create a diagnostic entity** named `[Sensor Name] Unsupported ([Model])` with the raw payload in its attributes
-3. **Log a warning** with full details to the Home Assistant logs
-
-To help add support for your sensor:
-
-1. Open the HomGar/RainPoint app on your phone and note the sensor values being displayed (e.g., temperature, humidity, battery level)
-2. In Home Assistant, go to **Settings → Devices & Services → HomGar** and find the unsupported sensor entity
-3. Click on the entity and copy the `raw_payload` attribute value
-4. Open an issue at https://github.com/brettmeyerowitz/homeassistant-homgar/issues with:
-   - Your sensor model (e.g., `HCS015ARF+`)
-   - The raw payload data
-   - **Screenshots or values from the mobile app** showing what the sensor is currently reading
-   - This helps us decode the payload by matching the raw bytes to actual values
+1. Note the sensor values shown in the HomGar/RainPoint mobile app
+2. Open an issue at https://github.com/brettmeyerowitz/homeassistant-homgar/issues with:
+   - Your device model (e.g. `HCS015ARF+`)
+   - A screenshot or list of values from the mobile app
 
 ---
 
 ## Troubleshooting
 
-### App Selection Issues
-- **Wrong app selected**: Reconfigure the integration and choose the correct app (HomGar vs RainPoint)
-- **No devices found**: Ensure you're selecting the app you actually use on your phone
-- **Existing users**: If upgraded from previous version, you're automatically using HomGar app type. Reconfigure if you need RainPoint
-- **Multiple accounts**: Each integration instance is independent. Check the correct integration for your specific site
-- **Devices offline**: This may occur if devices are inactive or not reporting data
-
-### API Login Issues
-- **Logged out of mobile app**: API login conflicts with mobile app session
-- **Solution**: Create separate API account or re-login to mobile app after setup
-- **Multiple devices**: Each API login kicks other sessions off the account
-
-### Performance Issues
-- **Slow updates**: Check if you're using the correct app type for optimal performance
-- **Rate limiting**: The integration automatically handles API rate limiting with appropriate delays
+- **Logged out of mobile app**: Use a dedicated API account (see above)
+- **No devices found**: Ensure you selected the correct app type (HomGar vs RainPoint) — the two apps use separate account systems
+- **Entities unavailable after upgrade**: Follow the clean install steps in [Upgrading from v2.x](#upgrading-from-v2x)
+- **Wrong app type configured**: Go to the integration → three-dot menu → **Reconfigure**
 
 ---
 
 ## Credits
 
-This integration was developed by Brett Meyerowitz. It is not affiliated with HomGar.
+Developed by Brett Meyerowitz. Not affiliated with HomGar or RainPoint.
 
-**Special thanks to [shaundekok/rainpoint](https://github.com/shaundekok/rainpoint) for Node-RED flow inspiration, payload decoding, and entity mapping logic.**
+**Thanks to [shaundekok/rainpoint](https://github.com/shaundekok/rainpoint) for Node-RED flow inspiration and early payload decoding work.**
 
-Feedback and contributions are welcome!
+Feedback and contributions welcome!
