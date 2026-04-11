@@ -3,8 +3,17 @@
 [![Release](https://img.shields.io/github/release/brettmeyerowitz/homeassistant-homgar.svg)](https://github.com/brettmeyerowitz/homeassistant-homgar/releases)
 [![License](https://img.shields.io/github/license/brettmeyerowitz/homeassistant-homgar.svg)](LICENSE)
 [![HACS](https://img.shields.io/badge/HACS-Default-blue.svg)](https://github.com/hacs/integration)
+[![Discord](https://img.shields.io/discord/1492565694250881216?logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/TtTvz9hWu5)
 
 Unofficial Home Assistant integration for RainPoint Smart+ devices via the HomGar/RainPoint cloud API.
+
+## 💬 Community & Support
+
+**[Join the Discord server](https://discord.gg/TtTvz9hWu5)** — the best place to get help, share your setup, discuss new device support, and chat with other HomGar/RainPoint users.
+
+[![Join Discord](https://img.shields.io/badge/Join%20the%20Community-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/TtTvz9hWu5)
+
+Whether you're troubleshooting a device, requesting a new model, or just want to show off your irrigation automation — come say hi!
 
 **HomGar** is the mobile app and cloud platform. **RainPoint** is the hardware manufacturer. All device models (HCS\*, HTV\*, HWG\*, etc.) are RainPoint hardware accessible via either mobile app.
 

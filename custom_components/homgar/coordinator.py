@@ -41,6 +41,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
         self._hids = entry.data.get(CONF_HIDS, [])
         self._notified_unknown_models: set[str] = set()
         self._mqtt_diagnostics: dict[str, dict] = {}
+        self._last_good_data: dict[str, dict] = {}
     
     async def handle_mqtt_update(self, data: dict) -> None:
         """Handle MQTT message for real-time valve updates."""
@@ -149,9 +150,10 @@ class HomGarCoordinator(DataUpdateCoordinator):
 
                     raw_value = s.get("value")
                     if not raw_value:
-                        # No reading / offline
-                        decoded = None
-                        _LOGGER.debug("No raw_value for mid=%s addr=%s (sid=%s)", mid, addr, sid)
+                        # No reading / offline — retain last known good data to avoid spurious unavailable
+                        sensor_key_preview = f"{mid}_{addr}"
+                        decoded = self._last_good_data.get(sensor_key_preview)
+                        _LOGGER.debug("No raw_value for mid=%s addr=%s (sid=%s) — using cached data=%s", mid, addr, sid, decoded is not None)
                     else:
                         model = sub.get("model")
                         try:
@@ -201,6 +203,8 @@ class HomGarCoordinator(DataUpdateCoordinator):
                             decoded = None
 
                     sensor_key = f"{mid}_{addr}"
+                    if decoded and "error" not in decoded:
+                        self._last_good_data[sensor_key] = decoded
                     
                     # Extract device timestamp from API response
                     device_time = s.get("time")

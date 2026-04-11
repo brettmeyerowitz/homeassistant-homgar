@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.8] - 2026-04-11
+
+### 🐛 Bug Fixes
+- **Intermittent "unavailable" entities** — when the HomGar API returns a `null` value for a device during a transient network/server hiccup, the coordinator now retains the last known good decoded data rather than clearing it. Entities stay available with their last value until a fresh reading arrives.
+
+### 🌐 Community
+- Added Discord server for discussion, troubleshooting, and device support requests.
+
+---
+
 ## [3.0.7] - 2026-04-11
 
 ### 🐛 Bug Fixes

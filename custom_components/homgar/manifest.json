@@ -1,7 +1,7 @@
 {
     "domain": "homgar",
     "name": "HomGar/RainPoint Cloud",
-    "version": "3.0.7",
+    "version": "3.0.8",
     "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "requirements": ["paho-mqtt>=1.6.0"],
