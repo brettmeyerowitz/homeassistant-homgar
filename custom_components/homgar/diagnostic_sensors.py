@@ -133,6 +133,60 @@ class HomGarDeviceIDSensor(HomGarDiagnosticSensorBase):
 
 
 
+class HomGarMqttRawPayloadSensor(HomGarDiagnosticSensorBase):
+    """Last raw MQTT payload received for this device (diagnostic)."""
+
+    _attr_icon = "mdi:antenna"
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        sub_name = sensor_info.get("sub_name") or "Sensor"
+        self._attr_unique_id = f"rainpoint_{base_slug}_mqtt_raw"
+        self._attr_name = f"{sub_name} Last MQTT Payload"
+
+    @property
+    def available(self) -> bool:
+        return self._sensor_key in self.coordinator._mqtt_diagnostics
+
+    @property
+    def native_value(self) -> str | None:
+        diag = self.coordinator._mqtt_diagnostics.get(self._sensor_key)
+        return diag.get("raw_payload") if diag else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        diag = self.coordinator._mqtt_diagnostics.get(self._sensor_key) or {}
+        return {"last_received": diag.get("last_received")}
+
+
+class HomGarMqttFriendlySensor(HomGarDiagnosticSensorBase):
+    """Last MQTT message decoded into human-readable summary (diagnostic)."""
+
+    _attr_icon = "mdi:message-text"
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator, sensor_key, sensor_info, base_slug):
+        super().__init__(coordinator, sensor_key, sensor_info, base_slug)
+        sub_name = sensor_info.get("sub_name") or "Sensor"
+        self._attr_unique_id = f"rainpoint_{base_slug}_mqtt_friendly"
+        self._attr_name = f"{sub_name} Last MQTT Summary"
+
+    @property
+    def available(self) -> bool:
+        return self._sensor_key in self.coordinator._mqtt_diagnostics
+
+    @property
+    def native_value(self) -> str | None:
+        diag = self.coordinator._mqtt_diagnostics.get(self._sensor_key)
+        return diag.get("friendly_summary") if diag else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        diag = self.coordinator._mqtt_diagnostics.get(self._sensor_key) or {}
+        return {"last_received": diag.get("last_received")}
+
+
 class HomGarFirmwareVersionSensor(HomGarDiagnosticSensorBase):
     """Firmware version diagnostic sensor."""
 

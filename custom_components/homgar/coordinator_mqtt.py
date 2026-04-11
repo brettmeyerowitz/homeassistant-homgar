@@ -120,6 +120,9 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
             # Update existing sensor data
             decoded_sensors[sensor_key]["data"] = decoded
             decoded_sensors[sensor_key]["raw_status"]["value"] = payload
+
+            # Keep last-good cache in sync so REST null responses don't clobber fresh MQTT data
+            coordinator._last_good_data[sensor_key] = decoded
             
             # Determine status message based on decoded fields (v3 field names)
             port1 = decoded.get("port_1", {})
@@ -142,6 +145,34 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
                 status_msg,
             )
             
+            # Store MQTT diagnostics for diagnostic sensor entities
+            friendly_parts = []
+            if "battery_level" in decoded:
+                friendly_parts.append(f"battery {decoded['battery_level']}%")
+            if "signal_strength" in decoded:
+                friendly_parts.append(f"RSSI {decoded['signal_strength']} dBm")
+            if "temperature" in decoded:
+                friendly_parts.append(f"temp {decoded['temperature']}°C")
+            if "humidity" in decoded:
+                friendly_parts.append(f"humidity {decoded['humidity']}%")
+            if "soil_moisture" in decoded:
+                friendly_parts.append(f"soil {decoded['soil_moisture']}%")
+            if "carbon_dioxide" in decoded:
+                friendly_parts.append(f"CO₂ {decoded['carbon_dioxide']} ppm")
+            if "air_pressure" in decoded:
+                friendly_parts.append(f"pressure {decoded['air_pressure']} hPa")
+            if "total_water_volume" in decoded:
+                friendly_parts.append(f"total flow {decoded['total_water_volume']} L")
+            for p in range(1, decoded.get("port_number", 1) + 1):
+                port = decoded.get(f"port_{p}", {})
+                if port.get("valve_state"):
+                    friendly_parts.append(f"zone {p}: {port['valve_state']}")
+            coordinator._mqtt_diagnostics[sensor_key] = {
+                "raw_payload": payload,
+                "friendly_summary": ", ".join(friendly_parts) if friendly_parts else "data updated",
+                "last_received": now_iso,
+            }
+
             # Trigger coordinator update to notify entities
             coordinator.async_set_updated_data(coordinator.data)
         else:

@@ -94,7 +94,13 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         decoded = info.get("data")
         if not decoded:
             return None
-        return decoded.get(f"port_{self._zone_num}")
+        port = decoded.get(f"port_{self._zone_num}")
+        if port is not None:
+            return port
+        # Single-port devices (HTV113FRF etc.) store valve fields at the top level
+        if self._zone_num == 1 and "is_watering" in decoded:
+            return decoded
+        return None
 
     # ------------------------------------------------------------------
     # Entity properties

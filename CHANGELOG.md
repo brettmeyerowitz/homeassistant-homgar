@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.10] - 2026-04-11
+
+### 🐛 Bug Fixes
+- **Valve "unknown" state on single-port RF valves** — HTV113FRF, HCS021FRF, HCS026FRF and similar `z8=False` single-port valves store `is_watering` at the top level of decoded data, not inside `port_1`. The valve entity was always returning `is_closed=None` → "unknown" on every MQTT update. Fixed by falling back to top-level fields when `port_1` is absent.
+- **MQTT cache sync** — `_last_good_data` is now also updated on every MQTT message, preventing a subsequent REST null response from clobbering fresh real-time data.
+
+### ✨ New Features
+- **MQTT diagnostic sensors** (disabled by default) — two new entities per device available under the diagnostic category:
+  - **Last MQTT Payload** — raw hex string of the most recent MQTT message
+  - **Last MQTT Summary** — human-readable decoded summary (e.g. `battery 75%, RSSI -82 dBm, zone 1: idle`)
+  - Both show a `last_received` timestamp attribute and are only available after the first MQTT message is received
+
+---
+
 ## [3.0.9] - 2026-04-11
 
 ### 🌐 Community & Discoverability

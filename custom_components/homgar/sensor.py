@@ -20,7 +20,11 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .coordinator import HomGarCoordinator
 from .sensor_defs import FIELD_SENSOR_MAP, sensor_fields_for_data
-from .diagnostic_sensors import HomGarFirmwareVersionSensor
+from .diagnostic_sensors import (
+    HomGarFirmwareVersionSensor,
+    HomGarMqttRawPayloadSensor,
+    HomGarMqttFriendlySensor,
+)
 from .hub_entities import (
     HomGarHubDeviceIDSensor,
     HomGarHubFirmwareSensor,
@@ -101,6 +105,10 @@ async def async_setup_entry(
 
         # Raw payload sensor (disabled by default)
         entities.append(HomGarRawPayloadSensor(coordinator, key, info, base_slug))
+
+        # MQTT diagnostic sensors (disabled by default)
+        entities.append(HomGarMqttRawPayloadSensor(coordinator, key, info, base_slug))
+        entities.append(HomGarMqttFriendlySensor(coordinator, key, info, base_slug))
 
     if entities:
         async_add_entities(entities)
