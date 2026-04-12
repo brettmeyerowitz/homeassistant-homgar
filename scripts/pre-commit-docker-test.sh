@@ -119,6 +119,56 @@ else
     exit 1
 fi
 
+# ── Test: config flow account identity logic ──────────────────────────────
+echo "🧪 Testing config flow account identity logic..."
+cat > /tmp/test_config_flow_identity.py << 'PYEOF'
+import sys
+from types import SimpleNamespace
+
+sys.path.insert(0, '/config')
+
+from custom_components.homgar.config_flow import (
+    _build_account_unique_id,
+    _entry_matches_account,
+)
+
+legacy_entry = SimpleNamespace(data={
+    "email": "user@example.com",
+    "area_code": "1",
+})
+homgar_entry = SimpleNamespace(data={
+    "email": "user@example.com",
+    "area_code": "1",
+    "app_type": "homgar",
+})
+rainpoint_entry = SimpleNamespace(data={
+    "email": "user@example.com",
+    "area_code": "1",
+    "app_type": "rainpoint",
+})
+
+if _build_account_unique_id("1", "User@Example.com", "homgar") == _build_account_unique_id("1", "user@example.com", "rainpoint"):
+    print("CONFIG_FLOW_TEST:FAIL:unique_id_collision")
+elif not _entry_matches_account(legacy_entry, "1", "USER@example.com", "homgar"):
+    print("CONFIG_FLOW_TEST:FAIL:legacy_match")
+elif _entry_matches_account(homgar_entry, "1", "user@example.com", "rainpoint"):
+    print("CONFIG_FLOW_TEST:FAIL:app_type_separation")
+elif not _entry_matches_account(rainpoint_entry, "1", "user@example.com", "rainpoint"):
+    print("CONFIG_FLOW_TEST:FAIL:rainpoint_match")
+else:
+    print("CONFIG_FLOW_TEST:PASS")
+PYEOF
+docker cp /tmp/test_config_flow_identity.py ha-test:/tmp/test_config_flow_identity.py > /dev/null
+CONFIG_FLOW_TEST=$(docker exec ha-test python3 /tmp/test_config_flow_identity.py 2>/dev/null)
+
+if [[ $CONFIG_FLOW_TEST == "CONFIG_FLOW_TEST:PASS" ]]; then
+    echo "✅ Config flow account identity logic passed"
+else
+    echo "❌ ERROR: Config flow account identity logic failed"
+    echo "Result: $CONFIG_FLOW_TEST"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null

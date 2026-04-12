@@ -29,6 +29,35 @@ from .api import HomGarClient, HomGarApiError
 _LOGGER = logging.getLogger(__name__)
 
 
+def _normalize_email(email: str) -> str:
+    """Normalize email for config-entry identity comparisons."""
+    return email.strip().casefold()
+
+
+def _normalize_area_code(area_code: str) -> str:
+    """Normalize area code for config-entry identity comparisons."""
+    return str(area_code).strip()
+
+
+def _build_account_unique_id(area_code: str, email: str, app_type: str) -> str:
+    """Build the unique ID for new config entries.
+
+    Include app type and area code so the same email can be used across
+    separate HomGar and RainPoint accounts without colliding.
+    """
+    return f"{DOMAIN}_{app_type}_{_normalize_area_code(area_code)}_{_normalize_email(email)}"
+
+
+def _entry_matches_account(entry, area_code: str, email: str, app_type: str) -> bool:
+    """Return True if a config entry represents the same account."""
+    data = entry.data
+    return (
+        _normalize_email(data.get(CONF_EMAIL, "")) == _normalize_email(email)
+        and _normalize_area_code(data.get(CONF_AREA_CODE, "")) == _normalize_area_code(area_code)
+        and data.get(CONF_APP_TYPE, APP_TYPE_HOMGAR) == app_type
+    )
+
+
 class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for HomGar/RainPoint Smart+ devices."""
 
@@ -47,12 +76,19 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             password = user_input[CONF_PASSWORD]
             app_type = user_input[CONF_APP_TYPE]
 
-            # Single account per HA instance
-            await self.async_set_unique_id(f"{DOMAIN}_{email}")
-            if self._reconfigure:
-                self._abort_if_unique_id_mismatch()
-            else:
-                self._abort_if_unique_id_configured()
+            # Backward-compatible duplicate detection:
+            # match existing entries by account fields so legacy entries that
+            # used email-only unique IDs still block true duplicates.
+            for existing_entry in self.hass.config_entries.async_entries(DOMAIN):
+                if _entry_matches_account(existing_entry, area_code, email, app_type):
+                    return self.async_abort(reason="already_configured")
+
+            # New entries use a stronger unique ID that includes app type and
+            # area code, allowing the same email across separate ecosystems.
+            await self.async_set_unique_id(
+                _build_account_unique_id(area_code, email, app_type)
+            )
+            self._abort_if_unique_id_configured()
 
             session = async_get_clientsession(self.hass)
             _LOGGER.debug("Creating client with app_type: %s", app_type)
@@ -182,6 +218,12 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             email = user_input[CONF_EMAIL]
             password = user_input[CONF_PASSWORD]
             app_type = user_input[CONF_APP_TYPE]
+
+            for existing_entry in self.hass.config_entries.async_entries(DOMAIN):
+                if existing_entry.entry_id == entry.entry_id:
+                    continue
+                if _entry_matches_account(existing_entry, area_code, email, app_type):
+                    return self.async_abort(reason="already_configured")
 
             # Test new credentials
             session = async_get_clientsession(self.hass)
