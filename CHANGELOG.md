@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.13] - 2026-04-12
+
+### 🐛 Bug Fixes
+- **Config entry account identity** — new config entries now use `app_type + area_code + email` for account identity instead of email alone. This allows separate HomGar and RainPoint accounts that share the same email address to be added without colliding, while preserving backward compatibility for existing entries.
+
+### 🔧 Internal
+- **Release validation coverage** — added a config-flow identity smoke test to `scripts/pre-commit-docker-test.sh` to guard against duplicate-account regressions and legacy-entry matching regressions.
+
+---
+
 ## [3.0.12] - 2026-04-12
 
 ### 🐛 Bug Fixes
