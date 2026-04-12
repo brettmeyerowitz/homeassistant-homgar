@@ -1,11 +1,113 @@
-# HomGar/RainPoint Cloud integration for Home Assistant
+# HomGar / RainPoint Cloud Integration for Home Assistant
 
 [![Release](https://img.shields.io/github/release/brettmeyerowitz/homeassistant-homgar.svg)](https://github.com/brettmeyerowitz/homeassistant-homgar/releases)
 [![License](https://img.shields.io/github/license/brettmeyerowitz/homeassistant-homgar.svg)](LICENSE)
 [![HACS](https://img.shields.io/badge/HACS-Default-blue.svg)](https://github.com/hacs/integration)
-[![Discord](https://img.shields.io/discord/1492565694250881216?logo=discord&logoColor=white&label=Discord&color=5865F2)](https://discord.gg/TtTvz9hWu5)
 
 Unofficial Home Assistant integration for RainPoint Smart+ devices via the HomGar/RainPoint cloud API.
+
+---
+
+## What you get
+
+Control and monitor your RainPoint / HomGar irrigation devices directly from Home Assistant.
+
+### Example entities
+
+![Entities](images/entities.png)
+
+### Valve control
+
+![Valve](images/valve.png)
+
+### Sensor examples
+
+![Soil Moisture](images/moisture.png)
+![Flow Meter](images/flowmeter.png)
+![CO2](images/co2.png)
+
+---
+
+## Why use this?
+
+This integration turns RainPoint hardware into a flexible, programmable irrigation system using Home Assistant.
+
+- Build automations based on real sensor data
+- Combine RainPoint devices with other brands (Sonoff, Shelly, etc.)
+- Create smarter irrigation using weather, temperature, and moisture
+- Monitor water usage and detect leaks
+
+Unlike the mobile app, you are not limited to predefined schedules — you can automate anything.
+
+---
+
+## Example use cases & automations
+
+### Cross‑vendor control (powerful)
+Use RainPoint sensors to control *any* device in Home Assistant.
+
+**Example:**
+- If soil moisture < 25%
+- And no rain in the last 24h
+→ Turn on a Sonoff relay controlling a dumb solenoid for 10 minutes
+
+This lets you mix RainPoint sensors with other brands (e.g. Sonoff, Shelly) to build a fully custom irrigation system.
+
+### Smart irrigation (context‑aware)
+Adjust watering based on conditions:
+
+- Moisture < 30%
+→ Water for:
+  - 5 minutes on cool days
+  - 15 minutes on hot days
+
+Combine with weather integrations to skip watering when rain is forecast.
+
+### Example: moisture-based irrigation (copy/paste)
+
+```yaml
+alias: Smart Irrigation
+trigger:
+  - platform: numeric_state
+    entity_id: sensor.your_device_soil_moisture
+    below: 25
+condition: []
+action:
+  - service: switch.turn_on
+    target:
+      entity_id: switch.your_irrigation_valve
+  - delay: "00:10:00"
+  - service: switch.turn_off
+    target:
+      entity_id: switch.your_irrigation_valve
+```
+
+Adjust entity IDs (e.g. `sensor.your_device_soil_moisture`, `switch.your_irrigation_valve`) and thresholds to match your setup.
+
+### Leak detection (flow meter)
+
+- If flow_rate > 0 AND valve is OFF
+→ Send an alert
+
+### Water usage tracking
+Track daily/weekly water usage and optimise irrigation over time.
+
+## Example dashboard
+
+A simple control panel combining valve control and live sensor data:
+
+![Valve](images/valve.png)
+![Soil Moisture](images/moisture.png)
+![Flow Meter](images/flowmeter.png)
+
+Tip: Combine these into a Lovelace dashboard with:
+- A valve toggle (button or switch card)
+- Soil moisture sensor (gauge or sensor card)
+- Flow rate sensor (for live feedback while watering)
+
+This gives you a simple "smart irrigation" control panel directly in Home Assistant.
+
+---
 
 ## 💬 Community & Support
 
@@ -16,6 +118,18 @@ Unofficial Home Assistant integration for RainPoint Smart+ devices via the HomGa
 Whether you're troubleshooting a device, requesting a new model, or just want to show off your irrigation automation — come say hi!
 
 **HomGar** is the mobile app and cloud platform. **RainPoint** is the hardware manufacturer. All device models (HCS\*, HTV\*, HWG\*, etc.) are RainPoint hardware accessible via either mobile app.
+
+---
+
+## Quick sanity check
+
+After setup you should see:
+- A device for each hub
+- Switch entities for each valve
+- Sensor entities (moisture, temperature, battery, etc.) depending on your device
+
+If nothing appears, check logs under:
+**Settings → System → Logs**
 
 ---
 
@@ -39,6 +153,8 @@ Whether you're troubleshooting a device, requesting a new model, or just want to
 ---
 
 ## Setup
+
+![Setup](images/setup.png)
 
 1. Go to **Settings → Devices & Services → Add Integration → HomGar/RainPoint Cloud**
 2. Select your app type — **HomGar** or **RainPoint Smart+** (choose whichever you use on your phone)

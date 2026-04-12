@@ -66,6 +66,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .migrate import async_migrate_unique_ids, async_merge_wifi_devices
     await async_migrate_unique_ids(hass, entry, coordinator)
 
+    # Prepare entry data storage early so we can track state during setup
+    hass.data.setdefault(DOMAIN, {})
+    entry_data = hass.data[DOMAIN].get(entry.entry_id, {})
+    # Check if renewal was already scheduled by a previous setup (shouldn't happen, but safety check)
+    already_scheduled = entry_data.get("_mqtt_renewal_scheduled", False)
+    entry_data = {"_mqtt_renewal_scheduled": already_scheduled}  # Fresh dict, preserve flag
+
     # Initialize MQTT client object (connect happens below after hass.data is set)
     mqtt_client = None
     try:
@@ -97,17 +104,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 if expire_ms:
                     try:
                         expire_ts = int(expire_ms) / 1000.0
-                        renew_in = max(60, expire_ts - time.time() - 60)
+                        now = time.time()
+                        renew_in = max(60, expire_ts - now - 60)
+                        # Enforce minimum 30 min renewal interval to prevent excessive reloads
+                        MIN_RENEWAL_INTERVAL = 1800  # 30 minutes
+                        if renew_in < MIN_RENEWAL_INTERVAL:
+                            _LOGGER.info(
+                                "HomGar [%s]: MQTT renewal would be in %.0fs (too frequent), extending to %.0fs",
+                                entry.title, renew_in, MIN_RENEWAL_INTERVAL
+                            )
+                            renew_in = MIN_RENEWAL_INTERVAL
+                        actual_expire = datetime.fromtimestamp(expire_ts).isoformat()
                         _LOGGER.info(
-                            "HomGar [%s]: MQTT subscription expires in %.0fs, scheduling renewal in %.0fs",
+                            "HomGar [%s]: MQTT subscription expires at %s (in %.0fs), scheduling renewal in %.0fs",
                             entry.title,
-                            expire_ts - time.time(),
+                            actual_expire,
+                            expire_ts - now,
                             renew_in,
                         )
-                        async def _renew_subscription(hass=hass, entry=entry):
-                            _LOGGER.info("HomGar [%s]: Renewing MQTT subscription (pre-expire renewal)", entry.title)
-                            await async_reload_entry(hass, entry)
-                        hass.loop.call_later(renew_in, lambda: hass.async_create_task(_renew_subscription()))
+                        # Prevent duplicate renewal schedules on reload
+                        if entry_data.get("_mqtt_renewal_scheduled"):
+                            _LOGGER.info("HomGar [%s]: MQTT renewal already scheduled, skipping duplicate", entry.title)
+                        else:
+                            entry_data["_mqtt_renewal_scheduled"] = True
+                            async def _renew_subscription(hass=hass, entry=entry):
+                                _LOGGER.info("HomGar [%s]: Renewing MQTT subscription (pre-expire renewal)", entry.title)
+                                await async_reload_entry(hass, entry)
+                            hass.loop.call_later(renew_in, lambda: hass.async_create_task(_renew_subscription()))
                     except Exception as renew_e:
                         _LOGGER.warning("HomGar [%s]: Failed to schedule MQTT renewal: %s", entry.title, renew_e)
 
@@ -153,12 +176,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         mqtt_client = None
 
     # Store data before platform setup so sensor.py can access mqtt_client
+    # entry_data was created earlier to track renewal schedule; add the main objects now
+    entry_data["client"] = client
+    entry_data["coordinator"] = coordinator
+    entry_data["mqtt_client"] = mqtt_client
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {
-        "client": client,
-        "coordinator": coordinator,
-        "mqtt_client": mqtt_client,
-    }
+    hass.data[DOMAIN][entry.entry_id] = entry_data
 
     # Connect MQTT after hass.data is set
     if mqtt_client is not None:
