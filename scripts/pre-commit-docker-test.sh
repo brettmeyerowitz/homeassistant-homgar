@@ -39,7 +39,9 @@ docker restart ha-test > /dev/null 2>&1
 echo "⏳ Waiting for HA to start..."
 sleep 25
 
-RECENT_LOGS=$(docker logs ha-test --since="30s" 2>&1)
+# Check HA log file (HA logs to file, not stdout)
+# Use more lines since log accumulates across restarts
+RECENT_LOGS=$(docker exec ha-test tail -1000 /config/home-assistant.log 2>&1)
 
 # ── HA startup checks ──────────────────────────────────────────────────────
 if echo "$RECENT_LOGS" | grep -q "Setup failed for custom integration 'homgar'"; then
