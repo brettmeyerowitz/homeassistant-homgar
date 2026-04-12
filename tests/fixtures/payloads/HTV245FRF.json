@@ -1,0 +1,27 @@
+{
+  "model": "HTV245FRF",
+  "samples": [
+    {
+      "id": "issue-17-tlv-idle",
+      "source_issue": 17,
+      "source_type": "github_issue",
+      "format": "tlv",
+      "payload": "11#17E1AE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0FF5151519",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true}
+      }
+    },
+    {
+      "id": "issue-10-ascii",
+      "source_issue": 10,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,-65,1;0,0,0,0,0,0|0,539,0,0,0,0",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true}
+      }
+    }
+  ]
+}

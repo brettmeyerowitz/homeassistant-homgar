@@ -1,0 +1,19 @@
+{
+  "model": "HCS008FRF",
+  "samples": [
+    {
+      "id": "live-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#E1AF00FF0B1A810100DC01990000B7EB4C1719FF0700000000AF000000009F05000000FF0A06000000CB371A0000B3519B0100FF0FEB4C1719",
+      "expected": {
+        "battery_level": 75,
+        "signal_strength": -81,
+        "total_water_volume": {"min": 0, "present": true},
+        "today_water_volume": {"present": true},
+        "flow_rate": {"min": 0}
+      }
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "model": "HCS014ARF",
+  "samples": [
+    {
+      "id": "issue-21-sample-1",
+      "source_issue": 21,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,0,1;798(798/798/1),30(30/30/1),",
+      "expected": {
+        "temperature": {"approx": 26.6, "tolerance": 0.6},
+        "humidity": 30
+      }
+    },
+    {
+      "id": "issue-21-sample-2",
+      "source_issue": 21,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,0,1;363(363/356/1),86(86/80/1),",
+      "expected": {
+        "temperature": {"approx": 2.4, "tolerance": 0.6},
+        "humidity": 86
+      }
+    },
+    {
+      "id": "issue-21-sample-3",
+      "source_issue": 21,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,0,1;802(804/802/1),30(30/30/1),",
+      "expected": {
+        "temperature": {"approx": 26.8, "tolerance": 0.6},
+        "humidity": 30
+      }
+    },
+    {
+      "id": "issue-21-tlv-1",
+      "source_issue": 21,
+      "source_type": "github_issue",
+      "format": "tlv",
+      "payload": "10#E74A022603DC01B8058551028843E92561FF0F4A700B19",
+      "expected": {
+        "temperature": {"min": -40, "max": 80},
+        "humidity": {"min": 0, "max": 100}
+      }
+    },
+    {
+      "id": "issue-21-tlv-2",
+      "source_issue": 21,
+      "source_type": "github_issue",
+      "format": "tlv",
+      "payload": "10#E74A022603DC01B805854E028844E92561FF0F98710B19",
+      "expected": {
+        "temperature": {"min": -40, "max": 80},
+        "humidity": {"min": 0, "max": 100}
+      }
+    },
+    {
+      "id": "issue-21-tlv-3",
+      "source_issue": 21,
+      "source_type": "github_issue",
+      "format": "tlv",
+      "payload": "10#E74A022603DC01B8058558028845E92561FF0FD4760B19",
+      "expected": {
+        "temperature": {"min": -40, "max": 80},
+        "humidity": {"min": 0, "max": 100}
+      }
+    },
+    {
+      "id": "issue-21-tlv-4",
+      "source_issue": 21,
+      "source_type": "github_issue",
+      "format": "tlv",
+      "payload": "10#E74A022603DC01B805855E028843E92561FF0F197A0B19",
+      "expected": {
+        "temperature": {"min": -40, "max": 80},
+        "humidity": {"min": 0, "max": 100}
+      }
+    },
+    {
+      "id": "issue-21-tlv-5",
+      "source_issue": 21,
+      "source_type": "github_issue",
+      "format": "tlv",
+      "payload": "10#E74A022603DC01B8058560028843E92561FF0F0F7C0B19",
+      "expected": {
+        "temperature": {"min": -40, "max": 80},
+        "humidity": {"min": 0, "max": 100}
+      }
+    }
+  ]
+}

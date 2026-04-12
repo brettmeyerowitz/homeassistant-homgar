@@ -9,7 +9,7 @@ __pycache__/
 PUBLISHING_GUIDE.md
 backup_guide.sh
 
-# Documentation moved to external repo
-docs/
+# Internal maintainer docs stay local
+internal_docs/
 post_with_curl.py
 POST_RESPONSES_README.md

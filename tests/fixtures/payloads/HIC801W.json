@@ -1,0 +1,15 @@
+{
+  "model": "HIC801W",
+  "samples": [
+    {
+      "id": "issue-20-bitmask",
+      "source_issue": 20,
+      "source_type": "github_issue",
+      "format": "tlv",
+      "payload": "10#108800AF00000000B700204200D800F700000000F9FF00",
+      "expected": {
+        "port_number": 8
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "model": "HWS019WRF-V2",
+  "samples": [
+    {
+      "id": "issue-29-eu-sample",
+      "source_issue": 29,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,0,1;816(816/816/1),31(31/31/1),P=10294(10294/10294/1),",
+      "expected": {
+        "temperature": {"min": -40, "max": 80},
+        "humidity": {"min": 0, "max": 100},
+        "air_pressure": {"min": 800, "max": 1200}
+      }
+    }
+  ]
+}

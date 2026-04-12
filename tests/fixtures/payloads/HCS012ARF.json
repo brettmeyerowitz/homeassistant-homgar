@@ -1,0 +1,27 @@
+{
+  "model": "HCS012ARF",
+  "samples": [
+    {
+      "id": "issue-30-rain",
+      "source_issue": 30,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,84,0,0;R=4870(10/20/430/2340)",
+      "expected": {
+        "battery_level": {"present": true},
+        "signal_strength": {"present": true},
+        "precipitation_total": {"present": true}
+      }
+    },
+    {
+      "id": "issue-30-body-sample",
+      "source_issue": 30,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,0,1;R=4870(10/20/430)",
+      "expected": {
+        "precipitation_total": {"present": true}
+      }
+    }
+  ]
+}

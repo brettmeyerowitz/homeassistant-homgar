@@ -5,8 +5,8 @@ trigger: always_on
 # HomGar Integration — Project Rules
 
 ## Testing
-- **Always test inside the `ha-test` Docker container — never locally**
-- Never run Python test scripts directly on the host machine
+- **Use the `ha-test` Docker container for Home Assistant integration validation**
+- Pure offline/unit-style tests may run on the host machine when they do not depend on Home Assistant runtime, Docker state, or container-only paths
 - After copying files to Docker, always restart the container to clear `.pyc` cache
 - Run `bash scripts/pre-commit-docker-test.sh` before every commit
 - **NEVER use `docker exec ha-test python3 -c "..."` inline text blocks — ALWAYS write the script to `/tmp/script.py` first, then `docker cp /tmp/script.py ha-test:/tmp/script.py && docker exec ha-test python3 /tmp/script.py`. No exceptions.**
@@ -38,4 +38,3 @@ trigger: always_on
 - Decoding is data-driven via `product_models.json` — `decode_payload(model, payload)` in `decoder.py` is used by both REST poll (`coordinator.py`) and MQTT (`coordinator_mqtt.py`)
 - New device support typically only requires an entry in `product_models.json` — no separate decoder file needed unless the device has a completely custom format (e.g. HIC801W)
 - Valve sub-device models are looked up by `addr` from `hub["subDevices"]` at MQTT decode time
-

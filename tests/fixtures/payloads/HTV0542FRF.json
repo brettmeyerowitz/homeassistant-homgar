@@ -1,0 +1,31 @@
+{
+  "model": "HTV0542FRF",
+  "samples": [
+    {
+      "id": "issue-22-body-sample",
+      "source_issue": 22,
+      "source_type": "github_issue",
+      "format": "tlv",
+      "payload": "01#17E1CA0019D8111AD8001BD8001CD8001D201E201F20202018DC0121B75BBADC1622B70000000023B70000000024B70000000025AD840326AD000027AD000028AD0000FEFF0FD4B6DC16",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true},
+        "port_3": {"present": true},
+        "port_4": {"present": true}
+      }
+    },
+    {
+      "id": "issue-22-comment-sample",
+      "source_issue": 22,
+      "source_type": "github_issue_comment",
+      "format": "tlv",
+      "payload": "11#17E1AE0019D8001AD8211BD8001CD8001D201E201F20202018DC0121B70000000022B752DA0C1923B70000000024B70000000025AD000026ADDC0527AD000028AD0000FEFF0F11D40C19",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true},
+        "port_3": {"present": true},
+        "port_4": {"present": true}
+      }
+    }
+  ]
+}

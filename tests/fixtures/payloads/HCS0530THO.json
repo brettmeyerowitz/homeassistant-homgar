@@ -1,0 +1,30 @@
+{
+  "model": "HCS0530THO",
+  "samples": [
+    {
+      "id": "live-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#CFCB01DC05DC01E789028103B80585D802883FE92744FF08A7013C02FF0F944B1719",
+      "expected": {
+        "carbon_dioxide": {"min": 300, "max": 5000},
+        "temperature": {"min": -10, "max": 50},
+        "battery_level": {"one_of": [10, 25, 50, 75, 100]},
+        "carbon_dioxide_warning_threshold": {"present": true}
+      }
+    },
+    {
+      "id": "live-2",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#CFCE01DC05DC01E78902AD02B80585A8028844E93F45FF0",
+      "expected": {
+        "carbon_dioxide": {"min": 300, "max": 5000},
+        "temperature": {"min": -10, "max": 50},
+        "battery_level": {"one_of": [10, 25, 50, 75, 100]}
+      }
+    }
+  ]
+}

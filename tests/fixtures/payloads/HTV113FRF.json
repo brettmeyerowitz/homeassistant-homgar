@@ -1,0 +1,26 @@
+{
+  "model": "HTV113FRF",
+  "samples": [
+    {
+      "id": "idle-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#E1AD00DC01D80020B700000000AD00009F00000000FF0F4D371719",
+      "expected": {
+        "is_watering": false,
+        "valve_state": "idle"
+      }
+    },
+    {
+      "id": "watering-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#E1AE00DC01D82020B700000000AD58029F00000000FF0F47371719",
+      "expected": {
+        "current_session_duration": {"min": 1}
+      }
+    }
+  ]
+}

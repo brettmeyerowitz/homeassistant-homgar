@@ -1,0 +1,97 @@
+{
+  "model": "HTV213FRF",
+  "samples": [
+    {
+      "id": "issue-17-tlv-idle",
+      "source_issue": 17,
+      "source_type": "github_issue",
+      "format": "tlv",
+      "payload": "11#17E1AE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0FF5151519",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true}
+      }
+    },
+    {
+      "id": "issue-17-ascii-zone2-open",
+      "source_issue": 17,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,-75,1;0,3,0,0,0,0|33,15,0,1775856207,600,0",
+      "expected": {
+        "port_1.is_watering": false,
+        "port_2.is_watering": true
+      }
+    },
+    {
+      "id": "issue-17-ascii-zone2-closed",
+      "source_issue": 17,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,-74,1;0,3,0,0,0,0|0,14,0,0,0,0",
+      "expected": {
+        "port_2.is_watering": false
+      }
+    },
+    {
+      "id": "issue-11-comment-1",
+      "source_issue": 11,
+      "source_type": "github_issue_comment",
+      "format": "tlv",
+      "payload": "11#17E1CD0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299FC80000002A9F5D000000FEFF0F7A8AF818",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true},
+        "battery_level": {"present": true}
+      }
+    },
+    {
+      "id": "issue-11-comment-2",
+      "source_issue": 11,
+      "source_type": "github_issue_comment",
+      "format": "tlv",
+      "payload": "11#17E1CE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F5D000000FEFF0F6269F918",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true},
+        "battery_level": {"present": true}
+      }
+    },
+    {
+      "id": "issue-11-comment-3",
+      "source_issue": 11,
+      "source_type": "github_issue_comment",
+      "format": "tlv",
+      "payload": "11#17E1C60019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0F52540319",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true},
+        "battery_level": {"present": true}
+      }
+    },
+    {
+      "id": "issue-11-comment-4",
+      "source_issue": 11,
+      "source_type": "github_issue_comment",
+      "format": "tlv",
+      "payload": "11#17E1CF0019D8001AD8001D201E2021B70000000022B70000000018DC0225AD000026AD0000299F000000002A9F00000000FEFF0FA69C0819",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true},
+        "battery_level": {"present": true}
+      }
+    },
+    {
+      "id": "issue-11-comment-5",
+      "source_issue": 11,
+      "source_type": "github_issue_comment",
+      "format": "tlv",
+      "payload": "01#17E1D30019D8001AD8001D201E2021B70000000022B70000000018DC0325AD000026AD0000299F000000002A9F00000000FEFF0FE86E0C19",
+      "expected": {
+        "port_1": {"present": true},
+        "port_2": {"present": true},
+        "battery_level": {"present": true}
+      }
+    }
+  ]
+}

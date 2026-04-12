@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "models": [
+    {"model": "HCS0530THO", "file": "payloads/HCS0530THO.json", "sample_count": 2},
+    {"model": "HCS014ARF", "file": "payloads/HCS014ARF.json", "sample_count": 8},
+    {"model": "HCS021FRF", "file": "payloads/HCS021FRF.json", "sample_count": 1},
+    {"model": "HCS008FRF", "file": "payloads/HCS008FRF.json", "sample_count": 1},
+    {"model": "HCS030FRF", "file": "payloads/HCS030FRF.json", "sample_count": 1},
+    {"model": "HCS0528ARF", "file": "payloads/HCS0528ARF.json", "sample_count": 2},
+    {"model": "HCS0565ARF", "file": "payloads/HCS0565ARF.json", "sample_count": 2},
+    {"model": "HTV113FRF", "file": "payloads/HTV113FRF.json", "sample_count": 2},
+    {"model": "HTV213FRF", "file": "payloads/HTV213FRF.json", "sample_count": 8},
+    {"model": "HTV245FRF", "file": "payloads/HTV245FRF.json", "sample_count": 2},
+    {"model": "HTV0537FRF", "file": "payloads/HTV0537FRF.json", "sample_count": 2},
+    {"model": "HTV0542FRF", "file": "payloads/HTV0542FRF.json", "sample_count": 2},
+    {"model": "HIC801W", "file": "payloads/HIC801W.json", "sample_count": 1},
+    {"model": "HTP115FRF", "file": "payloads/HTP115FRF.json", "sample_count": 1},
+    {"model": "HCS012ARF", "file": "payloads/HCS012ARF.json", "sample_count": 2},
+    {"model": "HWS019WRF-V2", "file": "payloads/HWS019WRF-V2.json", "sample_count": 1}
+  ]
+}

@@ -169,6 +169,27 @@ else
     exit 1
 fi
 
+# ── Test: fixture-driven payload corpus ───────────────────────────────────
+echo "🧪 Running fixture-driven payload corpus..."
+docker cp tests/fixtures ha-test:/tmp/tests/ > /dev/null
+docker cp tests/run_payload_fixture_tests.py ha-test:/tmp/tests/run_payload_fixture_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_payload_fixture_tests.py; then
+    echo "✅ Fixture-driven payload corpus passed"
+else
+    echo "❌ ERROR: Fixture-driven payload corpus failed"
+    exit 1
+fi
+
+# ── Test: MQTT parser regressions ─────────────────────────────────────────
+echo "🧪 Running MQTT parser regression tests..."
+docker cp tests/run_mqtt_parser_tests.py ha-test:/tmp/tests/run_mqtt_parser_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_mqtt_parser_tests.py; then
+    echo "✅ MQTT parser regression tests passed"
+else
+    echo "❌ ERROR: MQTT parser regression tests failed"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null

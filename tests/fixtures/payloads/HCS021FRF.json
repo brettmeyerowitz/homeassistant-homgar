@@ -1,0 +1,17 @@
+{
+  "model": "HCS021FRF",
+  "samples": [
+    {
+      "id": "live-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#E1B300DC01859602881CC6C91800FF0F628B1619",
+      "expected": {
+        "soil_moisture": {"min": 0, "max": 100},
+        "battery_level": {"one_of": [10, 25, 50, 75, 100]},
+        "signal_strength": {"max": -1}
+      }
+    }
+  ]
+}

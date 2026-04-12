@@ -28,6 +28,26 @@ TOPICS_TEMPLATE = [
 ]
 
 
+def _extract_device_updates(rest: str) -> dict | None:
+    """Extract the JSON device-update object from an MQTT param tail.
+
+    Some observed messages include scalar segments such as hub IDs or counters
+    between pipe delimiters before the actual JSON object. We only want the
+    object containing Dxx updates.
+    """
+    start = rest.find("{")
+    end = rest.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return None
+
+    try:
+        parsed = json.loads(rest[start:end + 1])
+    except json.JSONDecodeError:
+        return None
+
+    return parsed if isinstance(parsed, dict) else None
+
+
 def _build_aliyun_auth(product_key: str, device_name: str, device_secret: str) -> tuple[str, str, str]:
     """Build Alibaba Cloud IoT MQTT authentication credentials (securemode=2, Observer mode).
     
@@ -283,19 +303,16 @@ class HomGarMQTTClient:
             )
             rest = parts[1]
             
-            # Extract device updates (before final | separators)
-            d_updates_raw = rest.rsplit("|", 2)[0] if rest.count("|") >= 2 else rest
-            
-            try:
-                d_updates = json.loads(d_updates_raw)
-            except json.JSONDecodeError:
-                _LOGGER.warning("HomGar MQTT failed to parse device updates: %s", d_updates_raw[:100])
+            d_updates = _extract_device_updates(rest)
+            if d_updates is None:
+                _LOGGER.warning("HomGar MQTT failed to parse device updates: %s", rest[:100])
                 return
             
+            device_count = sum(1 for key in d_updates if isinstance(key, str) and key.startswith("D"))
             _LOGGER.debug(
                 "HomGar MQTT update for hub_mid=%s: %d device(s)",
                 hub_mid,
-                len(d_updates),
+                device_count,
             )
             
             # Process each device update (D01, D02, D03, D04, etc.)

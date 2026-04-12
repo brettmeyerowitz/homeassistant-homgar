@@ -12,6 +12,16 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [3.0.14] - 2026-04-12
+
+### 🐛 Bug Fixes
+- **MQTT parser hardening** — fixed MQTT message parsing for pipe-delimited payload variants that include scalar fragments before the device-update JSON object. This stops log spam such as `failed to parse device updates` and avoids `object of type 'int' has no len()` tracebacks when non-dict segments are received.
+
+### 🔧 Internal
+- **Public collaboration docs and fixture corpus** — added a public `docs/` set, issue-derived payload fixtures under `tests/fixtures/`, a fixture-driven decoder regression runner, and focused MQTT parser regression tests in the Docker gate.
+
+---
+
 ## [3.0.12] - 2026-04-12
 
 ### 🐛 Bug Fixes
