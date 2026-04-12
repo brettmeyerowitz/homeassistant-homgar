@@ -321,6 +321,13 @@ def _parse_legacy(status_param: str) -> dict:
         except (ValueError, TypeError):
             pass
 
+    g_base, _g_inner = parse_named_value("G")
+    if g_base is not None:
+        try:
+            out["_leg_illuminance_raw10"] = int(g_base)
+        except (ValueError, TypeError):
+            pass
+
     # Positional temp/humidity fallback (HCS014ARF, HWS019WRF-V2 etc.)
     # These use p2[0]=temp_raw, p2[1]=rh when no named T=/H= keys are present.
     if "_leg_temp_raw" not in out and p2i(0) is not None:
@@ -455,6 +462,9 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
     if "_leg_wind_raw" in leg and leg["_leg_wind_raw"] is not None:
         result["wind_speed"] = round(leg["_leg_wind_raw"] / 10.0, 1)
 
+    if "_leg_illuminance_raw10" in leg and leg["_leg_illuminance_raw10"] is not None:
+        result["illuminance"] = round(leg["_leg_illuminance_raw10"] / 10.0, 1)
+
     if leg.get("_leg_cur_water_raw") is not None:
         result["current_water_volume"] = _vol(leg["_leg_cur_water_raw"], unit)
     if leg.get("_leg_last_usage_raw") is not None:
@@ -473,7 +483,7 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
             result["signal_strength"] = bat_or_rssi
         else:
             result["battery_level"] = bat_or_rssi
-    if rssi is not None:
+    if rssi is not None and "signal_strength" not in result:
         result["signal_strength"] = rssi
 
     port_sections = leg.get("_leg_port_sections", [])

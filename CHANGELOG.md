@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.16] - 2026-04-12
+
+### 🐛 Bug Fixes
+- **HCS021FRF legacy illuminance restore** — restored illuminance decoding for legacy ASCII `HCS021FRF` soil sensor payloads using the `G=...` field, matching the behavior previously seen in `v2.1.8`.
+- **HCS021FRF legacy RSSI fix** — corrected legacy ASCII signal-strength handling so negative RSSI values like `-79 dBm` are preserved instead of being overwritten by the third header field.
+
+### 🔧 Internal
+- **Legacy HCS021FRF regression coverage** — added Dean-derived fixture samples to validate restored illuminance and RSSI decoding for legacy `HCS021FRF` payloads.
+
+---
+
 ## [3.0.15] - 2026-04-12
 
 ### 🐛 Bug Fixes

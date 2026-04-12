@@ -12,6 +12,32 @@
         "battery_level": {"one_of": [10, 25, 50, 75, 100]},
         "signal_strength": {"max": -1}
       }
+    },
+    {
+      "id": "dean-legacy-illuminance",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "legacy",
+      "payload": "1,-79,1;782,86,G=60370",
+      "expected": {
+        "temperature": {"approx": 25.7, "tolerance": 0.2},
+        "soil_moisture": 86,
+        "illuminance": {"approx": 6037.0, "tolerance": 0.1},
+        "signal_strength": -79
+      }
+    },
+    {
+      "id": "dean-legacy-illuminance-2",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "legacy",
+      "payload": "1,-78,1;789,86,G=56565",
+      "expected": {
+        "temperature": {"approx": 26.1, "tolerance": 0.2},
+        "soil_moisture": 86,
+        "illuminance": {"approx": 5656.5, "tolerance": 0.1},
+        "signal_strength": -78
+      }
     }
   ]
 }
