@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.15] - 2026-04-12
+
+### 🐛 Bug Fixes
+- **HIC801W zone decoding** — corrected `HIC801W` valve-state decoding so the WiFi 8-zone controller reports the active zone correctly across all 8 zones instead of interpreting the zone byte as a bitmask.
+- **HIC801W MQTT visibility** — improved MQTT routing/debug output for matched hub updates and fixed MQTT status summaries so multi-zone devices report the active zone instead of incorrectly defaulting to `port_1`.
+- **MQTT scalar fragment handling** — scalar-only MQTT fragments such as `1|1776014190215|103441486619` are now ignored at debug level instead of generating misleading warnings.
+
+### 🔧 Internal
+- **HIC801W regression coverage** — added confirmed live-capture fixtures for zones 1-8 and focused MQTT routing regressions covering real `HIC801W` `D01` updates.
+
+---
+
 ## [3.0.13] - 2026-04-12
 
 ### 🐛 Bug Fixes

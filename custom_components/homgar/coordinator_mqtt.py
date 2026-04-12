@@ -20,12 +20,14 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         data: MQTT message data with keys: hub_mid, device_key, payload
     """
     hub_mid = data.get("hub_mid")
+    hub_mid_candidates = data.get("hub_mid_candidates") or [hub_mid]
     device_key = data.get("device_key")  # e.g., "D01", "D02"
     payload = data.get("payload")  # e.g., "11#00..."
     
     _LOGGER.debug(
-        "HomGar MQTT update received: hub_mid=%s device_key=%s payload=%s",
+        "HomGar MQTT update received: hub_mid=%s candidates=%s device_key=%s payload=%s",
         hub_mid,
+        hub_mid_candidates,
         device_key,
         payload[:50] if payload else None,
     )
@@ -38,7 +40,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
     hubs = coordinator.data.get("hubs", [])
     target_hub = None
     for hub in hubs:
-        if str(hub.get("mid")) == str(hub_mid):
+        if str(hub.get("mid")) in {str(c) for c in hub_mid_candidates if c is not None}:
             target_hub = hub
             break
     
@@ -46,15 +48,20 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         # Log available hubs for debugging
         available_mids = [str(h.get("mid")) for h in hubs]
         _LOGGER.warning(
-            "HomGar MQTT: Hub mid=%s not found. Available hubs: %s",
+            "HomGar MQTT: Hub mid=%s candidates=%s not found. Available hubs: %s",
             hub_mid,
+            hub_mid_candidates,
             available_mids
         )
         return
-    
+
+    matched_mid = str(target_hub.get("mid"))
+    hub_name = target_hub.get("name", "Hub")
+
     _LOGGER.debug(
-        "HomGar MQTT: Found hub mid=%s model=%s sub_devices=%d",
-        hub_mid,
+        "HomGar MQTT: Found hub mid=%s name=%s model=%s sub_devices=%d",
+        matched_mid,
+        hub_name,
         target_hub.get("model"),
         len(target_hub.get("subDevices", []))
     )
@@ -67,8 +74,9 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         return
     
     _LOGGER.debug(
-        "HomGar MQTT: Processing update for hub_mid=%s addr=%d model=%s",
-        hub_mid,
+        "HomGar MQTT: Processing update for hub_mid=%s name=%s addr=%d model=%s",
+        matched_mid,
+        hub_name,
         addr,
         target_hub.get("model"),
     )
@@ -78,15 +86,21 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
     # Find sub-device model by addr in hub's subDevices list
     sub_devices = target_hub.get("subDevices", [])
     sub_model = None
+    sub_name = None
     for sub in sub_devices:
         if sub.get("addr") == addr:
             sub_model = sub.get("model")
+            sub_name = sub.get("name")
             break
-    
+
+    if addr == 0:
+        sub_name = target_hub.get("name", target_hub.get("model"))
+
     _LOGGER.debug(
-        "HomGar MQTT: Sub-device lookup addr=%d found=%s sub_model=%s",
+        "HomGar MQTT: Sub-device lookup addr=%d found=%s sub_name=%s sub_model=%s",
         addr,
         sub_model is not None,
+        sub_name,
         sub_model,
     )
 
@@ -100,15 +114,17 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
             return
         top_fields = [k for k in decoded if not k.startswith("port_") and k not in ("port_number", "dp_flag")]
         _LOGGER.debug(
-            "HomGar MQTT: Decoded model=%s for hub_mid=%s addr=%d fields=%s",
+            "HomGar MQTT: Decoded model=%s for hub_mid=%s name=%s addr=%d sub_name=%s fields=%s",
             model,
-            hub_mid,
+            matched_mid,
+            hub_name,
             addr,
+            sub_name,
             top_fields,
         )
         
         # Update the sensor data in coordinator
-        sensor_key = f"{hub_mid}_{addr}"
+        sensor_key = f"{matched_mid}_{addr}"
         decoded_sensors = coordinator.data.get("sensors", {})
         
         if sensor_key in decoded_sensors:
@@ -137,23 +153,33 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
             coordinator._last_good_data[sensor_key] = decoded
             
             # Determine status message based on decoded fields (v3 field names)
-            port1 = decoded.get("port_1", {})
-            if port1.get("valve_state") is not None:
-                status_msg = f"valve state: {port1.get('valve_state', 'unknown')}"
-            elif "carbon_dioxide" in decoded:
-                status_msg = f"CO2: {decoded.get('carbon_dioxide')} ppm"
-            elif "total_water_volume" in decoded:
-                status_msg = f"Total flow: {decoded.get('total_water_volume')} L"
-            elif "soil_moisture" in decoded:
-                status_msg = f"Moisture: {decoded.get('soil_moisture')}%"
-            elif "temperature" in decoded:
-                status_msg = f"Temp: {decoded.get('temperature')}°C"
+            watering_ports = [
+                p
+                for p in range(1, decoded.get("port_number", 1) + 1)
+                if decoded.get(f"port_{p}", {}).get("is_watering")
+            ]
+            if watering_ports:
+                status_msg = f"zone {watering_ports[0]}: irrigation"
             else:
-                status_msg = "data updated"
+                port1 = decoded.get("port_1", {})
+                if port1.get("valve_state") is not None:
+                    status_msg = f"valve state: {port1.get('valve_state', 'unknown')}"
+                elif "carbon_dioxide" in decoded:
+                    status_msg = f"CO2: {decoded.get('carbon_dioxide')} ppm"
+                elif "total_water_volume" in decoded:
+                    status_msg = f"Total flow: {decoded.get('total_water_volume')} L"
+                elif "soil_moisture" in decoded:
+                    status_msg = f"Moisture: {decoded.get('soil_moisture')}%"
+                elif "temperature" in decoded:
+                    status_msg = f"Temp: {decoded.get('temperature')}°C"
+                else:
+                    status_msg = "data updated"
             
             _LOGGER.debug(
-                "HomGar MQTT: Updated sensor %s with real-time data (%s)",
+                "HomGar MQTT: Updated sensor %s (%s / %s) with real-time data (%s)",
                 sensor_key,
+                hub_name,
+                sub_name or model,
                 status_msg,
             )
             
@@ -191,8 +217,10 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
             # Log available sensor keys for debugging
             available_keys = list(decoded_sensors.keys())
             _LOGGER.warning(
-                "HomGar MQTT: Sensor key %s not found. Available keys: %s",
+                "HomGar MQTT: Sensor key %s (%s / %s) not found. Available keys: %s",
                 sensor_key,
+                hub_name,
+                sub_name or model,
                 available_keys
             )
     

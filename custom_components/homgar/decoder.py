@@ -906,19 +906,28 @@ def decode_payload(model: str, status_param: str,
                     dp["dpCode"] for dp in model_dict.get("dp", [])
                     if dp.get("identity") == "STA_WATER_ZONES"
                 ), None)
+                wz_entries = []
                 if wz_dpcode is not None:
                     wz_entries = [e for e in entries if e["type_code"] == wz_dpcode]
-                    if wz_entries:
-                        bitmask = wz_entries[0]["type_value"][0] & 0xFF
-                        for p in range(1, port_number + 1):
-                            port_key = f"port_{p}"
-                            active = bool(bitmask & (1 << (p - 1)))
-                            if port_key not in sensor_data:
-                                sensor_data[port_key] = {}
-                            if "is_watering" not in sensor_data[port_key]:
-                                sensor_data[port_key]["is_watering"] = active
-                            if "valve_state" not in sensor_data[port_key]:
-                                sensor_data[port_key]["valve_state"] = "irrigation" if active else "idle"
+                if wz_entries:
+                    # TLV type_value[0] is the header byte; the actual 4-byte
+                    # WATER_ZONES payload starts at index 1.
+                    zone_byte = wz_entries[0]["type_value"][1] & 0xFF if len(wz_entries[0]["type_value"]) > 1 else 0
+                    # HIC801W reports the active zone as an ordinal in the
+                    # first payload byte: 0=all off, 1..8=that exact zone on.
+                    if model == "HIC801W":
+                        bitmask = 0 if zone_byte == 0 else (1 << (zone_byte - 1)) if 1 <= zone_byte <= port_number else 0
+                    else:
+                        bitmask = zone_byte
+                    for p in range(1, port_number + 1):
+                        port_key = f"port_{p}"
+                        active = bool(bitmask & (1 << (p - 1)))
+                        if port_key not in sensor_data:
+                            sensor_data[port_key] = {}
+                        if "is_watering" not in sensor_data[port_key]:
+                            sensor_data[port_key]["is_watering"] = active
+                        if "valve_state" not in sensor_data[port_key]:
+                            sensor_data[port_key]["valve_state"] = "irrigation" if active else "idle"
 
     except Exception as exc:
         _LOGGER.exception("decode_payload error for model=%s: %s", model, exc)

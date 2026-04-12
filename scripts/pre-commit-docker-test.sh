@@ -190,6 +190,16 @@ else
     exit 1
 fi
 
+# ── Test: MQTT routing regressions ────────────────────────────────────────
+echo "🧪 Running MQTT routing regression tests..."
+docker cp tests/run_mqtt_routing_tests.py ha-test:/tmp/tests/run_mqtt_routing_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_mqtt_routing_tests.py; then
+    echo "✅ MQTT routing regression tests passed"
+else
+    echo "❌ ERROR: MQTT routing regression tests failed"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null

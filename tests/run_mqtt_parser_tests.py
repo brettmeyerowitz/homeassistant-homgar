@@ -37,6 +37,7 @@ def _load_module():
 
 mqtt_client = _load_module()
 extract_updates = mqtt_client._extract_device_updates
+extract_hub_mid_candidates = mqtt_client._extract_hub_mid_candidates
 
 PASS = 0
 FAIL = 0
@@ -66,9 +67,17 @@ def main() -> int:
     parsed = extract_updates("103491408513")
     check("ignores bare scalar", parsed is None, repr(parsed))
 
+    parsed = extract_updates("1|1776014190215|103441486619")
+    check("ignores scalar triplet fragment", parsed is None, repr(parsed))
+
     parsed = extract_updates('{"D04":{"value":"10#PAYLOAD"}}')
     check("parses plain object body", isinstance(parsed, dict), repr(parsed))
     check("plain object contains D04", parsed is not None and "D04" in parsed, repr(parsed))
+
+    last6, candidates = extract_hub_mid_candidates("P260412163703000017280081139929")
+    check("mid extraction keeps raw candidate", last6 == "139929", repr((last6, candidates)))
+    check("mid extraction includes raw mid", candidates and candidates[0] == "139929", repr(candidates))
+    check("mid extraction includes stripped-leading-1 alias", "39929" in candidates, repr(candidates))
 
     total = PASS + FAIL
     print(f"\n{'=' * 50}")

@@ -48,6 +48,25 @@ def _extract_device_updates(rest: str) -> dict | None:
     return parsed if isinstance(parsed, dict) else None
 
 
+def _extract_hub_mid_candidates(prefix_full: str) -> tuple[str, list[str]]:
+    """Extract possible hub MID values from the MQTT prefix."""
+    last6 = prefix_full[-6:]
+    raw_mid = last6.lstrip("0") or "0"
+    candidates: list[str] = []
+
+    def add(candidate: str) -> None:
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    add(raw_mid)
+    if len(raw_mid) == 6 and raw_mid.endswith("0"):
+        add(raw_mid[:-1])
+    if len(raw_mid) == 6 and raw_mid.startswith("1"):
+        add(raw_mid[1:])
+
+    return last6, candidates
+
+
 def _build_aliyun_auth(product_key: str, device_name: str, device_secret: str) -> tuple[str, str, str]:
     """Build Alibaba Cloud IoT MQTT authentication credentials (securemode=2, Observer mode).
     
@@ -279,33 +298,24 @@ class HomGarMQTTClient:
                 _LOGGER.warning("HomGar MQTT message invalid format: %s", param_str[:100])
                 return
             
-            # Extract hub MID: last 6 chars of prefix, then normalize
-            # Format varies: "...001583580" -> "583580" -> "58358" (strip trailing 0)
-            #                "...000158358" -> "158358" -> "58358" (strip leading 1)
             prefix_full = parts[0]
-            last6 = prefix_full[-6:]
-            raw_mid = last6.lstrip("0") or "0"
-            
-            # Handle 6-digit encoding: strip trailing 0 or leading 1 to get 5-digit MID
-            if len(raw_mid) == 6:
-                if raw_mid.endswith("0"):
-                    hub_mid = raw_mid[:-1]  # "583580" -> "58358"
-                elif raw_mid.startswith("1"):
-                    hub_mid = raw_mid[1:]   # "158358" -> "58358"
-                else:
-                    hub_mid = raw_mid
-            else:
-                hub_mid = raw_mid
+            last6, hub_mid_candidates = _extract_hub_mid_candidates(prefix_full)
+            hub_mid = hub_mid_candidates[0]
             
             _LOGGER.debug(
-                "HomGar MQTT hub MID extraction: prefix_last6=%s raw_mid=%s -> hub_mid=%s",
-                last6, raw_mid, hub_mid
+                "HomGar MQTT hub MID extraction: prefix_last6=%s candidates=%s selected=%s",
+                last6,
+                hub_mid_candidates,
+                hub_mid,
             )
             rest = parts[1]
             
             d_updates = _extract_device_updates(rest)
             if d_updates is None:
-                _LOGGER.warning("HomGar MQTT failed to parse device updates: %s", rest[:100])
+                if "{" not in rest:
+                    _LOGGER.debug("HomGar MQTT ignoring non-device update fragment: %s", rest[:100])
+                else:
+                    _LOGGER.warning("HomGar MQTT failed to parse device updates: %s", rest[:100])
                 return
             
             device_count = sum(1 for key in d_updates if isinstance(key, str) and key.startswith("D"))
@@ -334,6 +344,7 @@ class HomGarMQTTClient:
                 # Call callback with parsed data
                 self._on_message_callback({
                     "hub_mid": hub_mid,
+                    "hub_mid_candidates": hub_mid_candidates,
                     "device_key": key,
                     "payload": str(raw_val),
                 })

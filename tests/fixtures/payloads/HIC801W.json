@@ -8,7 +8,118 @@
       "format": "tlv",
       "payload": "10#108800AF00000000B700204200D800F700000000F9FF00",
       "expected": {
-        "port_number": 8
+        "port_number": 8,
+        "port_1.is_watering": false,
+        "port_2.is_watering": false,
+        "port_3.is_watering": false,
+        "port_4.is_watering": false
+      }
+    },
+    {
+      "id": "local-active-zone-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#108800AF3C000000B7F4231919D821F7010F0000F9FF00",
+      "expected": {
+        "port_number": 8,
+        "port_1.is_watering": true,
+        "port_2.is_watering": false,
+        "port_3.is_watering": false,
+        "port_4.is_watering": false
+      }
+    },
+    {
+      "id": "local-active-zone-2",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#108800AF68010000B7E0371919D821F702020000F9FF00",
+      "expected": {
+        "port_number": 8,
+        "port_1.is_watering": false,
+        "port_2.is_watering": true,
+        "port_3.is_watering": false,
+        "port_4.is_watering": false
+      }
+    },
+    {
+      "id": "local-active-zone-3",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#108800AFA08C0000B72F571A19D821F703040000F9FF00",
+      "expected": {
+        "port_number": 8,
+        "port_1.is_watering": false,
+        "port_2.is_watering": false,
+        "port_3.is_watering": true,
+        "port_4.is_watering": false
+      }
+    },
+    {
+      "id": "local-active-zone-4",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#108800AF58020000B7913A1919D821F704080000F9FF00",
+      "expected": {
+        "port_number": 8,
+        "port_1.is_watering": false,
+        "port_2.is_watering": false,
+        "port_3.is_watering": false,
+        "port_4.is_watering": true
+      }
+    },
+    {
+      "id": "local-active-zone-5",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#108800AFB4000000B7353C1919D821F705FF0F00F9FF00",
+      "expected": {
+        "port_number": 8,
+        "port_4.is_watering": false,
+        "port_5.is_watering": true,
+        "port_6.is_watering": false
+      }
+    },
+    {
+      "id": "local-active-zone-6",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#108800AFB4000000B7833C1919D821F706FF1F00F9FF00",
+      "expected": {
+        "port_number": 8,
+        "port_5.is_watering": false,
+        "port_6.is_watering": true,
+        "port_7.is_watering": false
+      }
+    },
+    {
+      "id": "local-active-zone-7",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#108800AFB4000000B7D53C1919D821F707FF3F00F9FF00",
+      "expected": {
+        "port_number": 8,
+        "port_6.is_watering": false,
+        "port_7.is_watering": true,
+        "port_8.is_watering": false
+      }
+    },
+    {
+      "id": "local-active-zone-8",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#108800AFB4000000B7453D1919D821F708FF7F00F9FF00",
+      "expected": {
+        "port_number": 8,
+        "port_7.is_watering": false,
+        "port_8.is_watering": true
       }
     }
   ]
