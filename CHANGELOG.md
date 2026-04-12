@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.17] - 2026-04-12
+
+### 🐛 Bug Fixes
+- **HTV245FRF legacy valve decode cleanup** — legacy ASCII `HTV245FRF` payloads are now treated as valve payloads instead of environmental sensor payloads, preventing bogus temperature and humidity readings from appearing for Dean-style valve timers.
+- **HTV245FRF per-zone last usage** — restored useful per-zone idle usage decoding for legacy `HTV245FRF` payloads so values like `308` and `48` are exposed as `30.8 L` and `4.8 L` on the correct zones.
+
+### ⚠️ Notes
+- **Old bogus valve sensors may remain registered** — this release stops emitting the incorrect legacy valve `temperature` / `humidity` values, but it does not remove any previously created orphaned entities from the Home Assistant entity registry. Those may need to be deleted manually.
+
+### 🔧 Internal
+- **Legacy HTV245FRF regression coverage** — added Dean-derived fixture samples to validate RSSI preservation and per-zone last-water-volume decoding for legacy `HTV245FRF` payloads.
+
+---
+
 ## [3.0.16] - 2026-04-12
 
 ### 🐛 Bug Fixes
