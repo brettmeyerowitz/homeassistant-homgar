@@ -5,10 +5,18 @@ All notable changes to this project will be documented in this file.
 ## [3.0.12] - 2026-04-12
 
 ### 🐛 Bug Fixes
-- **MQTT renewal causing 'unavailable' flapping** — The MQTT subscription renewal was scheduling reloads every ~8 minutes (based on server expire time), causing all entities to briefly become unavailable. Now enforces a minimum 30-minute renewal interval and prevents duplicate schedule protection.
+- **MQTT renewal causing 'unavailable' flapping** — Fixed MQTT subscription renewal to NOT reload the entire integration. Previously, every renewal caused all entities to briefly become unavailable. Now:
+  - New `_async_renew_mqtt_subscription()` function handles renewal seamlessly
+  - Creates new MQTT client with fresh credentials while keeping coordinator/entities running
+  - Old client is disconnected, new client connects without interruption
+  - Minimum 30-minute renewal interval enforced to prevent excessive renewals
+  - No more "unavailable" state during renewal
 
 ### 🔧 Internal
 - **Fixed pre-commit log checking** — Script now correctly checks HA log file (`/config/home-assistant.log`) instead of Docker stdout, and uses 1000-line tail to catch setup message in accumulated logs.
+- **Suppress spurious state-change events** — coordinator now compares decoded sensor data before pushing updates; if values are identical (excluding timestamps) the update is skipped
+- **Log level cleanup** — per-poll and per-MQTT-message log calls demoted from `info` to `debug`
+- **Decoder regression test suite** — `scripts/test_decoders.py` added with 74 tests covering real payloads from GitHub issues
 
 ---
 

@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import voluptuous as vol
 
@@ -129,7 +129,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                             entry_data["_mqtt_renewal_scheduled"] = True
                             async def _renew_subscription(hass=hass, entry=entry):
                                 _LOGGER.info("HomGar [%s]: Renewing MQTT subscription (pre-expire renewal)", entry.title)
-                                await async_reload_entry(hass, entry)
+                                await _async_renew_mqtt_subscription(hass, entry)
                             hass.loop.call_later(renew_in, lambda: hass.async_create_task(_renew_subscription()))
                     except Exception as renew_e:
                         _LOGGER.warning("HomGar [%s]: Failed to schedule MQTT renewal: %s", entry.title, renew_e)
@@ -257,6 +257,119 @@ def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinato
         device = device_reg.async_get_device(identifiers={(DOMAIN, f"{mid}_{addr}")})
         if device and device.area_id != area.id:
             device_reg.async_update_device(device.id, area_id=area.id)
+
+
+async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Renew MQTT subscription with fresh credentials without full integration reload.
+    
+    This avoids entities becoming 'unavailable' during renewal by:
+    1. Keeping the coordinator and entities running
+    2. Getting fresh MQTT credentials via subscribeStatus
+    3. Disconnecting old MQTT client
+    4. Creating and connecting new MQTT client with fresh credentials
+    5. Updating hass.data with new client
+    """
+    entry_data = hass.data[DOMAIN].get(entry.entry_id, {})
+    client = entry_data.get("client")
+    coordinator = entry_data.get("coordinator")
+    old_mqtt_client = entry_data.get("mqtt_client")
+    
+    if not client or not coordinator:
+        _LOGGER.error("HomGar [%s]: Cannot renew MQTT - missing client or coordinator", entry.title)
+        return False
+    
+    try:
+        # Get fresh credentials via subscribeStatus
+        hubs = coordinator.data.get("hubs", []) if coordinator.data else []
+        hids = entry.data.get(CONF_HIDS, [])
+        if not hubs or not hids:
+            _LOGGER.warning("HomGar [%s]: Cannot renew MQTT - no hubs or hids", entry.title)
+            return False
+            
+        sub_creds = await client.subscribe_status(hids[0], hubs)
+        _LOGGER.info(
+            "HomGar [%s]: MQTT renewal - subscribeStatus returned device=%s productKey=%s host=%s",
+            entry.title,
+            sub_creds.get("deviceName"),
+            sub_creds.get("productKey"),
+            sub_creds.get("mqttHostUrl"),
+        )
+        
+        # Extract credentials
+        if not sub_creds.get("deviceName") or not sub_creds.get("deviceSecret"):
+            _LOGGER.error("HomGar [%s]: MQTT renewal - incomplete credentials from subscribeStatus", entry.title)
+            return False
+            
+        mqtt_host = sub_creds.get("mqttHostUrl", "")
+        if ":" in mqtt_host:
+            mqtt_host, mqtt_port_str = mqtt_host.rsplit(":", 1)
+            mqtt_port = int(mqtt_port_str)
+        else:
+            mqtt_port = 1883
+            
+        product_key = sub_creds["productKey"]
+        device_name = sub_creds["deviceName"]
+        device_secret = sub_creds["deviceSecret"]
+        
+        # Disconnect old client
+        if old_mqtt_client:
+            _LOGGER.info("HomGar [%s]: MQTT renewal - disconnecting old client", entry.title)
+            await hass.async_add_executor_job(old_mqtt_client.disconnect)
+        
+        # Create new MQTT client with fresh credentials
+        def on_mqtt_message(data: dict):
+            """Handle MQTT message safely from paho's background thread."""
+            hass.loop.call_soon_threadsafe(
+                lambda: hass.async_create_task(coordinator.handle_mqtt_update(data))
+            )
+        
+        new_mqtt_client = HomGarMQTTClient(
+            product_key=product_key,
+            device_name=device_name,
+            device_secret=device_secret,
+            mqtt_host=mqtt_host,
+            on_message_callback=on_mqtt_message,
+            mqtt_port=mqtt_port,
+            entry_title=entry.title,
+        )
+        
+        # Connect new client
+        _LOGGER.info("HomGar [%s]: MQTT renewal - connecting new client", entry.title)
+        connected = await hass.async_add_executor_job(new_mqtt_client.connect)
+        if not connected:
+            _LOGGER.error("HomGar [%s]: MQTT renewal - failed to connect new client", entry.title)
+            return False
+            
+        # Update hass.data with new client
+        entry_data["mqtt_client"] = new_mqtt_client
+        _LOGGER.info("HomGar [%s]: MQTT renewal - successfully switched to new client", entry.title)
+        
+        # Schedule next renewal
+        expire_ms = sub_creds.get("expire")
+        if expire_ms:
+            try:
+                expire_ts = int(expire_ms) / 1000.0
+                now = time.time()
+                renew_in = max(60, expire_ts - now - 60)
+                MIN_RENEWAL_INTERVAL = 1800  # 30 minutes
+                if renew_in < MIN_RENEWAL_INTERVAL:
+                    renew_in = MIN_RENEWAL_INTERVAL
+                _LOGGER.info(
+                    "HomGar [%s]: MQTT renewal complete - next renewal scheduled in %.0fs",
+                    entry.title, renew_in
+                )
+                
+                async def _schedule_next_renewal(hass=hass, entry=entry):
+                    await _async_renew_mqtt_subscription(hass, entry)
+                hass.loop.call_later(renew_in, lambda: hass.async_create_task(_schedule_next_renewal()))
+            except Exception as sched_e:
+                _LOGGER.warning("HomGar [%s]: MQTT renewal - failed to schedule next renewal: %s", entry.title, sched_e)
+        
+        return True
+        
+    except Exception as e:
+        _LOGGER.error("HomGar [%s]: MQTT renewal failed: %s", entry.title, e, exc_info=True)
+        return False
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
