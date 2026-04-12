@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.12] - 2026-04-12
+
+### 🐛 Bug Fixes
+- **MQTT renewal causing 'unavailable' flapping** — The MQTT subscription renewal was scheduling reloads every ~8 minutes (based on server expire time), causing all entities to briefly become unavailable. Now enforces a minimum 30-minute renewal interval and prevents duplicate schedule protection.
+
+### 🔧 Internal
+- **Fixed pre-commit log checking** — Script now correctly checks HA log file (`/config/home-assistant.log`) instead of Docker stdout, and uses 1000-line tail to catch setup message in accumulated logs.
+
+---
+
 ## [3.0.11] - 2026-04-11
 
 ### 🔧 Internal
