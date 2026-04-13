@@ -32,3 +32,32 @@ BRAND_MAPPING = {
     APP_TYPE_RAINPOINT: "RainPoint",
 }
 
+
+def get_port_labels(sensor_info: dict) -> list[str]:
+    """Return per-port friendly labels parsed from a sub-device portDescribe."""
+    raw = sensor_info.get("port_describe") or ""
+    if not isinstance(raw, str):
+        return []
+    return [part.strip() for part in raw.split("|") if part.strip()]
+
+
+def get_port_label(sensor_info: dict, port: int) -> str | None:
+    """Return the configured friendly label for a 1-based port, if present."""
+    labels = get_port_labels(sensor_info)
+    if 1 <= port <= len(labels):
+        return labels[port - 1]
+    return None
+
+
+def format_port_entity_name(
+    sub_name: str,
+    sensor_info: dict,
+    port: int,
+    suffix: str | None = None,
+) -> str:
+    """Format a user-facing per-port entity name without changing unique IDs."""
+    port_label = get_port_label(sensor_info, port) or f"Zone {port}"
+    parts = [sub_name, port_label]
+    if suffix:
+        parts.append(suffix)
+    return " ".join(parts)

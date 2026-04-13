@@ -17,7 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, format_port_entity_name
 from .coordinator import HomGarCoordinator
 from .sensor_defs import FIELD_SENSOR_MAP, sensor_fields_for_data
 from .diagnostic_sensors import (
@@ -247,7 +247,7 @@ class HomGarGenericSensor(HomGarSensorBase):
         label = (sdef.name if sdef and sdef.name else field_name.replace("_", " ").title())
         if port is not None:
             uid_suffix = f"{field_name}_port{port}"
-            self._attr_name = f"{sub_name} Zone {port} {label}"
+            self._attr_name = format_port_entity_name(sub_name, sensor_info, port, label)
         else:
             uid_suffix = field_name
             self._attr_name = f"{sub_name} {label}"

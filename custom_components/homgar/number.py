@@ -11,7 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, format_port_entity_name
 from .coordinator import HomGarCoordinator
 from .decoder import get_valve_ports
 
@@ -87,7 +87,7 @@ class HomGarZoneDurationNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
         sub_name = sensor_info.get("sub_name") or f"Valve Hub {addr}"
 
         self._attr_unique_id = f"rainpoint_{mid}_{addr}_zone{zone_num}_duration"
-        self._attr_name = f"{sub_name} Zone {zone_num} Duration"
+        self._attr_name = format_port_entity_name(sub_name, sensor_info, zone_num, "Duration")
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()

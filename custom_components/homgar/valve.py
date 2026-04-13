@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, format_port_entity_name
 from .coordinator import HomGarCoordinator
 from .decoder import get_valve_ports
 
@@ -79,7 +79,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         sub_name = sensor_info.get("sub_name") or f"Valve Hub {addr}"
 
         self._attr_unique_id = f"rainpoint_{mid}_{addr}_zone{zone_num}"
-        self._attr_name = f"{sub_name} Zone {zone_num}"
+        self._attr_name = format_port_entity_name(sub_name, sensor_info, zone_num)
 
     # ------------------------------------------------------------------
     # Coordinator data helpers

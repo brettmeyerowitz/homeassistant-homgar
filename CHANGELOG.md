@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.21] - 2026-04-13
+
+### 🐛 Bug Fixes
+- **Valve zone friendly names** — valve, duration, and per-zone sensor entities now use the RainPoint app’s per-zone labels from `portDescribe` when available (for example `Garage Hose` instead of `Zone 2`) while keeping the same unique IDs and entity IDs.
+
+### 🔧 Internal
+- **Zone label regression coverage** — added focused tests for parsing and formatting per-zone names from `portDescribe`, and verified the naming behavior in `ha-test` against Dean’s live-style timer data.
+
+---
+
 ## [3.0.20] - 2026-04-13
 
 ### 🐛 Bug Fixes

@@ -250,6 +250,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                             "home_name": hub.get("homeName"),
                             "hub_name": hub.get("name", "Hub"),
                             "sub_name": sub.get("name"),
+                            "port_describe": sub.get("portDescribe"),
                             "model": sub.get("model"),
                             "firmware_version": sub.get("softVer"),
                             "raw_status": s,
