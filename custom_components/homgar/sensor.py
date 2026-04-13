@@ -16,10 +16,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, format_port_entity_name
 from .coordinator import HomGarCoordinator
 from .sensor_defs import FIELD_SENSOR_MAP, sensor_fields_for_data
+from .decoder import get_valve_ports
 from .diagnostic_sensors import (
     HomGarFirmwareVersionSensor,
     HomGarMqttRawPayloadSensor,
@@ -34,6 +36,16 @@ from .hub_entities import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+_OPTIONAL_VALVE_PORT_SENSOR_FIELDS = (
+    "event_time",
+    "event_time2",
+    "irrigation_end_time",
+    "cycle_type",
+)
+
+_LOCAL_TLV_TIMESTAMP_FIELDS = {"event_time", "event_time2", "irrigation_end_time"}
 
 
 def _slugify(text: str) -> str:
@@ -89,7 +101,10 @@ async def async_setup_entry(
                 # Multi-port device: create per-port sensors + shared top-level fields
                 for port in range(1, port_number + 1):
                     port_data = data.get(f"port_{port}", {})
-                    for field in sensor_fields_for_data(port_data):
+                    port_fields = set(sensor_fields_for_data(port_data))
+                    if model and get_valve_ports(model):
+                        port_fields.update(_OPTIONAL_VALVE_PORT_SENSOR_FIELDS)
+                    for field in sorted(port_fields):
                         entities.append(HomGarGenericSensor(coordinator, key, info, field, port=port))
                 # Shared top-level diagnostic fields (battery, rssi)
                 for field in sensor_fields_for_data(data):
@@ -97,7 +112,10 @@ async def async_setup_entry(
                         entities.append(HomGarGenericSensor(coordinator, key, info, field))
             else:
                 # Single-port device
-                for field in sensor_fields_for_data(data):
+                fields = set(sensor_fields_for_data(data))
+                if model and get_valve_ports(model):
+                    fields.update(_OPTIONAL_VALVE_PORT_SENSOR_FIELDS)
+                for field in sorted(fields):
                     entities.append(HomGarGenericSensor(coordinator, key, info, field))
 
         # Diagnostic sensors for all sub-devices
@@ -269,6 +287,20 @@ class HomGarGenericSensor(HomGarSensorBase):
         if value is not None and getattr(self, "_attr_device_class", None) == SensorDeviceClass.TIMESTAMP and isinstance(value, str):
             try:
                 value = datetime.fromisoformat(value)
+                raw_status = self._sensor_info.get("raw_status") or {}
+                raw_payload = raw_status.get("value")
+                if (
+                    self._field_name in _LOCAL_TLV_TIMESTAMP_FIELDS
+                    and isinstance(raw_payload, str)
+                    and "#" in raw_payload
+                    and value.tzinfo is not None
+                ):
+                    local_tz = dt_util.get_time_zone(self.coordinator.hass.config.time_zone)
+                    if local_tz is not None:
+                        # RainPoint TLV event times are packed as local wall clock values.
+                        # Reinterpret the decoded wall time in HA's configured timezone
+                        # before exposing it as an absolute timestamp.
+                        value = value.replace(tzinfo=None).replace(tzinfo=local_tz).astimezone(timezone.utc)
             except (ValueError, TypeError):
                 value = None
         _LOGGER.debug("native_value for %s field=%s port=%s: %s", self._sensor_key, self._field_name, self._port, value)

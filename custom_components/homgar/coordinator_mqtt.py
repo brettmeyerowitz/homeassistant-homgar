@@ -83,6 +83,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
     )
     
     from .decoder import decode_payload
+    from .const import get_port_label
 
     # Find sub-device model by addr in hub's subDevices list
     sub_devices = target_hub.get("subDevices", [])
@@ -164,26 +165,56 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
                     status_msg = "data updated"
 
             friendly_parts = []
-            if "battery_level" in decoded:
-                friendly_parts.append(f"battery {decoded['battery_level']}%")
-            if "signal_strength" in decoded:
-                friendly_parts.append(f"RSSI {decoded['signal_strength']} dBm")
-            if "temperature" in decoded:
-                friendly_parts.append(f"temp {decoded['temperature']}°C")
-            if "humidity" in decoded:
-                friendly_parts.append(f"humidity {decoded['humidity']}%")
-            if "soil_moisture" in decoded:
-                friendly_parts.append(f"soil {decoded['soil_moisture']}%")
-            if "carbon_dioxide" in decoded:
-                friendly_parts.append(f"CO₂ {decoded['carbon_dioxide']} ppm")
-            if "air_pressure" in decoded:
-                friendly_parts.append(f"pressure {decoded['air_pressure']} hPa")
-            if "total_water_volume" in decoded:
-                friendly_parts.append(f"total flow {decoded['total_water_volume']} L")
+
+            def _append_scalar_parts(source: dict, prefix: str = "") -> None:
+                label_prefix = f"{prefix} " if prefix else ""
+                if "battery_level" in source:
+                    friendly_parts.append(f"{label_prefix}battery {source['battery_level']}%")
+                if "signal_strength" in source:
+                    friendly_parts.append(f"{label_prefix}RSSI {source['signal_strength']} dBm")
+                if "temperature" in source:
+                    friendly_parts.append(f"{label_prefix}temp {source['temperature']}°C")
+                if "humidity" in source:
+                    friendly_parts.append(f"{label_prefix}humidity {source['humidity']}%")
+                if "soil_moisture" in source:
+                    friendly_parts.append(f"{label_prefix}soil {source['soil_moisture']}%")
+                if "carbon_dioxide" in source:
+                    friendly_parts.append(f"{label_prefix}CO₂ {source['carbon_dioxide']} ppm")
+                if "air_pressure" in source:
+                    friendly_parts.append(f"{label_prefix}pressure {source['air_pressure']} hPa")
+                if "illuminance" in source:
+                    friendly_parts.append(f"{label_prefix}illuminance {source['illuminance']} lx")
+                if "current_water_volume" in source:
+                    friendly_parts.append(f"{label_prefix}current volume {source['current_water_volume']} L")
+                if "last_water_volume" in source:
+                    friendly_parts.append(f"{label_prefix}last volume {source['last_water_volume']} L")
+                if "today_water_volume" in source:
+                    friendly_parts.append(f"{label_prefix}today volume {source['today_water_volume']} L")
+                if "total_water_volume" in source:
+                    friendly_parts.append(f"{label_prefix}total volume {source['total_water_volume']} L")
+                if "flow_rate" in source:
+                    unit = source.get("flow_rate_unit", "L/min")
+                    friendly_parts.append(f"{label_prefix}flow {source['flow_rate']} {unit}")
+                if "current_session_duration" in source:
+                    friendly_parts.append(f"{label_prefix}session {source['current_session_duration']}s")
+                if "last_water_duration" in source:
+                    friendly_parts.append(f"{label_prefix}last duration {source['last_water_duration']}s")
+                if "event_time" in source:
+                    friendly_parts.append(f"{label_prefix}event {source['event_time']}")
+                if "event_time2" in source:
+                    friendly_parts.append(f"{label_prefix}event end {source['event_time2']}")
+                if "irrigation_end_time" in source:
+                    friendly_parts.append(f"{label_prefix}irrigation end {source['irrigation_end_time']}")
+                if "cycle_type" in source:
+                    friendly_parts.append(f"{label_prefix}cycle type {source['cycle_type']}")
+
+            _append_scalar_parts(decoded)
             for p in range(1, decoded.get("port_number", 1) + 1):
                 port = decoded.get(f"port_{p}", {})
                 if port.get("valve_state"):
-                    friendly_parts.append(f"zone {p}: {port['valve_state']}")
+                    label = get_port_label(decoded_sensors[sensor_key], p) or f"zone {p}"
+                    friendly_parts.append(f"{label}: {port['valve_state']}")
+                _append_scalar_parts(port, get_port_label(decoded_sensors[sensor_key], p) or f"zone {p}")
 
             # Always refresh MQTT diagnostics even when the decoded data is unchanged.
             decoded_sensors[sensor_key]["raw_status"]["value"] = payload

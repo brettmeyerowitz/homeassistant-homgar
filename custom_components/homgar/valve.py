@@ -227,6 +227,43 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         current["sensors"] = sensors
         self.coordinator.async_set_updated_data(current)
 
+    def _apply_optimistic_port_update(self, is_watering: bool, duration: int | None = None) -> None:
+        """Apply a minimal optimistic state update to the decoded valve data."""
+        current = dict(self.coordinator.data)
+        sensors = dict(current.get("sensors", {}))
+        entry = sensors.get(self._sensor_key)
+        if not entry:
+            return
+        entry = dict(entry)
+        decoded = dict(entry.get("data") or {})
+
+        if f"port_{self._zone_num}" in decoded:
+            port_key = f"port_{self._zone_num}"
+            port_data = dict(decoded.get(port_key) or {})
+            target = port_data
+            decoded[port_key] = port_data
+        elif self._zone_num == 1:
+            target = decoded
+        else:
+            return
+
+        target["is_watering"] = is_watering
+        if duration is not None:
+            target["current_session_duration"] = duration
+
+        if not is_watering:
+            target["valve_state"] = "idle"
+            target["current_session_duration"] = 0
+            target.pop("event_time", None)
+            target.pop("event_time2", None)
+            target.pop("irrigation_end_time", None)
+            target.pop("cycle_type", None)
+
+        entry["data"] = decoded
+        sensors[self._sensor_key] = entry
+        current["sensors"] = sensors
+        self.coordinator.async_set_updated_data(current)
+
     # ------------------------------------------------------------------
     async def async_open_valve(self, **kwargs: Any) -> None:
         if "duration" in kwargs:
@@ -263,13 +300,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         await self.coordinator.async_request_refresh()
         
         # OPTIMISTIC LOCAL UPDATE to prevent UI desync
-        current = dict(self.coordinator.data)
-        try:
-            current["sensors"][self._sensor_key]["data"][f"port_{self._zone_num}"]["is_watering"] = True
-            current["sensors"][self._sensor_key]["data"][f"port_{self._zone_num}"]["current_session_duration"] = duration
-        except KeyError:
-            pass
-        self.coordinator.async_set_updated_data(current)
+        self._apply_optimistic_port_update(True, duration)
         return
 
     async def async_close_valve(self, **kwargs: Any) -> None:
@@ -303,11 +334,5 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         await self.coordinator.async_request_refresh()
         
         # OPTIMISTIC LOCAL UPDATE to prevent UI desync
-        current = dict(self.coordinator.data)
-        try:
-            current["sensors"][self._sensor_key]["data"][f"port_{self._zone_num}"]["is_watering"] = False
-            current["sensors"][self._sensor_key]["data"][f"port_{self._zone_num}"]["current_session_duration"] = 0
-        except KeyError:
-            pass
-        self.coordinator.async_set_updated_data(current)
+        self._apply_optimistic_port_update(False, 0)
         return

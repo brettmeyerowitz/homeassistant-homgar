@@ -210,8 +210,11 @@ BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HC
 | today_water_volume | Water | L |
 | flow_rate | Volume flow rate | L/min |
 | current_session_duration | Duration | s |
+| cycle_type | Enum sensor | — |
+| Current Step End Time | Timestamp | — |
+| Schedule End Time | Timestamp | — |
+| Irrigation End Time | Timestamp | — |
 | precipitation_total / _1h / _24h / _7d | Precipitation | mm |
-| event_time / event_time2 | Timestamp | — |
 
 Valve devices additionally get a **valve open/close** entity and a **duration (minutes)** number entity per zone.
 
@@ -236,6 +239,8 @@ The MQTT session is renewed automatically before it expires (based on the `expir
 | Weather stations (HWS\*) | ✅ Yes | Periodic |
 
 All other models fall back to 2-minute REST polling.
+
+Short `Cycle&Soak` and mist schedules can transition faster than RainPoint’s cloud updates are delivered. In those cases `Current Step End Time` may briefly appear stale until the next MQTT or REST update arrives. `Irrigation End Time` is usually the more stable indicator of the overall run.
 
 ### Troubleshooting MQTT
 

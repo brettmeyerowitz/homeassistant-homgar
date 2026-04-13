@@ -174,13 +174,20 @@ FIELD_SENSOR_MAP: dict[str, SensorDef | None] = {
     ),
     "event_time": SensorDef(
         device_class=SensorDeviceClass.TIMESTAMP,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        name="Last Event Time",
+        name="Current Step End Time",
     ),
     "event_time2": SensorDef(
         device_class=SensorDeviceClass.TIMESTAMP,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        name="Last Event End Time",
+        name="Schedule End Time",
+    ),
+    "irrigation_end_time": SensorDef(
+        device_class=SensorDeviceClass.TIMESTAMP,
+        name="Irrigation End Time",
+        icon="mdi:timer-end",
+    ),
+    "cycle_type": SensorDef(
+        icon="mdi:sprinkler-variant",
+        name="Cycle Type",
     ),
 
     # --- Handled by valve.py — do NOT create sensor entities for these ---

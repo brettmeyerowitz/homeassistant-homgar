@@ -118,6 +118,7 @@ _DP_CODE: dict[int, str] = {
     41: "STA_CALL", 42: "STA_WATER_PS", 43: "HOUR_RAIN", 44: "DAY_RAIN",
     45: "WEEK_RAIN", 46: "STA_CUR_FLOW", 47: "MAX_CO2", 48: "MAX_PM25",
     49: "STA_LAST_DURATION", 50: "STA_OTHER_TOTAL", 51: "STA_RSSI2",
+    52: "EVENT_TIME2",
 }
 
 _WORK_MODES: dict[int, str] = {
@@ -385,6 +386,20 @@ _WORK_MODE_TO_VALVE_STATE = {
 }
 
 
+def _derive_cycle_type(
+    valve_state: str | None, has_schedule_end: bool, keep_schedule_context: bool = False
+) -> str | None:
+    if valve_state == "mist":
+        return "Misting Irrigation"
+    if valve_state in ("cycle", "soak"):
+        return "Cycle&Soak"
+    if valve_state == "idle" and has_schedule_end and keep_schedule_context:
+        return "Cycle&Soak"
+    if valve_state == "irrigation":
+        return "Normal Irrigation"
+    return None
+
+
 def _decode_legacy_port_section(section: str, unit: str) -> dict:
     """Decode one pipe-separated port section from a legacy multi-port valve payload.
 
@@ -429,6 +444,14 @@ def _decode_legacy_port_section(section: str, unit: str) -> dict:
     ev_time = fi(3)
     if ev_time is not None and ev_time > 1_000_000_000:
         result["event_time_raw"] = ev_time
+        if wk_raw is not None and (wk_raw & 0x0F) != 0:
+            result["irrigation_end_time"] = datetime.fromtimestamp(
+                ev_time, tz=timezone.utc
+            ).isoformat()
+
+    cycle_type = _derive_cycle_type(result.get("valve_state"), False)
+    if cycle_type is not None:
+        result["cycle_type"] = cycle_type
 
     return result
 
@@ -536,6 +559,24 @@ def _le_int(tlv: dict) -> int:
     payload = tlv["type_value"][1:1 + tlen]
     buf = bytes(payload + [0] * (8 - len(payload)))
     return struct.unpack_from("<q", buf)[0]
+
+
+def _t4_from_bytes(payload: list[int]) -> str | None:
+    if len(payload) < 4:
+        return None
+    raw = struct.unpack_from("<I", bytes(payload[:4]))[0]
+    second = raw & 0x3F
+    minute = (raw >> 6) & 0x3F
+    hour = (raw >> 12) & 0x1F
+    day = (raw >> 17) & 0x1F
+    month = (raw >> 22) & 0x0F
+    year = ((raw >> 26) & 0x3F) + 2020
+    if not (1 <= month <= 12 and 1 <= day <= 31 and hour <= 23 and minute <= 59 and second <= 59):
+        return None
+    try:
+        return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc).isoformat()
+    except ValueError:
+        return None
 
 
 def _entries_for_port(entries: list[dict], dp_index: dict[int, dict],
@@ -715,16 +756,16 @@ def _dec_event_time(entries, dp_index, port=None):
         e = _find_by_name(entries, "EVENT_TIME")
     if e is None or len(e["type_value"]) < 5:
         return None
-    payload = e["type_value"][1:5]
-    return struct.unpack_from("<I", bytes(payload + [0] * 4))[0]
+    return _t4_from_bytes(e["type_value"][1:5])
 
 
 def _dec_event_time2(entries, dp_index, port=None):
     e = _find_by_identity(entries, dp_index, "STA_EVTIME2", port)
+    if e is None:
+        e = _find_by_name(entries, "EVENT_TIME2")
     if e is None or len(e["type_value"]) < 5:
         return None
-    payload = e["type_value"][1:5]
-    return struct.unpack_from("<I", bytes(payload + [0] * 4))[0]
+    return _t4_from_bytes(e["type_value"][1:5])
 
 
 def _dec_total_rain(entries, dp_index):
@@ -789,12 +830,31 @@ def _decode_port(entries: list[dict], dp_index: dict[int, dict],
         result["last_water_volume"] = lu
 
     et = _dec_event_time(entries, dp_index, port)
-    if et is not None and et > 1_000_000_000:
-        result["event_time"] = datetime.fromtimestamp(et, tz=timezone.utc).isoformat()
+    if et is not None:
+        result["event_time"] = et
+        if result.get("is_watering"):
+            result["irrigation_end_time"] = et
 
     et2 = _dec_event_time2(entries, dp_index, port)
-    if et2 is not None and et2 > 1_000_000_000:
-        result["event_time2"] = datetime.fromtimestamp(et2, tz=timezone.utc).isoformat()
+    keep_schedule_context = bool(
+        et2 is not None
+        and (
+            result.get("is_watering")
+            or (dur is not None and dur > 0)
+            or result.get("valve_state") in ("cycle", "soak", "mist")
+        )
+    )
+    if et2 is not None:
+        if keep_schedule_context:
+            result["event_time2"] = et2
+            if result.get("valve_state") in ("cycle", "soak", "mist", "idle"):
+                result["irrigation_end_time"] = et2
+
+    cycle_type = _derive_cycle_type(
+        result.get("valve_state"), "event_time2" in result, keep_schedule_context
+    )
+    if cycle_type is not None:
+        result["cycle_type"] = cycle_type
 
     alarm = _dec_alarm(entries, dp_index, port)
     if alarm is not None:

@@ -34,6 +34,34 @@
       }
     },
     {
+      "id": "dean-legacy-zone2-idle-pre-open",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "legacy",
+      "payload": "1,-79,1;0,3,0,0,0,0|0,32,0,0,0,0",
+      "expected": {
+        "signal_strength": -79,
+        "port_1.is_watering": false,
+        "port_1.last_water_volume": {"approx": 0.3, "tolerance": 0.1},
+        "port_2.is_watering": false
+      }
+    },
+    {
+      "id": "dean-legacy-zone2-open",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "legacy",
+      "payload": "1,-75,1;0,3,0,0,0,0|33,15,0,1775856207,600,0",
+      "expected": {
+        "signal_strength": -75,
+        "port_1.is_watering": false,
+        "port_1.last_water_volume": {"approx": 0.3, "tolerance": 0.1},
+        "port_2.is_watering": true,
+        "port_2.current_session_duration": 900,
+        "port_2.irrigation_end_time": {"present": true}
+      }
+    },
+    {
       "id": "issue-11-comment-1",
       "source_issue": 11,
       "source_type": "github_issue_comment",

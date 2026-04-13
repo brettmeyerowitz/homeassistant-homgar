@@ -43,6 +43,7 @@ sys.modules.setdefault("custom_components", types.ModuleType("custom_components"
 sys.modules.setdefault("custom_components.homgar", types.ModuleType("custom_components.homgar"))
 
 _load_module("custom_components.homgar.decoder", "custom_components/homgar/decoder.py")
+_load_module("custom_components.homgar.const", "custom_components/homgar/const.py")
 coordinator_mqtt = _load_module(
     "custom_components.homgar.coordinator_mqtt",
     "custom_components/homgar/coordinator_mqtt.py",
@@ -219,6 +220,61 @@ def main() -> int:
         "updates raw_status on no-change update",
         unchanged_sensor["raw_status"]["value"].startswith("10#1088"),
         repr(unchanged_sensor),
+    )
+
+    hose = FakeCoordinator()
+    hose.data = {
+        "hubs": [
+            {
+                "mid": 235522,
+                "hid": 153901,
+                "name": "Hub",
+                "model": "HWG023WBRF-V2",
+                "softVer": "1.1.1035",
+                "subDevices": [
+                    {
+                        "addr": 6,
+                        "name": "1 Zone Smart Hose Timer",
+                        "model": "HTV113FRF",
+                    }
+                ],
+            }
+        ],
+        "sensors": {
+            "235522_6": {
+                "hid": 153901,
+                "mid": 235522,
+                "addr": 6,
+                "home_name": "92 CBD",
+                "hub_name": "Hub",
+                "sub_name": "1 Zone Smart Hose Timer",
+                "model": "HTV113FRF",
+                "firmware_version": "126",
+                "raw_status": {"value": "10#E1AE00DC01D80020B700000000AD00009F00000000FF0FE1491719"},
+                "data": {},
+                "type_flag": 0,
+            }
+        },
+    }
+    asyncio.run(
+        coordinator_mqtt.handle_mqtt_update(
+            hose,
+            {
+                "hub_mid": "235522",
+                "hub_mid_candidates": ["235522"],
+                "device_key": "D06",
+                "payload": "10#E1A000DC01D82120B7B55A1B19AD58029F00000000FF0F97581B19",
+            },
+        )
+    )
+    hose_diag = hose._mqtt_diagnostics.get("235522_6", {})
+    check("routes HTV113FRF D06 update", hose.updated, repr(hose.data["sensors"]["235522_6"]))
+    check(
+        "summarizes HTV113FRF mqtt fields",
+        "battery 75%" in hose_diag.get("friendly_summary", "")
+        and "RSSI -96 dBm" in hose_diag.get("friendly_summary", "")
+        and "session 600s" in hose_diag.get("friendly_summary", ""),
+        repr(hose_diag),
     )
 
     display = FakeCoordinator()
