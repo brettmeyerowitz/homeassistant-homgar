@@ -439,15 +439,16 @@ def _decode_legacy_port_section(section: str, unit: str) -> dict:
         if wk_raw is not None and (wk_raw & 0x0F) == 0:
             result["last_water_volume"] = _vol(value1, unit)
         else:
+            result["last_water_volume"] = 0.0
             result["current_session_duration"] = value1 * 60
 
     ev_time = fi(3)
     if ev_time is not None and ev_time > 1_000_000_000:
         result["event_time_raw"] = ev_time
+        event_time_iso = datetime.fromtimestamp(ev_time, tz=timezone.utc).isoformat()
         if wk_raw is not None and (wk_raw & 0x0F) != 0:
-            result["irrigation_end_time"] = datetime.fromtimestamp(
-                ev_time, tz=timezone.utc
-            ).isoformat()
+            result["event_time"] = event_time_iso
+            result["irrigation_end_time"] = event_time_iso
 
     cycle_type = _derive_cycle_type(result.get("valve_state"), False)
     if cycle_type is not None:

@@ -60,7 +60,9 @@
       "expected": {
         "signal_strength": -67,
         "port_1.is_watering": true,
+        "port_1.event_time": {"present": true},
         "port_1.irrigation_end_time": {"present": true},
+        "port_1.last_water_volume": 0.0,
         "port_2.is_watering": false,
         "port_2.last_water_volume": {"approx": 1.7, "tolerance": 0.1}
       }

@@ -2,12 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.0.22-beta1] - 2026-04-13
+## [3.0.22] - 2026-04-14
 
 ### 🐛 Bug Fixes
 - **HTV113FRF schedule decoding** — added TLV decoding for packed `EVENT_TIME` / `EVENT_TIME2` values so the 1-zone smart hose timer now exposes accurate schedule-aware timing during active runs, including `Normal Irrigation`, `Cycle&Soak`, and `Misting Irrigation` states.
 - **Valve stop-state cleanup** — Home Assistant initiated valve stops now clear schedule-related fields immediately instead of waiting for a later backend refresh, preventing stale cycle labels and end times after `turn_off`.
 - **Timestamp timezone handling** — TLV schedule timestamps are now interpreted against Home Assistant’s configured timezone so short active runs no longer appear offset by the local UTC difference.
+- **Legacy valve step end times** — legacy RainPoint valve payloads now expose `Current Step End Time` alongside `Irrigation End Time`, so Dean-style `HTV213FRF` and `HTV245FRF` timers surface the active step end time during live runs.
+- **Legacy active last-volume fallback** — legacy valve payloads now keep `Last Session Volume` at `0.0` during active runs with no reported flow instead of flipping the sensor to `unavailable`.
+- **MQTT renewal timeout handling** — temporary `subscribeStatus` timeouts now log as warnings and retry with exponential backoff instead of spamming full error tracebacks for transient cloud hiccups.
 
 ### ✨ Improvements
 - **Valve schedule entities** — added user-facing valve schedule sensors where reported by the payload:
@@ -19,10 +22,11 @@ All notable changes to this project will be documented in this file.
 
 ### 🔧 Internal
 - **HTV113FRF regression coverage** — added live-capture fixtures for normal, `Cycle&Soak`, misting, off-pulse, and stopped states.
-- **Dean legacy valve coverage** — added extra `HTV213FRF` and `HTV245FRF` legacy samples to preserve the confirmed end-time and duration behaviour seen in Dean’s setup.
+- **Dean legacy valve coverage** — added extra `HTV213FRF` and `HTV245FRF` legacy samples to preserve the confirmed end-time, duration, and active-volume fallback behaviour seen in Dean’s setup.
 
 ### ⚠️ Notes
 - **Short mist/cycle transitions** — very short `Cycle&Soak` or mist phases can outpace RainPoint cloud update delivery. In those cases `Current Step End Time` may briefly lag until the next MQTT or REST update arrives.
+- **Legacy schedule end timestamps** — `Schedule End Time` is only shown when the payload includes a separate schedule-level end timestamp. Many legacy valve payloads only expose the current step end time, so `Schedule End Time` may remain unavailable even while a schedule is active.
 
 ---
 

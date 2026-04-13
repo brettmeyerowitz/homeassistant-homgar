@@ -1,7 +1,9 @@
 import logging
 import time
+import asyncio
 from datetime import datetime, timedelta
 
+from aiohttp import ClientError
 import voluptuous as vol
 
 from homeassistant import config_entries
@@ -20,6 +22,7 @@ from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[str] = ["sensor", "valve", "number"]
+_MQTT_RENEWAL_BACKOFF_SECONDS = (30, 60, 300, 900)
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -342,6 +345,7 @@ async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry
             
         # Update hass.data with new client
         entry_data["mqtt_client"] = new_mqtt_client
+        entry_data["_mqtt_renewal_retry_count"] = 0
         _LOGGER.info("HomGar [%s]: MQTT renewal - successfully switched to new client", entry.title)
         
         # Schedule next renewal
@@ -367,6 +371,23 @@ async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry
         
         return True
         
+    except (asyncio.TimeoutError, ClientError) as e:
+        retry_count = int(entry_data.get("_mqtt_renewal_retry_count", 0))
+        retry_in = _MQTT_RENEWAL_BACKOFF_SECONDS[min(retry_count, len(_MQTT_RENEWAL_BACKOFF_SECONDS) - 1)]
+        entry_data["_mqtt_renewal_retry_count"] = retry_count + 1
+        _LOGGER.warning(
+            "HomGar [%s]: MQTT renewal timed out: %s; retrying in %ss (attempt %s)",
+            entry.title,
+            e,
+            retry_in,
+            retry_count + 1,
+        )
+
+        async def _retry_renewal(hass=hass, entry=entry):
+            await _async_renew_mqtt_subscription(hass, entry)
+
+        hass.loop.call_later(retry_in, lambda: hass.async_create_task(_retry_renewal()))
+        return False
     except Exception as e:
         _LOGGER.error("HomGar [%s]: MQTT renewal failed: %s", entry.title, e, exc_info=True)
         return False

@@ -284,6 +284,15 @@ class HomGarGenericSensor(HomGarSensorBase):
     def native_value(self):
         src = self._source_data
         value = src.get(self._field_name) if src else None
+        if (
+            value is None
+            and self._field_name == "last_water_volume"
+            and src
+            and src.get("is_watering") is True
+        ):
+            # Some valve payloads omit an explicit last-session volume while a
+            # run is active. Prefer a stable zero value over unavailable.
+            value = 0.0
         if value is not None and getattr(self, "_attr_device_class", None) == SensorDeviceClass.TIMESTAMP and isinstance(value, str):
             try:
                 value = datetime.fromisoformat(value)
