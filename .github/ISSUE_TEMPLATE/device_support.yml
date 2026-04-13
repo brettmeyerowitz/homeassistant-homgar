@@ -13,6 +13,10 @@ body:
         **Important:** Screenshots from the RainPoint or HomGar app showing actual readings are essential. Raw payloads alone cannot tell us what values the bytes represent — we need to see what the app displays alongside the payload to map the byte offsets to the correct sensor values.
         
         The more payload+screenshot pairs you provide (in different states), the faster and more accurate the implementation will be.
+
+        **Latest released integration version:** `3.0.19`
+        
+        Please update to the latest release and restart Home Assistant before opening a new device support request.
   
   - type: input
     id: device_model
@@ -143,8 +147,8 @@ body:
     id: integration_version
     attributes:
       label: Integration Version
-      description: What version of the HomGar/RainPoint integration are you using?
-      placeholder: "2.0.3"
+      description: What exact version of the HomGar/RainPoint integration are you using? Latest release is 3.0.19.
+      placeholder: "e.g. 3.0.19"
     validations:
       required: true
   
@@ -172,6 +176,8 @@ body:
       description: Please confirm you have completed the following
       options:
         - label: I have attached screenshots from the RainPoint/HomGar app showing actual readings
+          required: true
+        - label: I have updated to the latest released version (3.0.19) and restarted Home Assistant
           required: true
         - label: I have provided payloads from HA debug logs that match my app screenshots
           required: true
