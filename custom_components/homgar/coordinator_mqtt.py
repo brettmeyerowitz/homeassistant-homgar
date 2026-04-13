@@ -23,6 +23,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
     hub_mid_candidates = data.get("hub_mid_candidates") or [hub_mid]
     device_key = data.get("device_key")  # e.g., "D01", "D02"
     payload = data.get("payload")  # e.g., "11#00..."
+    hub_state = data.get("hub_state")
     
     _LOGGER.debug(
         "HomGar MQTT update received: hub_mid=%s candidates=%s device_key=%s payload=%s",
@@ -109,6 +110,15 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
 
     try:
         decoded = decode_payload(model, payload)
+        if model == "HWS019WRF-V2":
+            decoded.pop("battery_level", None)
+            try:
+                if hub_state:
+                    parts = str(hub_state).split(",")
+                    if len(parts) >= 2:
+                        decoded["signal_strength"] = int(parts[1])
+            except (TypeError, ValueError):
+                pass
         if "error" in decoded:
             _LOGGER.debug("HomGar MQTT: No decoder for model=%s (sub_model=%s)", model, sub_model)
             return
@@ -128,30 +138,8 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         decoded_sensors = coordinator.data.get("sensors", {})
         
         if sensor_key in decoded_sensors:
-            # Skip update if decoded data is identical to what's already stored
-            existing = decoded_sensors[sensor_key].get("data") or {}
-            _SKIP_KEYS = {"device_timestamp", "timestamp_source"}
-            existing_cmp = {k: v for k, v in existing.items() if k not in _SKIP_KEYS}
-            decoded_cmp = {k: v for k, v in decoded.items() if k not in _SKIP_KEYS}
-            if existing_cmp == decoded_cmp:
-                _LOGGER.debug(
-                    "HomGar MQTT: No change in data for sensor %s — skipping update",
-                    sensor_key,
-                )
-                return
-
-            # Stamp with current time and mark as MQTT-sourced
             now_iso = datetime.now(timezone.utc).isoformat()
-            decoded["device_timestamp"] = now_iso
-            decoded["timestamp_source"] = "mqtt"
 
-            # Update existing sensor data
-            decoded_sensors[sensor_key]["data"] = decoded
-            decoded_sensors[sensor_key]["raw_status"]["value"] = payload
-
-            # Keep last-good cache in sync so REST null responses don't clobber fresh MQTT data
-            coordinator._last_good_data[sensor_key] = decoded
-            
             # Determine status message based on decoded fields (v3 field names)
             watering_ports = [
                 p
@@ -174,16 +162,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
                     status_msg = f"Temp: {decoded.get('temperature')}°C"
                 else:
                     status_msg = "data updated"
-            
-            _LOGGER.debug(
-                "HomGar MQTT: Updated sensor %s (%s / %s) with real-time data (%s)",
-                sensor_key,
-                hub_name,
-                sub_name or model,
-                status_msg,
-            )
-            
-            # Store MQTT diagnostics for diagnostic sensor entities
+
             friendly_parts = []
             if "battery_level" in decoded:
                 friendly_parts.append(f"battery {decoded['battery_level']}%")
@@ -205,11 +184,44 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
                 port = decoded.get(f"port_{p}", {})
                 if port.get("valve_state"):
                     friendly_parts.append(f"zone {p}: {port['valve_state']}")
+
+            # Always refresh MQTT diagnostics even when the decoded data is unchanged.
+            decoded_sensors[sensor_key]["raw_status"]["value"] = payload
             coordinator._mqtt_diagnostics[sensor_key] = {
                 "raw_payload": payload,
                 "friendly_summary": ", ".join(friendly_parts) if friendly_parts else "data updated",
                 "last_received": now_iso,
             }
+
+            # Skip state update if decoded data is identical to what's already stored
+            existing = decoded_sensors[sensor_key].get("data") or {}
+            _SKIP_KEYS = {"device_timestamp", "timestamp_source"}
+            existing_cmp = {k: v for k, v in existing.items() if k not in _SKIP_KEYS}
+            decoded_cmp = {k: v for k, v in decoded.items() if k not in _SKIP_KEYS}
+            if existing_cmp == decoded_cmp:
+                _LOGGER.debug(
+                    "HomGar MQTT: No change in data for sensor %s — refreshed MQTT diagnostics only",
+                    sensor_key,
+                )
+                coordinator.async_set_updated_data(coordinator.data)
+                return
+
+            # Stamp with current time and mark as MQTT-sourced
+            decoded["device_timestamp"] = now_iso
+            decoded["timestamp_source"] = "mqtt"
+
+            # Update existing sensor data
+            decoded_sensors[sensor_key]["data"] = decoded
+
+            # Keep last-good cache in sync so REST null responses don't clobber fresh MQTT data
+            coordinator._last_good_data[sensor_key] = decoded
+            _LOGGER.debug(
+                "HomGar MQTT: Updated sensor %s (%s / %s) with real-time data (%s)",
+                sensor_key,
+                hub_name,
+                sub_name or model,
+                status_msg,
+            )
 
             # Trigger coordinator update to notify entities
             coordinator.async_set_updated_data(coordinator.data)

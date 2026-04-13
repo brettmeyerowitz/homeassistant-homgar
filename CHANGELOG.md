@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.19] - 2026-04-13
+
+### 🐛 Bug Fixes
+- **HWS019WRF-V2 display diagnostics cleanup** — stopped emitting bogus `battery_level` and legacy-header `signal_strength` values for the RainPoint display subdevice. The display now keeps its environmental readings while using the real hub RSSI from the `state` payload (for example `-50 dBm`) instead of showing `1 dBm`.
+- **MQTT diagnostics on unchanged data** — `Last MQTT Payload` and `Last MQTT Summary` sensors now refresh even when a new MQTT message decodes to the same entity state, making it easier to confirm that realtime traffic is arriving.
+
+### 🔧 Internal
+- **Display-specific regression coverage** — added routing and fixture assertions for `HWS019WRF-V2` so fake battery values stay suppressed and hub-state RSSI stays mapped correctly.
+
+---
+
 ## [3.0.18] - 2026-04-13
 
 ### 🐛 Bug Fixes

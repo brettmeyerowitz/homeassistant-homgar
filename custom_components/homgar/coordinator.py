@@ -26,6 +26,19 @@ from .decoder import decode_payload, get_valve_ports
 _LOGGER = logging.getLogger(__name__)
 
 
+def _extract_state_rssi(raw_state: str | None) -> int | None:
+    """Extract RSSI from hub state strings like ``0,-50``."""
+    if not raw_state:
+        return None
+    try:
+        parts = str(raw_state).split(",")
+        if len(parts) < 2:
+            return None
+        return int(parts[1])
+    except (TypeError, ValueError):
+        return None
+
+
 class HomGarCoordinator(DataUpdateCoordinator):
     """Coordinator for HomGar polling."""
 
@@ -126,6 +139,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
             for hub in hubs:
                 mid = hub["mid"]
                 status = status_by_mid.get(mid, {"subDeviceStatus": []})
+                hub_state_rssi = _extract_state_rssi(next((entry.get("value") for entry in status.get("subDeviceStatus", []) if entry.get("id") == "state"), None))
 
                 _LOGGER.debug("Processing hub mid=%s with status", mid)
 
@@ -160,6 +174,10 @@ class HomGarCoordinator(DataUpdateCoordinator):
                             _LOGGER.debug("Decoding payload for model=%s mid=%s addr=%s: %s", model, mid, addr, raw_value)
                             
                             decoded = decode_payload(model, raw_value)
+                            if model == "HWS019WRF-V2":
+                                decoded.pop("battery_level", None)
+                                if hub_state_rssi is not None:
+                                    decoded["signal_strength"] = hub_state_rssi
                             if "error" in decoded:
                                 # Model not found in product_models.json
                                 decoded = {

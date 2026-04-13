@@ -116,6 +116,34 @@ async def _run_case() -> tuple[bool, dict, dict]:
     return coordinator.updated, sensor, diag
 
 
+async def _run_no_change_case() -> tuple[bool, dict, dict]:
+    coordinator = FakeCoordinator()
+    existing = {
+        "port_number": 8,
+        "port_1": {"valve_state": "idle", "is_watering": False},
+        "port_2": {"valve_state": "idle", "is_watering": False},
+        "port_3": {"valve_state": "idle", "is_watering": False},
+        "port_4": {"valve_state": "idle", "is_watering": False},
+        "port_5": {"valve_state": "idle", "is_watering": False},
+        "port_6": {"valve_state": "idle", "is_watering": False},
+        "port_7": {"valve_state": "idle", "is_watering": False},
+        "port_8": {"valve_state": "idle", "is_watering": False},
+    }
+    coordinator.data["sensors"]["39929_0"]["data"] = existing.copy()
+    await coordinator_mqtt.handle_mqtt_update(
+        coordinator,
+        {
+            "hub_mid": "139929",
+            "hub_mid_candidates": ["139929", "39929"],
+            "device_key": "D00",
+            "payload": "10#108800AF00000000B700204200D800F700000000F9FF00",
+        },
+    )
+    sensor = coordinator.data["sensors"]["39929_0"]
+    diag = coordinator._mqtt_diagnostics.get("39929_0", {})
+    return coordinator.updated, sensor, diag
+
+
 def main() -> int:
     print("\n🧪 MQTT routing regression tests")
     updated, sensor, diag = asyncio.run(_run_case())
@@ -179,6 +207,70 @@ def main() -> int:
         "zone 3: irrigation" in hic_diag.get("friendly_summary", ""),
         repr(hic_diag),
     )
+
+    unchanged_updated, unchanged_sensor, unchanged_diag = asyncio.run(_run_no_change_case())
+    check("refreshes diagnostics even when decoded data is unchanged", unchanged_updated, repr(unchanged_diag))
+    check(
+        "stores raw mqtt payload on no-change update",
+        unchanged_diag.get("raw_payload", "").startswith("10#1088"),
+        repr(unchanged_diag),
+    )
+    check(
+        "updates raw_status on no-change update",
+        unchanged_sensor["raw_status"]["value"].startswith("10#1088"),
+        repr(unchanged_sensor),
+    )
+
+    display = FakeCoordinator()
+    display.data = {
+        "hubs": [
+            {
+                "mid": 139929,
+                "hid": 90929,
+                "name": "Rainpoint Display",
+                "model": "HIS019WRF-V2",
+                "softVer": "1.1.1050",
+                "subDevices": [
+                    {
+                        "addr": 1,
+                        "name": "Rainpoint Display",
+                        "model": "HWS019WRF-V2",
+                    }
+                ],
+            }
+        ],
+        "sensors": {
+            "139929_1": {
+                "hid": 90929,
+                "mid": 139929,
+                "addr": 1,
+                "home_name": "Rainpoint Home",
+                "hub_name": "Rainpoint Display",
+                "sub_name": "Rainpoint Display",
+                "model": "HWS019WRF-V2",
+                "firmware_version": "27",
+                "raw_status": {"value": "1,0,1;730(737/730/1),35(36/35/1),P=9708(9716/9708/1),"},
+                "data": {},
+                "type_flag": 1,
+            }
+        },
+    }
+    asyncio.run(
+        coordinator_mqtt.handle_mqtt_update(
+            display,
+            {
+                "hub_mid": "139929",
+                "hub_mid_candidates": ["139929", "39929"],
+                "device_key": "D01",
+                "payload": "1,0,1;728(737/728/1),35(36/35/1),P=9708(9716/9708/1),",
+                "hub_state": "0,-50",
+            },
+        )
+    )
+    display_data = display.data["sensors"]["139929_1"]["data"]
+    check("routes HWS019WRF-V2 display update", display.updated, repr(display_data))
+    check("uses hub state RSSI for display", display_data.get("signal_strength") == -50, repr(display_data))
+    check("suppresses bogus display battery", "battery_level" not in display_data, repr(display_data))
 
     total = PASS + FAIL
     print(f"\n{'=' * 50}")

@@ -10,7 +10,9 @@
       "expected": {
         "temperature": {"min": -40, "max": 80},
         "humidity": {"min": 0, "max": 100},
-        "air_pressure": {"min": 800, "max": 1200}
+        "air_pressure": {"min": 800, "max": 1200},
+        "battery_level": {"present": false},
+        "signal_strength": {"present": false}
       }
     }
   ]

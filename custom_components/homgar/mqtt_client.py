@@ -363,6 +363,7 @@ class HomGarMQTTClient:
                     "hub_mid_candidates": hub_mid_candidates,
                     "device_key": key,
                     "payload": str(raw_val),
+                    "hub_state": d_updates.get("state", {}).get("value") if isinstance(d_updates.get("state"), dict) else d_updates.get("state"),
                 })
         
         except Exception as e:

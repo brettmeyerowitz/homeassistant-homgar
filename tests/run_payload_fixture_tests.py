@@ -77,8 +77,12 @@ def get_path(data: dict, path: str):
 def evaluate_expected(actual, expected) -> tuple[bool, str]:
     """Evaluate one expectation entry against an actual decoded value."""
     if isinstance(expected, dict):
-        if expected.get("present") and actual is None:
-            return False, "value missing"
+        if "present" in expected:
+            should_be_present = bool(expected["present"])
+            if should_be_present and actual is None:
+                return False, "value missing"
+            if not should_be_present and actual is not None:
+                return False, f"unexpected value {actual!r}"
         if "one_of" in expected and actual not in expected["one_of"]:
             return False, f"got {actual!r}"
         if "min" in expected:

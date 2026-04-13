@@ -437,6 +437,7 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
                           port_number: int = 1, model_str: str = "") -> dict:
     result: dict = {}
     is_valve_model = bool(model_str and get_valve_ports(model_str))
+    is_display_hub_v2 = model_str == "HWS019WRF-V2"
     port_sections = leg.get("_leg_port_sections", [])
     has_multi_port_sections = port_number > 1 and len(port_sections) >= port_number
 
@@ -488,13 +489,14 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
 
     bat_or_rssi = leg.get("_p1_bat_or_rssi")
     rssi = leg.get("_p1_rssi")
-    if bat_or_rssi is not None:
-        if bat_or_rssi < 0:
-            result["signal_strength"] = bat_or_rssi
-        else:
-            result["battery_level"] = bat_or_rssi
-    if rssi is not None and "signal_strength" not in result:
-        result["signal_strength"] = rssi
+    if not is_display_hub_v2:
+        if bat_or_rssi is not None:
+            if bat_or_rssi < 0:
+                result["signal_strength"] = bat_or_rssi
+            else:
+                result["battery_level"] = bat_or_rssi
+        if rssi is not None and "signal_strength" not in result:
+            result["signal_strength"] = rssi
 
     if port_number > 1 and len(port_sections) >= port_number:
         for p in range(1, port_number + 1):
