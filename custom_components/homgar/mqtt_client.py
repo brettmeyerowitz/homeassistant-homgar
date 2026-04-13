@@ -67,6 +67,22 @@ def _extract_hub_mid_candidates(prefix_full: str) -> tuple[str, list[str]]:
     return last6, candidates
 
 
+def _looks_like_device_payload(raw_val: str) -> bool:
+    """Return True when an MQTT device value looks like a real device payload.
+
+    We accept both TLV/hex payloads (e.g. ``10#...``) and the older ASCII
+    payloads used by some RainPoint valve timers (e.g. ``1,-71,1;...|...``).
+    """
+    raw = str(raw_val).strip()
+    if not raw:
+        return False
+
+    if "#" in raw:
+        return True
+
+    return ";" in raw and "," in raw
+
+
 def _build_aliyun_auth(product_key: str, device_name: str, device_secret: str) -> tuple[str, str, str]:
     """Build Alibaba Cloud IoT MQTT authentication credentials (securemode=2, Observer mode).
     
@@ -331,7 +347,7 @@ class HomGarMQTTClient:
                     continue
                 
                 raw_val = val.get("value", "") if isinstance(val, dict) else val
-                if not raw_val or "#" not in str(raw_val):
+                if not _looks_like_device_payload(str(raw_val)):
                     continue
                 
                 _LOGGER.debug(

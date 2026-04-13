@@ -38,6 +38,7 @@ def _load_module():
 mqtt_client = _load_module()
 extract_updates = mqtt_client._extract_device_updates
 extract_hub_mid_candidates = mqtt_client._extract_hub_mid_candidates
+looks_like_device_payload = mqtt_client._looks_like_device_payload
 
 PASS = 0
 FAIL = 0
@@ -73,6 +74,18 @@ def main() -> int:
     parsed = extract_updates('{"D04":{"value":"10#PAYLOAD"}}')
     check("parses plain object body", isinstance(parsed, dict), repr(parsed))
     check("plain object contains D04", parsed is not None and "D04" in parsed, repr(parsed))
+
+    check("accepts tlv device payload", looks_like_device_payload("10#108800AF00000000"), "expected True")
+    check(
+        "accepts legacy ascii valve payload",
+        looks_like_device_payload("1,-71,1;0,0,0,0,0,0|32,0,0,0,600,0"),
+        "expected True",
+    )
+    check(
+        "rejects scalar mqtt fragment",
+        not looks_like_device_payload("1|1776014190215|103441486619"),
+        "expected False",
+    )
 
     last6, candidates = extract_hub_mid_candidates("P260412163703000017280081139929")
     check("mid extraction keeps raw candidate", last6 == "139929", repr((last6, candidates)))

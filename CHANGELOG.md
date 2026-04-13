@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.18] - 2026-04-13
+
+### 🐛 Bug Fixes
+- **Legacy MQTT realtime updates for HTV213FRF** — fixed the MQTT client so legacy ASCII valve payloads such as `1,-71,1;...|...` are forwarded to the coordinator instead of being silently dropped. This restores realtime MQTT updates for Dean-style `HTV213FRF` timers when changes originate from the RainPoint app.
+
+### 🔧 Internal
+- **MQTT parser regression coverage** — added focused parser coverage to accept real legacy ASCII device payloads while continuing to ignore scalar-only MQTT fragments.
+
+---
+
 ## [3.0.17] - 2026-04-12
 
 ### 🐛 Bug Fixes
