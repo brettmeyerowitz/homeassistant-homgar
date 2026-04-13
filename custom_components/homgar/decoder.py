@@ -486,6 +486,8 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
             result["total_water_volume"] = _vol(leg["_leg_total_water_raw"], unit)
         if leg.get("_leg_cur_duration") is not None:
             result["current_session_duration"] = leg["_leg_cur_duration"]
+        if leg.get("_leg_last_duration") is not None:
+            result["last_water_duration"] = leg["_leg_last_duration"]
 
     bat_or_rssi = leg.get("_p1_bat_or_rssi")
     rssi = leg.get("_p1_rssi")

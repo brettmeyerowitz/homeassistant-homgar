@@ -88,6 +88,17 @@
         "temperature": {"min": -40, "max": 80},
         "humidity": {"min": 0, "max": 100}
       }
+    },
+    {
+      "id": "shaun-live-legacy-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "legacy",
+      "payload": "1,0,1;622(645/595/1),87(96/78/1),",
+      "expected": {
+        "temperature": {"approx": 16.8, "tolerance": 0.2},
+        "humidity": 87
+      }
     }
   ]
 }

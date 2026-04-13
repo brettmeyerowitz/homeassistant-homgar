@@ -25,6 +25,18 @@
         "temperature": {"min": -10, "max": 50},
         "battery_level": {"one_of": [10, 25, 50, 75, 100]}
       }
+    },
+    {
+      "id": "shaun-live-legacy-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "legacy",
+      "payload": "1,0,1;728(759/723/1),54(57/44/1),C=E601DC05(754/437)",
+      "expected": {
+        "temperature": {"approx": 22.7, "tolerance": 0.2},
+        "humidity": 54,
+        "carbon_dioxide": 486
+      }
     }
   ]
 }

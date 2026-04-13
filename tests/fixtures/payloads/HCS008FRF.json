@@ -14,6 +14,22 @@
         "today_water_volume": {"present": true},
         "flow_rate": {"min": 0}
       }
+    },
+    {
+      "id": "shaun-live-legacy-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "legacy",
+      "payload": "1,-71,1;12B21A19,0,0,0,16,208,4551,513825",
+      "expected": {
+        "signal_strength": -71,
+        "current_water_volume": 0.0,
+        "current_session_duration": 0,
+        "last_water_volume": 1.6,
+        "last_water_duration": 208,
+        "today_water_volume": 455.1,
+        "total_water_volume": 51382.5
+      }
     }
   ]
 }

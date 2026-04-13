@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.20] - 2026-04-13
+
+### 🐛 Bug Fixes
+- **HCS008FRF legacy duration coverage** — restored `last_water_duration` emission for legacy ASCII `HCS008FRF` payloads so the decoder preserves the app-observed last-duration field instead of silently dropping it.
+
+### 🔧 Internal
+- **Shaun legacy regression samples** — added live-capture legacy fixture coverage for `HCS014ARF`, `HCS0530THO`, `HCS008FRF`, and `HWS019WRF-V2` to lock in the cross-account legacy formats now validated from both RainPoint SA and Dean’s environment.
+
+---
+
 ## [3.0.19] - 2026-04-13
 
 ### 🐛 Bug Fixes

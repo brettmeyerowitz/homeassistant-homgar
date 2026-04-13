@@ -14,6 +14,20 @@
         "battery_level": {"present": false},
         "signal_strength": {"present": false}
       }
+    },
+    {
+      "id": "shaun-live-legacy-1",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "legacy",
+      "payload": "1,0,1;758(798/750/1),54(54/46/1),P=8569(8569/8540/1),",
+      "expected": {
+        "temperature": {"approx": 24.3, "tolerance": 0.2},
+        "humidity": 54,
+        "air_pressure": {"approx": 856.9, "tolerance": 0.2},
+        "battery_level": {"present": false},
+        "signal_strength": {"present": false}
+      }
     }
   ]
 }
