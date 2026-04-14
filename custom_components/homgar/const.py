@@ -6,6 +6,7 @@ CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
 CONF_HIDS = "hids"  # list of selected home IDs
 CONF_APP_TYPE = "app_type"  # "homgar" or "rainpoint"
+CONF_GROUP_MULTI_ZONE_DEVICES = "group_multi_zone_devices"
 
 DEFAULT_SCAN_INTERVAL = 120  # seconds
 
@@ -54,10 +55,39 @@ def format_port_entity_name(
     sensor_info: dict,
     port: int,
     suffix: str | None = None,
+    *,
+    use_device_prefix: bool = False,
 ) -> str:
     """Format a user-facing per-port entity name without changing unique IDs."""
-    port_label = get_port_label(sensor_info, port) or f"Zone {port}"
-    parts = [sub_name, port_label]
+    if use_device_prefix:
+        parts = [format_port_device_name(sub_name, sensor_info, port)]
+    else:
+        port_label = get_port_label(sensor_info, port) or f"Zone {port}"
+        parts = [sub_name, port_label]
     if suffix:
         parts.append(suffix)
     return " ".join(parts)
+
+
+def format_port_device_name(
+    sub_name: str,
+    sensor_info: dict,
+    port: int,
+) -> str:
+    """Format the HA device name for a single controller port."""
+    port_label = get_port_label(sensor_info, port) or f"Zone {port}"
+    return f"{sub_name} - {port_label}"
+
+
+def zone_device_identifier(mid: int | str, addr: int | str, port: int) -> str:
+    """Return the stable HA device identifier for a controller port."""
+    return f"{mid}_{addr}_zone{port}"
+
+
+def controller_device_identifier(sensor_info: dict) -> str:
+    """Return the HA device identifier for the parent controller device."""
+    mid = sensor_info["mid"]
+    if sensor_info.get("type_flag") == 1:
+        return f"rainpoint_hub_{mid}"
+    addr = sensor_info["addr"]
+    return f"{mid}_{addr}"

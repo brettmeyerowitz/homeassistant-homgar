@@ -210,6 +210,16 @@ else
     exit 1
 fi
 
+# ── Test: zone device regressions ─────────────────────────────────────────
+echo "🧪 Running zone device regression tests..."
+docker cp tests/run_zone_device_tests.py ha-test:/tmp/tests/run_zone_device_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_zone_device_tests.py; then
+    echo "✅ Zone device regression tests passed"
+else
+    echo "❌ ERROR: Zone device regression tests failed"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null

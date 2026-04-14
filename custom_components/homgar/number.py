@@ -11,7 +11,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, format_port_entity_name
+from .const import (
+    DOMAIN,
+    CONF_GROUP_MULTI_ZONE_DEVICES,
+    controller_device_identifier,
+    format_port_device_name,
+    format_port_entity_name,
+    zone_device_identifier,
+)
 from .coordinator import HomGarCoordinator
 from .decoder import get_valve_ports
 
@@ -87,7 +94,16 @@ class HomGarZoneDurationNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
         sub_name = sensor_info.get("sub_name") or f"Valve Hub {addr}"
 
         self._attr_unique_id = f"rainpoint_{mid}_{addr}_zone{zone_num}_duration"
-        self._attr_name = format_port_entity_name(sub_name, sensor_info, zone_num, "Duration")
+        self._attr_name = format_port_entity_name(
+            sub_name,
+            sensor_info,
+            zone_num,
+            "Duration",
+            use_device_prefix=(
+                self.coordinator._entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)
+                and len(get_valve_ports(sensor_info.get("model"))) > 1
+            ),
+        )
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -141,6 +157,18 @@ class HomGarZoneDurationNumber(CoordinatorEntity, NumberEntity, RestoreEntity):
         addr = self._sensor_info["addr"]
         sub_name = self._sensor_info.get("sub_name") or f"Valve Hub {addr}"
         model = self._sensor_info.get("model") or "Unknown"
+        parent_ident = controller_device_identifier(self._sensor_info)
+        if (
+            self.coordinator._entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)
+            and len(get_valve_ports(model)) > 1
+        ):
+            return {
+                "identifiers": {(DOMAIN, zone_device_identifier(mid, addr, self._zone_num))},
+                "name": format_port_device_name(sub_name, self._sensor_info, self._zone_num),
+                "manufacturer": "RainPoint",
+                "model": model,
+                "via_device": (DOMAIN, parent_ident),
+            }
         if self._sensor_info.get("type_flag") == 1:
             return {
                 "identifiers": {(DOMAIN, f"rainpoint_hub_{mid}")},

@@ -18,7 +18,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, format_port_entity_name
+from .const import (
+    DOMAIN,
+    CONF_GROUP_MULTI_ZONE_DEVICES,
+    controller_device_identifier,
+    format_port_device_name,
+    format_port_entity_name,
+    zone_device_identifier,
+)
 from .coordinator import HomGarCoordinator
 from .sensor_defs import FIELD_SENSOR_MAP, sensor_fields_for_data
 from .decoder import get_valve_ports
@@ -170,7 +177,23 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
         addr = self._sensor_info["addr"]
         sub_name = self._sensor_info.get("sub_name") or f"Sensor {addr}"
         model = self._sensor_info.get("model") or "Unknown"
+        parent_ident = controller_device_identifier(self._sensor_info)
+        port = self._device_port()
+        group_multi_zone = (
+            port is not None
+            and self.coordinator._entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)
+            and len(get_valve_ports(model)) > 1
+        )
 
+        if group_multi_zone:
+            return {
+                "identifiers": {(DOMAIN, zone_device_identifier(mid, addr, port))},
+                "name": format_port_device_name(sub_name, self._sensor_info, port),
+                "manufacturer": "RainPoint",
+                "model": model,
+                "suggested_area": self._sensor_info.get("home_name"),
+                "via_device": (DOMAIN, parent_ident),
+            }
         if self._sensor_info.get("type_flag") == 1:
             return {
                 "identifiers": {(DOMAIN, f"rainpoint_hub_{mid}")},
@@ -187,6 +210,10 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
             "suggested_area": self._sensor_info.get("home_name"),
             "via_device": (DOMAIN, f"rainpoint_hub_{mid}"),
         }
+
+    def _device_port(self) -> int | None:
+        """Return the port number that owns this entity, if any."""
+        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -265,7 +292,16 @@ class HomGarGenericSensor(HomGarSensorBase):
         label = (sdef.name if sdef and sdef.name else field_name.replace("_", " ").title())
         if port is not None:
             uid_suffix = f"{field_name}_port{port}"
-            self._attr_name = format_port_entity_name(sub_name, sensor_info, port, label)
+            self._attr_name = format_port_entity_name(
+                sub_name,
+                sensor_info,
+                port,
+                label,
+                use_device_prefix=(
+                    self.coordinator._entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)
+                    and len(get_valve_ports(sensor_info.get("model"))) > 1
+                ),
+            )
         else:
             uid_suffix = field_name
             self._attr_name = f"{sub_name} {label}"
@@ -279,6 +315,9 @@ class HomGarGenericSensor(HomGarSensorBase):
         if self._port is not None:
             return data.get(f"port_{self._port}")
         return data
+
+    def _device_port(self) -> int | None:
+        return self._port
 
     @property
     def native_value(self):

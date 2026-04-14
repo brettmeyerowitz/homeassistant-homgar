@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -20,6 +21,7 @@ from .const import (
     CONF_PASSWORD,
     CONF_HIDS,
     CONF_APP_TYPE,
+    CONF_GROUP_MULTI_ZONE_DEVICES,
     APP_TYPE_HOMGAR,
     APP_TYPE_RAINPOINT,
 )
@@ -66,6 +68,12 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._reconfigure = False
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> config_entries.OptionsFlow:
+        """Return the options flow handler."""
+        return HomGarOptionsFlow(config_entry)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         errors: dict[str, str] = {}
@@ -327,4 +335,30 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="select_homes_reconfigure",
             data_schema=data_schema,
             errors=errors,
+        )
+
+
+class HomGarOptionsFlow(config_entries.OptionsFlow):
+    """Handle HomGar options."""
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        self._config_entry = config_entry
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Manage integration options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        data_schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_GROUP_MULTI_ZONE_DEVICES,
+                    default=self._config_entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False),
+                ): bool,
+            }
+        )
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=data_schema,
         )

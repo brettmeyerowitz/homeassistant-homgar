@@ -218,6 +218,21 @@ BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HC
 
 Valve devices additionally get a **valve open/close** entity and a **duration (minutes)** number entity per zone.
 
+### Optional multi-zone device grouping
+
+For multi-zone controllers, you can enable **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options** and turn on:
+
+- `Create a separate Home Assistant device for each controller zone`
+
+When enabled:
+
+- each valve zone gets its own Home Assistant device
+- the child device name uses the RainPoint zone label when available
+- valve, duration, and per-zone schedule sensors move under the child device
+- shared diagnostics such as MQTT payload/summary stay on the parent controller device
+
+This option is reversible and does not change entity IDs or unique IDs.
+
 ---
 
 ## MQTT Real-time Updates

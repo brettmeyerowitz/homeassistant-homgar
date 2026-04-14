@@ -12,10 +12,21 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import entity_registry as er, device_registry as dr
 
-from .const import DOMAIN
+from .const import (
+    CONF_GROUP_MULTI_ZONE_DEVICES,
+    controller_device_identifier,
+    DOMAIN,
+    format_port_device_name,
+    zone_device_identifier,
+)
+from .decoder import get_valve_ports
 
 _OLD_HUB_IDENT = re.compile(r"^hub_\d+$")
 _OLD_SENSOR_IDENT = re.compile(r"^\d+_\d+_\d+$")
+_ZONE_DEVICE_IDENT = re.compile(r"^\d+_\d+_zone\d+$")
+_PER_ZONE_ENTITY_UID = re.compile(
+    r"^rainpoint_(?P<mid>\d+)_(?P<addr>\d+)_(?:(?P<field>.+)_port(?P<sensor_port>\d+)|zone(?P<zone_port>\d+)(?:_duration)?)$"
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -173,3 +184,110 @@ async def async_merge_wifi_devices(
             _LOGGER.info("HomGar migrate: moved WiFi entity %s to hub device", entity_entry.unique_id)
         device_reg.async_remove_device(old_dev.id)
         _LOGGER.info("HomGar migrate: merged WiFi sub-device mid=%s addr=%s into hub", mid, addr)
+
+
+async def async_rehome_multi_zone_entities(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    coordinator,
+) -> None:
+    """Assign per-zone entities to child devices when the option is enabled.
+
+    Reversible and idempotent: entities move back to the parent controller
+    device when the option is disabled again.
+    """
+    data = coordinator.data
+    if not data:
+        return
+
+    entity_reg = er.async_get(hass)
+    device_reg = dr.async_get(hass)
+    sensors = data.get("sensors", {})
+    sensors_by_key: dict[tuple[int, int], dict] = {}
+    for sensor_info in sensors.values():
+        mid = sensor_info.get("mid")
+        addr = sensor_info.get("addr")
+        model = sensor_info.get("model")
+        if mid is None or addr is None or not model or len(get_valve_ports(model)) <= 1:
+            continue
+        sensors_by_key[(int(mid), int(addr))] = sensor_info
+
+    group_by_zone = entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)
+    matched_entities = 0
+    moved_entities = 0
+
+    for entity_entry in er.async_entries_for_config_entry(entity_reg, entry.entry_id):
+        uid = entity_entry.unique_id or ""
+        match = _PER_ZONE_ENTITY_UID.match(uid)
+        if not match:
+            continue
+        matched_entities += 1
+
+        mid = int(match.group("mid"))
+        addr = int(match.group("addr"))
+        port = int(match.group("sensor_port") or match.group("zone_port") or 0)
+        if port <= 0:
+            continue
+
+        sensor_info = sensors_by_key.get((mid, addr))
+        if not sensor_info:
+            continue
+
+        parent_ident_str = controller_device_identifier(sensor_info)
+        parent_ident = (DOMAIN, parent_ident_str)
+        parent_dev = device_reg.async_get_device(identifiers={parent_ident})
+        if parent_dev is None:
+            create_kwargs = {
+                "config_entry_id": entry.entry_id,
+                "identifiers": {parent_ident},
+                "manufacturer": "RainPoint",
+                "model": sensor_info.get("model") or "Unknown",
+                "name": sensor_info.get("sub_name") or f"Valve Hub {addr}",
+                "suggested_area": sensor_info.get("home_name"),
+            }
+            if sensor_info.get("type_flag") != 1:
+                create_kwargs["via_device"] = (DOMAIN, f"rainpoint_hub_{mid}")
+            parent_dev = device_reg.async_get_or_create(**create_kwargs)
+
+        target_dev = parent_dev
+        if group_by_zone:
+            zone_ident = (DOMAIN, zone_device_identifier(mid, addr, port))
+            target_dev = device_reg.async_get_or_create(
+                config_entry_id=entry.entry_id,
+                identifiers={zone_ident},
+                manufacturer="RainPoint",
+                model=sensor_info.get("model") or "Unknown",
+                name=format_port_device_name(
+                    sensor_info.get("sub_name") or f"Valve Hub {addr}",
+                    sensor_info,
+                    port,
+                ),
+                via_device=parent_ident,
+                suggested_area=sensor_info.get("home_name"),
+            )
+
+        if entity_entry.device_id != target_dev.id:
+            entity_reg.async_update_entity(entity_entry.entity_id, device_id=target_dev.id)
+            moved_entities += 1
+            _LOGGER.info(
+                "HomGar migrate: moved %s to %s",
+                entity_entry.unique_id,
+                next(iter(target_dev.identifiers))[1],
+            )
+
+    for device_entry in list(dr.async_entries_for_config_entry(device_reg, entry.entry_id)):
+        idents = {i[1] for i in device_entry.identifiers}
+        if not any(_ZONE_DEVICE_IDENT.match(i) for i in idents):
+            continue
+        attached = er.async_entries_for_device(entity_reg, device_entry.id, include_disabled_entities=True)
+        if not attached:
+            device_reg.async_remove_device(device_entry.id)
+            _LOGGER.info("HomGar migrate: removed empty zone device '%s' (%s)", device_entry.name, idents)
+
+    _LOGGER.info(
+        "HomGar migrate: zone re-home complete for %s (group_by_zone=%s matched=%s moved=%s)",
+        entry.title,
+        group_by_zone,
+        matched_entities,
+        moved_entities,
+    )

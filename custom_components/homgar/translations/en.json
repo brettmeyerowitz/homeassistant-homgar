@@ -57,5 +57,19 @@
             "already_configured": "This account is already configured.",
             "reconfigure_successful": "HomGar/RainPoint integration has been successfully reconfigured."
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "HomGar/RainPoint Options",
+                "description": "Adjust how multi-zone controllers are presented in Home Assistant.",
+                "data": {
+                    "group_multi_zone_devices": "Create a separate Home Assistant device for each controller zone"
+                },
+                "data_description": {
+                    "group_multi_zone_devices": "When enabled, per-zone valves, durations, and per-port sensors are grouped under child devices. Shared diagnostics stay on the parent controller device."
+                }
+            }
+        }
     }
 }

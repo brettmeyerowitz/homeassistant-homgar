@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.23] - 2026-04-14
+
+### ✨ Improvements
+- **Optional per-zone HA devices** — multi-zone valve controllers can now be grouped into separate Home Assistant devices per zone from the integration options flow. This makes larger 2/4/8-zone controllers easier to navigate without changing existing entity IDs or unique IDs.
+- **Grouped device naming** — grouped child devices now use the RainPoint zone labels when available, and grouped entity names are aligned so Home Assistant trims the repeated device prefix cleanly in device view.
+
+### 🐛 Bug Fixes
+- **Reversible zone grouping** — toggling grouped mode on or off now re-homes per-zone entities cleanly between the parent controller device and the child zone devices.
+- **Setup/reload stability** — the post-setup device-layout pass no longer leaves the integration stuck in `Starting` during reloads and no longer leaves transient empty zone devices behind after reverting the option.
+
+### ⚠️ Notes
+- **Opt-in only** — grouped zone devices are disabled by default. Existing installs keep the current parent-device layout unless the option is enabled manually.
+- **Shared diagnostics stay on the parent** — MQTT payload/summary sensors and other controller-level diagnostics remain attached to the parent controller device when grouped mode is enabled.
+
+---
+
 ## [3.0.22] - 2026-04-14
 
 ### 🐛 Bug Fixes

@@ -10,12 +10,20 @@ from homeassistant import config_entries
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_APP_TYPE, CONF_HIDS
+from .const import (
+    CONF_GROUP_MULTI_ZONE_DEVICES,
+    DOMAIN,
+    DEFAULT_SCAN_INTERVAL,
+    CONF_APP_TYPE,
+    CONF_HIDS,
+    zone_device_identifier,
+)
 from .coordinator import HomGarCoordinator
-from .decoder import _MODELS  # noqa: F401 — imported here to trigger eager file load in executor
+from .decoder import _MODELS, get_valve_ports  # noqa: F401 — imported here to trigger eager file load in executor
 from .api import HomGarClient
 from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
 
@@ -66,7 +74,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Migrate v1->v2 unique_ids before platform setup so renamed IDs don't
     # collide with freshly registered entities
-    from .migrate import async_migrate_unique_ids, async_merge_wifi_devices
+    from .migrate import (
+        async_migrate_unique_ids,
+        async_merge_wifi_devices,
+        async_rehome_multi_zone_entities,
+    )
     await async_migrate_unique_ids(hass, entry, coordinator)
 
     # Prepare entry data storage early so we can track state during setup
@@ -185,6 +197,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry_data["mqtt_client"] = mqtt_client
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = entry_data
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
     # Connect MQTT after hass.data is set
     if mqtt_client is not None:
@@ -202,12 +215,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _LOGGER.info("Completed platform setup for entry: %s", entry.entry_id)
 
-    # Merge WiFi self-contained devices after platform setup (hub device must exist first)
-    await async_merge_wifi_devices(hass, entry, coordinator)
+    async def _async_finalize_device_layout() -> None:
+        """Run post-setup registry/area work after platform entities exist.
 
-    # Assign devices to HA Areas based on home name — runs every startup so
-    # areas are kept in sync even when suggested_area hint was missed
-    _assign_devices_to_areas(hass, entry, coordinator)
+        This must not block entry setup because live MQTT updates can keep the
+        event loop active long enough that `async_block_till_done()` never
+        settles during startup/reconfigure.
+        """
+        if entry.entry_id not in hass.data.get(DOMAIN, {}):
+            return
+        try:
+            _LOGGER.info("HomGar [%s]: Finalizing device layout", entry.title)
+            await async_merge_wifi_devices(hass, entry, coordinator)
+            await async_rehome_multi_zone_entities(hass, entry, coordinator)
+            _assign_devices_to_areas(hass, entry, coordinator)
+            _LOGGER.info("HomGar [%s]: Device layout finalized", entry.title)
+        except Exception as ex:  # noqa: BLE001
+            _LOGGER.warning("HomGar [%s]: Device layout finalization failed: %s", entry.title, ex, exc_info=True)
+
+    async def _async_finalize_device_layout_later(_now) -> None:
+        await _async_finalize_device_layout()
+
+    # Run once shortly after setup returns so Home Assistant can finish
+    # restoring entities before we move them between devices. A second delayed
+    # pass caused transient empty child devices to linger during option flips.
+    entry.async_on_unload(async_call_later(hass, 2, _async_finalize_device_layout_later))
 
     return True
 
@@ -244,6 +276,7 @@ def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinato
             device_reg.async_update_device(hub_device.id, area_id=area.id)
 
     sensors = data.get("sensors", {})
+    group_multi_zone = entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)
     for sensor_info in sensors.values():
         home_name = sensor_info.get("home_name") or ""
         if not home_name:
@@ -260,6 +293,15 @@ def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinato
         device = device_reg.async_get_device(identifiers={(DOMAIN, f"{mid}_{addr}")})
         if device and device.area_id != area.id:
             device_reg.async_update_device(device.id, area_id=area.id)
+
+        model = sensor_info.get("model")
+        if group_multi_zone and model and len(get_valve_ports(model)) > 1:
+            for port in get_valve_ports(model):
+                zone_device = device_reg.async_get_device(
+                    identifiers={(DOMAIN, zone_device_identifier(mid, addr, port))}
+                )
+                if zone_device and zone_device.area_id != area.id:
+                    device_reg.async_update_device(zone_device.id, area_id=area.id)
 
 
 async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry) -> bool:
