@@ -8,7 +8,7 @@
       "format": "tlv",
       "payload": "10#00E1A300DC01D800B700000000AD00009F3600000020FF0F542E1119",
       "expected": {
-        "battery_level": 75,
+        "battery_level": 100,
         "signal_strength": -93,
         "is_watering": false,
         "last_water_volume": {"approx": 5.4, "tolerance": 0.6}

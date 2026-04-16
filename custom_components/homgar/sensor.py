@@ -225,6 +225,8 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
             attrs["battery_percent"] = data["battery_percent"]
         elif "battery_status_code" in data:
             attrs["battery_status_code"] = data["battery_status_code"]
+        if "battery_status" in data:
+            attrs["battery_status"] = data["battery_status"]
 
         # Add firmware version from sensor info
         sensors = self.coordinator.data.get("sensors", {})

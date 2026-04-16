@@ -38,6 +38,21 @@
         "illuminance": {"approx": 5656.5, "tolerance": 0.1},
         "signal_strength": -78
       }
+    },
+    {
+      "id": "issue-36-legacy-battery-ok",
+      "source_issue": 36,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,-78,1;838,84,G=49109",
+      "expected": {
+        "temperature": {"approx": 28.8, "tolerance": 0.2},
+        "soil_moisture": 84,
+        "illuminance": {"approx": 4910.9, "tolerance": 0.1},
+        "signal_strength": -78,
+        "battery_level": 100,
+        "battery_status_code": 1
+      }
     }
   ]
 }

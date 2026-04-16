@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.25] - 2026-04-16
+
+### 🐛 Bug Fixes
+- **Two-state battery decoding** — normalized legacy ASCII payload headers and TLV `BAT` values to report a simple full-vs-low battery state, so Dean-style `HTV245FRF`, `HTV213FRF`, and `HCS021FRF` payloads no longer show misleading intermediate percentages like `75%` when the app is effectively reporting a normal/full battery state.
+
+### 🔧 Internal
+- **Battery regression coverage** — expanded fixture, MQTT routing, and decoder regression coverage around Dean’s live payloads so both legacy and REST/MQTT battery paths stay aligned on the same two-state mapping.
+
+### ⚠️ Notes
+- **Two-state only for now** — the integration now intentionally collapses current battery reporting to `normal/full` vs `low` because that is the only behavior confirmed by the live payloads and app observations captured so far.
+
+---
+
 ## [3.0.24] - 2026-04-16
 
 ### ✨ Improvements

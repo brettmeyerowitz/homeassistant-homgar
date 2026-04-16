@@ -271,7 +271,7 @@ def main() -> int:
     check("routes HTV113FRF D06 update", hose.updated, repr(hose.data["sensors"]["235522_6"]))
     check(
         "summarizes HTV113FRF mqtt fields",
-        "battery 75%" in hose_diag.get("friendly_summary", "")
+        "battery 100%" in hose_diag.get("friendly_summary", "")
         and "RSSI -96 dBm" in hose_diag.get("friendly_summary", "")
         and "session 600s" in hose_diag.get("friendly_summary", ""),
         repr(hose_diag),
