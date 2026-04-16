@@ -10,7 +10,7 @@ body:
         
         Please provide as much detail as possible to help us identify and fix the issue.
 
-        **Latest released integration version:** `3.0.19`
+        **Latest released integration version:** `3.0.24`
         
         Please update to the latest release and restart Home Assistant before opening a bug report.
   
@@ -117,8 +117,8 @@ body:
     id: integration_version
     attributes:
       label: Integration Version
-      description: What exact version of the HomGar/RainPoint integration are you using? Latest release is 3.0.19.
-      placeholder: "e.g. 3.0.19"
+      description: What exact version of the HomGar/RainPoint integration are you using? Latest release is 3.0.24.
+      placeholder: "e.g. 3.0.24"
     validations:
       required: true
   
@@ -157,7 +157,7 @@ body:
       options:
         - label: I have searched existing issues to ensure this is not a duplicate
           required: true
-        - label: I have updated to the latest released version (3.0.19) and restarted Home Assistant
+        - label: I have updated to the latest released version (3.0.24) and restarted Home Assistant
           required: true
         - label: I have provided steps to reproduce the issue
           required: true

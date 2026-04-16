@@ -97,6 +97,36 @@ def get_valve_ports(model: str) -> list[int]:
     return []
 
 
+def get_switch_ports(model: str) -> list[int]:
+    """
+    Return a list of port numbers that have CTL_SOCK entries.
+    Empty list means the model is not a switch-controllable device.
+
+    Two layouts are handled:
+      - Per-port: CTL_SOCK dp entries each have dpPort > 0.
+      - Hub-as-device: CTL_SOCK with dpPort=0 and portNumber > 0.
+    """
+    info = get_model_info(model)
+    if not info:
+        return []
+    per_port = [
+        dp["dpPort"] for dp in info.get("dp", [])
+        if dp.get("identity") == "CTL_SOCK"
+        and dp.get("dpPort", 0) > 0
+    ]
+    if per_port:
+        return per_port
+    has_global_ctl = any(
+        dp.get("identity") == "CTL_SOCK"
+        and dp.get("dpPort", 0) == 0
+        for dp in info.get("dp", [])
+    )
+    port_number = info.get("portNumber", 0) or 0
+    if has_global_ctl and port_number > 0:
+        return list(range(1, port_number + 1))
+    return []
+
+
 def _build_dp_index(model_dict: dict) -> dict[int, dict]:
     return {dp["dpId"]: dp for dp in model_dict.get("dp", [])}
 

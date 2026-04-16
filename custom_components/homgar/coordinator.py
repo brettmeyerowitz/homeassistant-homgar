@@ -21,7 +21,7 @@ from .const import (
     DOMAIN,
 )
 from .api import HomGarClient, HomGarApiError
-from .decoder import decode_payload, get_valve_ports
+from .decoder import decode_payload, get_switch_ports, get_valve_ports
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -265,7 +265,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                 # It never appears in subDevices[], so the loop above skips it.
                 hub_model = hub.get("model") or hub.get("displayModel")
                 if hub_model:
-                    if get_valve_ports(hub_model):
+                    if get_valve_ports(hub_model) or get_switch_ports(hub_model):
                         d00 = sub_status.get("D00") or sub_status.get("D0")
                         if d00:
                             raw_value = d00.get("value")

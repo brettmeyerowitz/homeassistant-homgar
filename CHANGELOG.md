@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.24] - 2026-04-16
+
+### ✨ Improvements
+- **CTL_SOCK switch support** — added Home Assistant `switch` entities for RainPoint/HomGar socket-style devices that expose `CTL_SOCK`, including `HWG004WRF`-style devices and the existing `HCS003FRF` socket pattern seen in the RainPoint app source.
+- **Socket naming cleanup** — single-port socket devices now use the natural device name in Home Assistant instead of an awkward synthetic `Zone 1` suffix.
+
+### 🐛 Bug Fixes
+- **Hub-as-device socket registration** — WiFi socket devices whose live status arrives as `D00` on the parent hub are now registered and decoded instead of being skipped by the coordinator’s valve-only hub-device path.
+
+### 🔧 Internal
+- **RainPoint app correlation** — traced the app source to confirm `CTL_SOCK` devices use the same `controlWorkMode` family as valves with binary `workMode` semantics (`0=off`, `1=on`), then aligned the integration to that behavior.
+- **Release triage follow-up** — added a support comment on issue `#37` asking the reporter to retest and share debug logs / raw payloads if the new switch path still does not work on their live `HWG004WRF`.
+
+### ⚠️ Notes
+- **Live hardware confirmation still welcome** — the new switch path is covered by the project’s Docker-backed validation flow and app-source correlation, but a real `HWG004WRF` retest is still the best confirmation that no model-specific control quirk remains.
+
+---
+
 ## [3.0.23] - 2026-04-14
 
 ### ✨ Improvements

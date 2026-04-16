@@ -23,13 +23,13 @@ from .const import (
     zone_device_identifier,
 )
 from .coordinator import HomGarCoordinator
-from .decoder import _MODELS, get_valve_ports  # noqa: F401 — imported here to trigger eager file load in executor
+from .decoder import _MODELS, get_switch_ports, get_valve_ports  # noqa: F401 — imported here to trigger eager file load in executor
 from .api import HomGarClient
 from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[str] = ["sensor", "valve", "number"]
+PLATFORMS: list[str] = ["sensor", "valve", "switch", "number"]
 _MQTT_RENEWAL_BACKOFF_SECONDS = (30, 60, 300, 900)
 
 
