@@ -8,7 +8,7 @@
       "format": "tlv",
       "payload": "10#E7E8021203DC01B805850E03FF0FAA1A0319",
       "expected": {
-        "battery_level": 75,
+        "battery_level": 100,
         "temperature": {"approx": 25.7, "tolerance": 0.1}
       }
     },
@@ -19,7 +19,7 @@
       "format": "tlv",
       "payload": "10#E7EA021503DC01B805850E03FF0F2F1C0319",
       "expected": {
-        "battery_level": 75,
+        "battery_level": 100,
         "temperature": {"approx": 25.7, "tolerance": 0.1}
       }
     }

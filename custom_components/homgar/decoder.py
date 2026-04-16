@@ -551,6 +551,14 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
                 result["signal_strength"] = bat_or_rssi
             else:
                 result["battery_level"] = bat_or_rssi
+        if (
+            bat_or_rssi is not None
+            and bat_or_rssi < 0
+            and rssi in _LEGACY_SIMPLE_BATTERY_STATUS_TO_PCT
+        ):
+            result["battery_level"] = _LEGACY_SIMPLE_BATTERY_STATUS_TO_PCT[rssi]
+            result["battery_status_code"] = rssi
+            result["battery_status"] = "low" if rssi >= 2 else "normal"
         if rssi is not None and "signal_strength" not in result:
             result["signal_strength"] = rssi
 
@@ -658,7 +666,23 @@ def _dec_rssi(entries, dp_index):
     return raw - 256 if raw > 127 else raw
 
 
-_BAT_LEVEL_TO_PCT = {0: 100, 1: 75, 2: 50, 3: 25, 4: 10}
+_BAT_LEVEL_TO_PCT = {
+    # RainPoint appears to expose both legacy and TLV battery fields as a
+    # simple status flag rather than a granular percentage. In the captures we
+    # have, 1 means normal/full and higher nonzero values indicate low.
+    0: 100,
+    1: 100,
+    2: 10,
+    3: 10,
+    4: 10,
+}
+_LEGACY_SIMPLE_BATTERY_STATUS_TO_PCT = {
+    # Dean confirmed the app flips to low-battery when the legacy header's
+    # third field changes from 1 to 2 on HTV245FRF payloads. HCS021FRF legacy
+    # payloads use the same simple header shape for battery OK vs low.
+    1: 100,
+    2: 10,
+}
 
 
 def _dec_bat(entries, dp_index):

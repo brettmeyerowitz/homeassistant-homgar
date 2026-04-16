@@ -8,14 +8,14 @@ This document tracks the real payload samples currently represented in the publi
 | --- | ---: | --- |
 | HCS0530THO | 3 | live captures |
 | HCS014ARF | 9 | GitHub issue #21 and live captures |
-| HCS021FRF | 2 | live captures |
+| HCS021FRF | 4 | GitHub issue #36 and live captures |
 | HCS008FRF | 2 | live captures |
 | HCS030FRF | 1 | GitHub issue #27 |
 | HCS0528ARF | 2 | GitHub issue #18 |
 | HCS0565ARF | 2 | GitHub issue #23 |
 | HTV113FRF | 8 | live captures |
 | HTV213FRF | 10 | GitHub issues #11, #17 and live captures |
-| HTV245FRF | 5 | GitHub issues #10, #17 and live captures |
+| HTV245FRF | 6 | GitHub issues #10, #17, #36 and live captures |
 | HTV0537FRF | 2 | GitHub issue #26 |
 | HTV0542FRF | 2 | GitHub issue #22 |
 | HIC801W | 1 | GitHub issue #20 |

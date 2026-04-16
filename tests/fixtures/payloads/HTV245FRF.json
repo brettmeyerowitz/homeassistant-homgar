@@ -66,6 +66,20 @@
         "port_2.is_watering": false,
         "port_2.last_water_volume": {"approx": 1.7, "tolerance": 0.1}
       }
+    },
+    {
+      "id": "issue-36-legacy-battery-low",
+      "source_issue": 36,
+      "source_type": "github_issue",
+      "format": "legacy",
+      "payload": "1,-70,2;0,0,0,0,0,0|0,0,0,0,0,0",
+      "expected": {
+        "signal_strength": -70,
+        "battery_level": 10,
+        "battery_status_code": 2,
+        "port_1.is_watering": false,
+        "port_2.is_watering": false
+      }
     }
   ]
 }

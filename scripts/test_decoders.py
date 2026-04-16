@@ -35,7 +35,7 @@ check("≥100 models loaded", len(_MODELS) >= 100, f"got {len(_MODELS)}")
 
 # ── Battery ordinal mapping ─────────────────────────────────────────────────
 print("\n🧪 Battery ordinal mapping")
-expected_bat = {0: 100, 1: 75, 2: 50, 3: 25, 4: 10}
+expected_bat = {0: 100, 1: 100, 2: 10, 3: 10, 4: 10}
 check("ordinal map correct", _BAT_LEVEL_TO_PCT == expected_bat, str(_BAT_LEVEL_TO_PCT))
 
 
@@ -116,7 +116,7 @@ check("signal_strength",  r.get("signal_strength") is not None and r["signal_str
 print("\n🧪 HCS008FRF — flow meter (TLV)")
 r = decode_payload("HCS008FRF", "10#E1AF00FF0B1A810100DC01990000B7EB4C1719FF0700000000AF000000009F05000000FF0A06000000CB371A0000B3519B0100FF0FEB4C1719")
 check("no error",              "error" not in r)
-check("battery_level=75",      r.get("battery_level") == 75, str(r.get("battery_level")))
+check("battery_level=100",     r.get("battery_level") == 100, str(r.get("battery_level")))
 check("signal_strength=-81",   r.get("signal_strength") == -81, str(r.get("signal_strength")))
 check("total_water_volume",    r.get("total_water_volume") is not None and r["total_water_volume"] > 0,
       str(r.get("total_water_volume")))
@@ -197,7 +197,7 @@ check("zones dict present", "zones" in r or any(f"port_{i}" in r for i in range(
 print("\n🧪 HTP115FRF — pump valve (issue #31)")
 r = decode_payload("HTP115FRF", "10#00E1A300DC01D800B700000000AD00009F3600000020FF0F542E1119")
 check("no error",              "error" not in r)
-check("battery_level=75",      r.get("battery_level") == 75,     str(r.get("battery_level")))
+check("battery_level=100",     r.get("battery_level") == 100,     str(r.get("battery_level")))
 check("signal_strength=-93",   r.get("signal_strength") == -93,  str(r.get("signal_strength")))
 check("valve_state present",   r.get("valve_state") is not None, str(r.get("valve_state")))
 check("is_watering=False",     r.get("is_watering") is False,    str(r.get("is_watering")))
