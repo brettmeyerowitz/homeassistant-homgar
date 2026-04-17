@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.28] - 2026-04-17
+
+### 🐛 Bug Fixes
+- **HACS metadata validation** — removed unsupported keys from `hacs.json` so the repository passes the current HACS validation action used for store submission.
+- **Manifest ordering compliance** — sorted `manifest.json` keys to satisfy current Hassfest manifest validation rules.
+
+### 🔧 Internal
+- **Publishing pipeline readiness** — bumped the integration version for the manifest-only packaging update required by the repository’s version enforcement workflow.
+
+---
+
 ## [3.0.27] - 2026-04-17
 
 ### 🐛 Bug Fixes
