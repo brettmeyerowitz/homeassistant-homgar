@@ -16,7 +16,7 @@ from .coordinator import HomGarCoordinator
 from .sensor import HomGarSensorBase
 
 
-class HomGarRainBinarySensor(HomGarSensorBase, BinarySensorEntity):
+class HomGarRainBinarySensor(BinarySensorEntity, HomGarSensorBase):
     """Binary sensor for rain state on supported sensor models."""
 
     _attr_device_class = BinarySensorDeviceClass.MOISTURE

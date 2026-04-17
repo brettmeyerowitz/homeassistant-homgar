@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.27] - 2026-04-17
+
+### 🐛 Bug Fixes
+- **HCS044FRF binary sensor state rendering** — fixed the new `Rained` entity so Home Assistant resolves it as a true binary sensor instead of showing `Unknown` while the decoded rain state is valid.
+
+### 🔧 Internal
+- **Binary sensor inheritance cleanup** — adjusted the entity inheritance order so the platform follows Home Assistant's binary sensor state path reliably.
+
+---
+
 ## [3.0.26] - 2026-04-17
 
 ### ✨ Improvements
