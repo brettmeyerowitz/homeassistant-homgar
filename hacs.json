@@ -1,11 +1,5 @@
 {
     "name": "HomGar/RainPoint Cloud",
-    "domains": [
-        "homgar"
-    ],
     "render_readme": true,
-    "homeassistant": "2024.5.0",
-    "iot_class": [
-        "Cloud Polling"
-    ]
+    "homeassistant": "2024.5.0"
 }

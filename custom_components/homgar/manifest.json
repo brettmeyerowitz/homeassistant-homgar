@@ -1,17 +1,17 @@
 {
     "domain": "homgar",
     "name": "HomGar/RainPoint Cloud",
-    "version": "3.0.27",
-    "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
-    "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
-    "requirements": ["paho-mqtt>=1.6.0"],
     "codeowners": [
         "@brettmeyerowitz"
     ],
     "config_flow": true,
-    "iot_class": "cloud_push",
+    "documentation": "https://github.com/brettmeyerowitz/homeassistant-homgar",
     "integration_type": "hub",
+    "iot_class": "cloud_push",
+    "issue_tracker": "https://github.com/brettmeyerowitz/homeassistant-homgar/issues",
     "loggers": [
         "custom_components.homgar"
-    ]
+    ],
+    "requirements": ["paho-mqtt>=1.6.0"],
+    "version": "3.0.28"
 }

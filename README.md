@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/release/brettmeyerowitz/homeassistant-homgar.svg)](https://github.com/brettmeyerowitz/homeassistant-homgar/releases)
 [![License](https://img.shields.io/github/license/brettmeyerowitz/homeassistant-homgar.svg)](LICENSE)
-[![HACS](https://img.shields.io/badge/HACS-Default-blue.svg)](https://github.com/hacs/integration)
+[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
 Unofficial Home Assistant integration for RainPoint Smart+ devices via the HomGar/RainPoint cloud API.
 
