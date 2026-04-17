@@ -53,6 +53,16 @@ _OPTIONAL_VALVE_PORT_SENSOR_FIELDS = (
 )
 
 _LOCAL_TLV_TIMESTAMP_FIELDS = {"event_time", "event_time2", "irrigation_end_time"}
+_MODEL_SENSOR_LABEL_OVERRIDES: dict[str, dict[str, str]] = {
+    "HCS044FRF": {
+        "event_time": "Rain Event Time",
+    },
+}
+
+
+def _filtered_sensor_fields(model: str | None, data: dict) -> set[str]:
+    fields = set(sensor_fields_for_data(data))
+    return fields
 
 
 def _slugify(text: str) -> str:
@@ -108,7 +118,7 @@ async def async_setup_entry(
                 # Multi-port device: create per-port sensors + shared top-level fields
                 for port in range(1, port_number + 1):
                     port_data = data.get(f"port_{port}", {})
-                    port_fields = set(sensor_fields_for_data(port_data))
+                    port_fields = _filtered_sensor_fields(model, port_data)
                     if model and get_valve_ports(model):
                         port_fields.update(_OPTIONAL_VALVE_PORT_SENSOR_FIELDS)
                     for field in sorted(port_fields):
@@ -119,7 +129,7 @@ async def async_setup_entry(
                         entities.append(HomGarGenericSensor(coordinator, key, info, field))
             else:
                 # Single-port device
-                fields = set(sensor_fields_for_data(data))
+                fields = _filtered_sensor_fields(model, data)
                 if model and get_valve_ports(model):
                     fields.update(_OPTIONAL_VALVE_PORT_SENSOR_FIELDS)
                 for field in sorted(fields):
@@ -292,6 +302,9 @@ class HomGarGenericSensor(HomGarSensorBase):
 
         sub_name = sensor_info.get("sub_name") or "Sensor"
         label = (sdef.name if sdef and sdef.name else field_name.replace("_", " ").title())
+        model = (sensor_info.get("model") or "").upper()
+        if model:
+            label = _MODEL_SENSOR_LABEL_OVERRIDES.get(model, {}).get(field_name, label)
         if port is not None:
             uid_suffix = f"{field_name}_port{port}"
             self._attr_name = format_port_entity_name(

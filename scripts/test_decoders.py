@@ -112,6 +112,20 @@ check("battery valid",    r.get("battery_level") in (10, 25, 50, 75, 100))
 check("signal_strength",  r.get("signal_strength") is not None and r["signal_strength"] < 0)
 
 
+# ── HCS044FRF — rain sensor state/timestamp ──────────────────────────────────
+print("\n🧪 HCS044FRF — rain sensor (TLV)")
+r = decode_payload("HCS044FRF", "10#DC01E1C40011B737B51A1920FF0FDA251C19")
+check("no error",          "error" not in r, str(r))
+check("rain_detected=True", r.get("rain_detected") is True, str(r.get("rain_detected")))
+check("event_time matches wet event", r.get("event_time") == "2026-04-13T11:20:55+00:00", str(r.get("event_time")))
+check("alarm=0",           r.get("alarm") == 0, str(r.get("alarm")))
+
+r2 = decode_payload("HCS044FRF", "10#DC01E1C60010B7E932051920FF0FA8B31A19")
+check("dry payload no error", "error" not in r2, str(r2))
+check("rain_detected=False", r2.get("rain_detected") is False, str(r2.get("rain_detected")))
+check("event_time matches dry event", r2.get("event_time") == "2026-04-02T19:11:41+00:00", str(r2.get("event_time")))
+
+
 # ── HCS008FRF — flow meter (issue session) ───────────────────────────────────
 print("\n🧪 HCS008FRF — flow meter (TLV)")
 r = decode_payload("HCS008FRF", "10#E1AF00FF0B1A810100DC01990000B7EB4C1719FF0700000000AF000000009F05000000FF0A06000000CB371A0000B3519B0100FF0FEB4C1719")

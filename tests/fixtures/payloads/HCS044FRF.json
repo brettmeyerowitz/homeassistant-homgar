@@ -1,0 +1,47 @@
+{
+  "model": "HCS044FRF",
+  "samples": [
+    {
+      "id": "shaun-rained",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#DC01E1C40011B737B51A1920FF0FDA251C19",
+      "expected": {
+        "rain_detected": true,
+        "battery_level": 100,
+        "signal_strength": -60,
+        "alarm": 0,
+        "event_time": "2026-04-13T11:20:55+00:00"
+      }
+    },
+    {
+      "id": "shaun-not-rained",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#DC01E1C60010B7E932051920FF0FA8B31A19",
+      "expected": {
+        "rain_detected": false,
+        "battery_level": 100,
+        "signal_strength": -58,
+        "alarm": 0,
+        "event_time": "2026-04-02T19:11:41+00:00"
+      }
+    },
+    {
+      "id": "shaun-rained-2",
+      "source_issue": null,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#DC01E1C50011B79F0C231920FF0FC4422319",
+      "expected": {
+        "rain_detected": true,
+        "battery_level": 100,
+        "signal_strength": -59,
+        "alarm": 0,
+        "event_time": "2026-04-17T16:50:31+00:00"
+      }
+    }
+  ]
+}

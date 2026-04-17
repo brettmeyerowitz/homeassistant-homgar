@@ -4,6 +4,7 @@
     {"model": "HCS0530THO", "file": "payloads/HCS0530THO.json", "sample_count": 3},
     {"model": "HCS014ARF", "file": "payloads/HCS014ARF.json", "sample_count": 9},
     {"model": "HCS021FRF", "file": "payloads/HCS021FRF.json", "sample_count": 4},
+    {"model": "HCS044FRF", "file": "payloads/HCS044FRF.json", "sample_count": 3},
     {"model": "HCS008FRF", "file": "payloads/HCS008FRF.json", "sample_count": 2},
     {"model": "HCS030FRF", "file": "payloads/HCS030FRF.json", "sample_count": 1},
     {"model": "HCS0528ARF", "file": "payloads/HCS0528ARF.json", "sample_count": 2},

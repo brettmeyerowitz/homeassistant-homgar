@@ -205,6 +205,7 @@ BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HC
 | wind_speed | Wind speed | m/s |
 | battery_level | Battery | % |
 | signal_strength | Signal strength | dBm |
+| rain_detected | Binary moisture (`Rained`) | on/off |
 | total_water_volume | Water | L |
 | last_water_volume | Water | L |
 | today_water_volume | Water | L |
@@ -212,6 +213,7 @@ BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HC
 | current_session_duration | Duration | s |
 | cycle_type | Enum sensor | — |
 | Current Step End Time | Timestamp | — |
+| Rain Event Time | Timestamp | — |
 | Schedule End Time | Timestamp | — |
 | Irrigation End Time | Timestamp | — |
 | precipitation_total / _1h / _24h / _7d | Precipitation | mm |
@@ -249,7 +251,7 @@ The MQTT session is renewed automatically before it expires (based on the `expir
 | CO₂ sensors (HCS0530THO) | ✅ Yes | ~45 s periodic |
 | Soil moisture (HCS021FRF, HCS026FRF) | ✅ Yes | ~45 s periodic |
 | Flow meters (HCS008FRF) | ✅ Yes | Event-driven when water flows |
-| Rain sensors (HCS012ARF) | ✅ Yes | Periodic |
+| Rain sensors (HCS012ARF, HCS044FRF) | ✅ Yes | Periodic |
 | Temp/humidity (HCS014ARF) | ✅ Yes | Periodic |
 | Weather stations (HWS\*) | ✅ Yes | Periodic |
 

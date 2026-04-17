@@ -172,6 +172,10 @@ SOIL_MOISTURE_MODELS: frozenset[str] = frozenset({
     "HCS999FRF-P",
 })
 
+RAIN_STATE_MODELS: frozenset[str] = frozenset({
+    "HCS044FRF",
+})
+
 
 # ---------------------------------------------------------------------------
 # TLV parser
@@ -702,6 +706,20 @@ def _dec_alarm(entries, dp_index, port=None):
     return e["type_value"][0] & 0x0F
 
 
+def _dec_rain_detected(entries, dp_index, model_str: str):
+    if model_str.upper() not in RAIN_STATE_MODELS:
+        return None
+    e = _find_by_identity(entries, dp_index, "STA_RAIN")
+    if e is None:
+        e = _find_by_name(entries, "RAIN")
+    if e is None or not e["type_value"]:
+        return None
+    raw = e["type_value"][0] & 0xFF
+    if raw in (0x10, 0x11):
+        return bool(raw & 0x01)
+    return None
+
+
 def _dec_temperature(entries, dp_index, temp_unit):
     e = _find_entry(entries, dp_index, "STA_TEM", "TEM")
     if e is None or e["type_len"] < 2 or len(e["type_value"]) < 3:
@@ -958,6 +976,10 @@ def _decode_port(entries: list[dict], dp_index: dict[int, dict],
     dr = _dec_day_rain(entries, dp_index)
     if dr is not None:
         result["precipitation_24h"] = dr
+
+    rain_detected = _dec_rain_detected(entries, dp_index, model_str)
+    if rain_detected is not None:
+        result["rain_detected"] = rain_detected
 
     tw = _dec_today_water(entries, dp_index, unit)
     if tw is not None:

@@ -159,6 +159,8 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
                     status_msg = f"Total flow: {decoded.get('total_water_volume')} L"
                 elif "soil_moisture" in decoded:
                     status_msg = f"Moisture: {decoded.get('soil_moisture')}%"
+                elif "rain_detected" in decoded:
+                    status_msg = "Rained" if decoded.get("rain_detected") else "Not rained"
                 elif "temperature" in decoded:
                     status_msg = f"Temp: {decoded.get('temperature')}°C"
                 else:
@@ -178,6 +180,10 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
                     friendly_parts.append(f"{label_prefix}humidity {source['humidity']}%")
                 if "soil_moisture" in source:
                     friendly_parts.append(f"{label_prefix}soil {source['soil_moisture']}%")
+                if "rain_detected" in source:
+                    friendly_parts.append(
+                        f"{label_prefix}rain {'rained' if source['rain_detected'] else 'not rained'}"
+                    )
                 if "carbon_dioxide" in source:
                     friendly_parts.append(f"{label_prefix}CO₂ {source['carbon_dioxide']} ppm")
                 if "air_pressure" in source:

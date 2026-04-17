@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.26] - 2026-04-17
+
+### ✨ Improvements
+- **HCS044FRF rain state support** — added a dedicated `Rained` binary sensor for `HCS044FRF` rain sensors, using the confirmed `STA_RAIN` mapping from live payloads and app event history.
+- **Rain event timestamp labeling** — retained the model's useful event timestamp but renamed it to `Rain Event Time` so it no longer appears as a misleading irrigation-style `Current Step End Time`.
+
+### 🔧 Internal
+- **HCS044FRF regression coverage** — added fixture and decoder regression cases for both `rained` and `not rained` payloads, including timestamp validation against observed app logs.
+
+### ⚠️ Notes
+- **Conservative rain-state decoding** — `HCS044FRF` currently treats only `0x10` and `0x11` `STA_RAIN` values as confirmed dry/wet states; any other raw value is left unknown rather than guessed.
+
+---
+
 ## [3.0.25] - 2026-04-16
 
 ### 🐛 Bug Fixes
