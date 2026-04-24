@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.29] - 2026-04-24
+
+### 🐛 Bug Fixes
+- **HTV210B BLE valve control** — fixed `HTV210B` zone control so Home Assistant now uses RainPoint's BLE-backed `controlWorkModeDP` command path instead of the legacy RF-style control endpoint. This restores real start/stop control for `HTV210B` valves behind RainPoint hubs.
+- **BLE runtime encoding** — aligned the BLE valve control payload with the RainPoint app's observed request format, including the little-endian runtime blob used for manual valve runs (`600s -> 58020000`).
+
+### 🔧 Internal
+- **BLE valve path selection** — models that expose `CTL_BT_WATER` now route through the BLE datapoint control path while existing RF valve models continue using the legacy control endpoint.
+- **Regression coverage** — added focused regression checks for BLE valve model detection and exact `controlWorkModeDP` payload construction using captured `HTV210B` app traffic.
+
+### ⚠️ Notes
+- **Confirmed on `HTV210B`** — this release was validated against a live `HTV210B` setup in `ha-test` using captured RainPoint app request payloads and a successful Home Assistant on/off retest.
+- **Other BLE timer families** — the BLE control path is selected generically for `CTL_BT_WATER` models, but `HTV210B` is the model directly confirmed so far.
+
+---
+
 ## [3.0.28] - 2026-04-17
 
 ### 🐛 Bug Fixes

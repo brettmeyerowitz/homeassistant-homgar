@@ -437,6 +437,45 @@ class HomGarClient:
         
         return result
 
+    def _extract_control_response_state(self, data: dict) -> str | None:
+        """Extract an optional state payload from a control endpoint response."""
+        response_data = data.get("data")
+        if isinstance(response_data, dict):
+            state = response_data.get("state")
+            if isinstance(state, str):
+                return state
+        return None
+
+    def _encode_control_work_mode_dp_param(self, mode: int, duration: int) -> str:
+        """Encode BLE valve runtime as the little-endian hex blob used by the app."""
+        if mode == 0:
+            return "00000000"
+        duration = max(0, int(duration))
+        return duration.to_bytes(4, byteorder="little", signed=False).hex()
+
+    def _build_control_work_mode_dp_payload(
+        self,
+        mid: int,
+        addr: int,
+        device_name: str,
+        product_key: str,
+        port: int,
+        mode: int,
+        duration: int,
+        dp_code: int = 1,
+    ) -> dict:
+        """Build the BLE valve control payload used by the RainPoint app."""
+        return {
+            "mid": str(mid),
+            "productKey": product_key,
+            "deviceName": device_name,
+            "mode": mode,
+            "addr": addr,
+            "port": port,
+            "param": self._encode_control_work_mode_dp_param(mode, duration),
+            "dpCode": dp_code,
+        }
+
     async def control_work_mode(
         self,
         mid: int,
@@ -449,19 +488,7 @@ class HomGarClient:
         hid: int | None = None,
     ) -> str | None:
         """
-        Control a valve zone via the controlWorkMode endpoint.
-        
-        Args:
-            mid: Hub mid (device ID)
-            addr: Sub-device address
-            device_name: Hub deviceName field (e.g. "MAC-885721174638")
-            product_key: Hub productKey field (e.g. "a3QrDxYPTM2")
-            port: Zone number (1-based)
-            mode: 1 = open, 0 = close
-            duration: Run time in seconds (ignored when closing)
-            
-        Returns:
-            Updated state payload string from API response, or None
+        Control a valve zone via the legacy RF-oriented controlWorkMode endpoint.
         """
         await self.ensure_logged_in()
         url = f"{self._base_url}/app/device/controlWorkMode"
@@ -478,18 +505,72 @@ class HomGarClient:
         if hid is not None:
             payload["hid"] = str(hid)
         _LOGGER.debug("API call: control_work_mode URL=%s payload=%s", url, payload)
-        
+
         async with self._session.post(url, json=payload, headers=self._auth_headers()) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"controlWorkMode HTTP {resp.status}")
             data = await resp.json()
-            
+
         _LOGGER.debug("API response: control_work_mode data=%s", data)
-        
+
         code = data.get("code")
         if code == 4:
-            # Code 4 = device already in requested state or transitioning - not fatal
             _LOGGER.warning(
                 "controlWorkMode returned code 4 (busy/already in state), treating as non-fatal: %s",
-                data
+                data,
             )
+            return self._extract_control_response_state(data)
+        if code != 0:
+            raise HomGarApiError(f"controlWorkMode failed: code={code} msg={data.get('msg')}")
+        return self._extract_control_response_state(data)
+
+    async def control_work_mode_dp(
+        self,
+        mid: int,
+        addr: int,
+        device_name: str,
+        product_key: str,
+        port: int,
+        mode: int,
+        duration: int,
+        hid: int | None = None,
+        dp_code: int = 1,
+    ) -> str | None:
+        """
+        Control a BLE-backed valve zone via the app's controlWorkModeDP endpoint.
+        """
+        await self.ensure_logged_in()
+        url = f"{self._base_url}/app/device/controlWorkModeDP"
+        payload = self._build_control_work_mode_dp_payload(
+            mid=mid,
+            addr=addr,
+            device_name=device_name,
+            product_key=product_key,
+            port=port,
+            mode=mode,
+            duration=duration,
+            dp_code=dp_code,
+        )
+        headers = self._auth_headers()
+        if hid is not None:
+            headers["hid"] = str(hid)
+
+        _LOGGER.debug("API call: control_work_mode_dp URL=%s payload=%s", url, payload)
+
+        async with self._session.post(url, json=payload, headers=headers) as resp:
+            if resp.status != 200:
+                raise HomGarApiError(f"controlWorkModeDP HTTP {resp.status}")
+            data = await resp.json()
+
+        _LOGGER.debug("API response: control_work_mode_dp data=%s", data)
+
+        code = data.get("code")
+        if code == 4:
+            _LOGGER.warning(
+                "controlWorkModeDP returned code 4 (busy/already in state), treating as non-fatal: %s",
+                data,
+            )
+            return self._extract_control_response_state(data)
+        if code != 0:
+            raise HomGarApiError(f"controlWorkModeDP failed: code={code} msg={data.get('msg')}")
+        return self._extract_control_response_state(data)

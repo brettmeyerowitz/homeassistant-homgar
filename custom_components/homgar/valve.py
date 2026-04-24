@@ -21,7 +21,7 @@ from .const import (
     zone_device_identifier,
 )
 from .coordinator import HomGarCoordinator
-from .decoder import get_valve_ports
+from .decoder import get_valve_ports, uses_ble_valve_control
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -315,16 +315,29 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
 
         hid = self._sensor_info.get("hid")
         client = self.coordinator._client
-        response_state = await client.control_work_mode(
-            mid=mid,
-            addr=addr,
-            device_name=device_name,
-            product_key=product_key,
-            port=self._zone_num,
-            mode=1,
-            duration=duration,
-            hid=hid,
-        )
+        model = self._sensor_info.get("model")
+        if model and uses_ble_valve_control(model):
+            response_state = await client.control_work_mode_dp(
+                mid=mid,
+                addr=addr,
+                device_name=device_name,
+                product_key=product_key,
+                port=self._zone_num,
+                mode=1,
+                duration=duration,
+                hid=hid,
+            )
+        else:
+            response_state = await client.control_work_mode(
+                mid=mid,
+                addr=addr,
+                device_name=device_name,
+                product_key=product_key,
+                port=self._zone_num,
+                mode=1,
+                duration=duration,
+                hid=hid,
+            )
         # Bypass _apply_response_state to avoid crash - use refresh instead
         await self.coordinator.async_request_refresh()
         
@@ -349,16 +362,29 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
 
         hid = self._sensor_info.get("hid")
         client = self.coordinator._client
-        response_state = await client.control_work_mode(
-            mid=mid,
-            addr=addr,
-            device_name=device_name,
-            product_key=product_key,
-            port=self._zone_num,
-            mode=0,
-            duration=0,
-            hid=hid,
-        )
+        model = self._sensor_info.get("model")
+        if model and uses_ble_valve_control(model):
+            response_state = await client.control_work_mode_dp(
+                mid=mid,
+                addr=addr,
+                device_name=device_name,
+                product_key=product_key,
+                port=self._zone_num,
+                mode=0,
+                duration=0,
+                hid=hid,
+            )
+        else:
+            response_state = await client.control_work_mode(
+                mid=mid,
+                addr=addr,
+                device_name=device_name,
+                product_key=product_key,
+                port=self._zone_num,
+                mode=0,
+                duration=0,
+                hid=hid,
+            )
         # Bypass _apply_response_state to avoid crash - use refresh instead
         await self.coordinator.async_request_refresh()
         

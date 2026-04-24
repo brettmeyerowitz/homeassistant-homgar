@@ -97,6 +97,17 @@ def get_valve_ports(model: str) -> list[int]:
     return []
 
 
+def uses_ble_valve_control(model: str) -> bool:
+    """Return True when the model exposes BLE valve control datapoints."""
+    info = get_model_info(model)
+    if not info:
+        return False
+    return any(
+        dp.get("identity") == "CTL_BT_WATER"
+        for dp in info.get("dp", [])
+    )
+
+
 def get_switch_ports(model: str) -> list[int]:
     """
     Return a list of port numbers that have CTL_SOCK entries.
