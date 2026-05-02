@@ -15,13 +15,27 @@ from .const import DOMAIN
 from .coordinator import HomGarCoordinator
 
 
+def _hub_name(hub_info: dict) -> str:
+    model = hub_info.get("model")
+    return (
+        hub_info.get("name")
+        or hub_info.get("displayModel")
+        or (model if model and model != "Unknown" else None)
+        or "RainPoint Hub"
+    )
+
+
+def _hub_model(hub_info: dict) -> str:
+    return hub_info.get("model") or hub_info.get("displayModel") or "Unknown"
+
+
 class HomGarHubDevice(Entity):
     """Mixin providing device_info for HomGar hub entities."""
 
     def __init__(self, hub_info: dict) -> None:
         self._hub_info = hub_info
         self._attr_unique_id = f"rainpoint_hub_{hub_info['mid']}"
-        self._attr_name = hub_info.get("name", "HomGar Hub")
+        self._attr_name = _hub_name(hub_info)
         self._attr_should_poll = False
 
     @property
@@ -29,12 +43,12 @@ class HomGarHubDevice(Entity):
         mid = self._hub_info["mid"]
         return DeviceInfo(
             identifiers={(DOMAIN, f"rainpoint_hub_{mid}")},
-            name=self._hub_info.get("name", "HomGar Hub"),
+            name=_hub_name(self._hub_info),
             manufacturer="RainPoint",
-            model=self._hub_info.get("model", "Unknown"),
-            sw_version=self._hub_info.get("softVer"),
-            hw_version=self._hub_info.get("hardwareVersion"),
-            serial_number=self._hub_info.get("mac"),
+            model=_hub_model(self._hub_info),
+            sw_version=self._hub_info.get("softVer") or None,
+            hw_version=self._hub_info.get("hardwareVersion") or None,
+            serial_number=self._hub_info.get("mac") or None,
             suggested_area=self._hub_info.get("homeName"),
         )
 
@@ -89,11 +103,11 @@ class HomGarHubDeviceIDSensor(HomGarHubSensorBase):
     def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
         super().__init__(coordinator, hub_info)
         self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_device_id"
-        self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} Device ID"
+        self._attr_name = f"{_hub_name(hub_info)} Device ID"
 
     @property
     def native_value(self) -> str | int | None:
-        return self._hub_info.get("hid")
+        return self._hub_info.get("mid")
 
 
 class HomGarHubFirmwareSensor(HomGarHubSensorBase):
@@ -104,7 +118,7 @@ class HomGarHubFirmwareSensor(HomGarHubSensorBase):
     def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
         super().__init__(coordinator, hub_info)
         self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_firmware"
-        self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} Firmware Version"
+        self._attr_name = f"{_hub_name(hub_info)} Firmware Version"
 
     @property
     def native_value(self) -> str | None:
@@ -119,7 +133,7 @@ class HomGarHubMACSensor(HomGarHubSensorBase):
     def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
         super().__init__(coordinator, hub_info)
         self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_mac"
-        self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} MAC Address"
+        self._attr_name = f"{_hub_name(hub_info)} MAC Address"
 
     @property
     def native_value(self) -> str | None:
@@ -136,7 +150,7 @@ class HomGarHubChannelSelect(CoordinatorEntity, SelectEntity, HomGarHubDevice):
         CoordinatorEntity.__init__(self, coordinator)
         HomGarHubDevice.__init__(self, hub_info)
         self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_channel"
-        self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} RF Channel"
+        self._attr_name = f"{_hub_name(hub_info)} RF Channel"
         self._attr_options = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"]
         # Channel 7 from your hub data
         self._attr_current_option = "7"
@@ -167,7 +181,7 @@ class HomGarHubBroadcastSwitch(CoordinatorEntity, SwitchEntity, HomGarHubDevice)
         CoordinatorEntity.__init__(self, coordinator)
         HomGarHubDevice.__init__(self, hub_info)
         self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_broadcast"
-        self._attr_name = f"{hub_info.get('name', 'HomGar Hub')} Automatic Broadcast"
+        self._attr_name = f"{_hub_name(hub_info)} Automatic Broadcast"
         self._attr_is_on = True  # Default to on
 
     @property

@@ -24,11 +24,25 @@ from .decoder import get_valve_ports
 _OLD_HUB_IDENT = re.compile(r"^hub_\d+$")
 _OLD_SENSOR_IDENT = re.compile(r"^\d+_\d+_\d+$")
 _ZONE_DEVICE_IDENT = re.compile(r"^\d+_\d+_zone\d+$")
+_HUB_DEVICE_IDENT = re.compile(r"^rainpoint_hub_(?P<mid>\d+)$")
+_HUB_DIAGNOSTIC_UID = re.compile(
+    r"^rainpoint_hub_(?P<mid>\d+)_(?:device_id|firmware|mac|channel|broadcast)$"
+)
 _PER_ZONE_ENTITY_UID = re.compile(
     r"^rainpoint_(?P<mid>\d+)_(?P<addr>\d+)_(?:(?P<field>.+)_port(?P<sensor_port>\d+)|zone(?P<zone_port>\d+)(?:_duration)?)$"
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _fallback_hub_name(hub_info: dict) -> str:
+    model = hub_info.get("model")
+    return (
+        hub_info.get("name")
+        or hub_info.get("displayModel")
+        or (model if model and model != "Unknown" else None)
+        or "RainPoint Hub"
+    )
 
 
 async def async_migrate_unique_ids(
@@ -116,6 +130,51 @@ async def async_migrate_unique_ids(
                 _LOGGER.warning("HomGar migrate uid failed %s: %s", uid, ex)
 
     device_reg = dr.async_get(hass)
+    known_hub_mids = {str(hub_info.get("mid")) for hub_info in hubs if hub_info.get("mid") is not None}
+
+    # --- Repair devices created from cloud rows with blank name/model strings ---
+    for hub_info in hubs:
+        mid = hub_info.get("mid")
+        if mid is None:
+            continue
+        hub_dev = device_reg.async_get_device(identifiers={(DOMAIN, f"rainpoint_hub_{mid}")})
+        if hub_dev is None:
+            continue
+        update: dict = {}
+        if not hub_dev.name:
+            update["name"] = _fallback_hub_name(hub_info)
+        if not hub_dev.model:
+            update["model"] = hub_info.get("model") or hub_info.get("displayModel") or "Unknown"
+        if update:
+            device_reg.async_update_device(hub_dev.id, **update)
+            _LOGGER.info("HomGar migrate: repaired blank hub device metadata for mid=%s", mid)
+
+    # --- Remove stale placeholder hub devices no longer returned by the cloud ---
+    for device_entry in list(dr.async_entries_for_config_entry(device_reg, entry.entry_id)):
+        idents = {i[1] for i in device_entry.identifiers}
+        hub_mids = {
+            match.group("mid")
+            for ident in idents
+            if (match := _HUB_DEVICE_IDENT.match(ident))
+        }
+        if not hub_mids or hub_mids & known_hub_mids:
+            continue
+
+        attached = er.async_entries_for_device(entity_reg, device_entry.id, include_disabled_entities=True)
+        if not attached:
+            device_reg.async_remove_device(device_entry.id)
+            _LOGGER.info("HomGar migrate: removed stale empty hub device '%s' (%s)", device_entry.name, idents)
+            continue
+
+        if all(
+            entity.unique_id and _HUB_DIAGNOSTIC_UID.match(entity.unique_id)
+            for entity in attached
+        ):
+            for entity in attached:
+                entity_reg.async_remove(entity.entity_id)
+                _LOGGER.info("HomGar migrate: removed stale hub diagnostic entity %s", entity.unique_id)
+            device_reg.async_remove_device(device_entry.id)
+            _LOGGER.info("HomGar migrate: removed stale empty hub device '%s' (%s)", device_entry.name, idents)
 
     # --- Build known old MQTT device identifiers (hid_mid format) from coordinator data ---
     known_old_mqtt_idents: set[str] = set()
