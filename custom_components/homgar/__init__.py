@@ -248,6 +248,15 @@ def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinato
     """Create HA Areas for each home and assign all homgar devices to them."""
     from homeassistant.helpers import area_registry as ar, device_registry as dr
 
+    def _fallback_hub_name(hub_info: dict) -> str:
+        model = hub_info.get("model")
+        return (
+            hub_info.get("name")
+            or hub_info.get("displayModel")
+            or (model if model and model != "Unknown" else None)
+            or "RainPoint Hub"
+        )
+
     data = coordinator.data
     if not data:
         return
@@ -272,8 +281,16 @@ def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinato
             area = area_reg.async_create(home_name)
 
         hub_device = device_reg.async_get_device(identifiers={(DOMAIN, f"rainpoint_hub_{mid}")})
-        if hub_device and hub_device.area_id != area.id:
-            device_reg.async_update_device(hub_device.id, area_id=area.id)
+        if hub_device:
+            update: dict = {}
+            if hub_device.area_id != area.id:
+                update["area_id"] = area.id
+            if not hub_device.name:
+                update["name"] = _fallback_hub_name(hub_info)
+            if not hub_device.model:
+                update["model"] = hub_info.get("model") or hub_info.get("displayModel") or "Unknown"
+            if update:
+                device_reg.async_update_device(hub_device.id, **update)
 
     sensors = data.get("sensors", {})
     group_multi_zone = entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)

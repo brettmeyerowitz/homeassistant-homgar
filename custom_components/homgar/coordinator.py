@@ -39,6 +39,43 @@ def _extract_state_rssi(raw_state: str | None) -> int | None:
         return None
 
 
+def _is_empty_hub_placeholder(hub: dict) -> bool:
+    """Return True for cloud rows that do not describe a real hub."""
+    metadata_fields = (
+        "model",
+        "displayModel",
+        "mac",
+    )
+    return not any(
+        hub.get(field) and str(hub.get(field)).strip().lower() != "unknown"
+        for field in metadata_fields
+    ) and not hub.get("subDevices")
+
+
+def _hub_metadata_score(hub: dict) -> int:
+    """Prefer complete hub rows over cloud shadow rows."""
+    has_model = any(
+        hub.get(field) and str(hub.get(field)).strip().lower() != "unknown"
+        for field in ("model", "displayModel")
+    )
+    return (
+        (10 if hub.get("subDevices") else 0)
+        + (5 if has_model else 0)
+        + (3 if hub.get("name") else 0)
+        + (2 if hub.get("mac") else 0)
+    )
+
+
+def _hub_identity_keys(hub: dict) -> set[tuple[str, str]]:
+    """Return stable cloud identity keys that can reveal duplicate hub rows."""
+    keys: set[tuple[str, str]] = set()
+    for field in ("deviceName", "iotId"):
+        value = hub.get(field)
+        if value:
+            keys.add((field, str(value)))
+    return keys
+
+
 class HomGarCoordinator(DataUpdateCoordinator):
     """Coordinator for HomGar polling."""
 
@@ -83,11 +120,37 @@ class HomGarCoordinator(DataUpdateCoordinator):
             for hid in homes:
                 devices = await self._client.get_devices_by_hid(hid)
                 _LOGGER.debug("Found %d devices for HID %s: %s", len(devices), hid, [d.get('model', 'unknown') for d in devices])
-                for hub in devices:
+                seen_hub_keys: set[tuple[str, str]] = set()
+                for hub in sorted(devices, key=_hub_metadata_score, reverse=True):
+                    if _is_empty_hub_placeholder(hub):
+                        _LOGGER.debug(
+                            "Skipping empty hub placeholder hid=%s mid=%s",
+                            hid,
+                            hub.get("mid"),
+                        )
+                        continue
+                    identity_keys = _hub_identity_keys(hub)
+                    if identity_keys and seen_hub_keys.intersection(identity_keys):
+                        _LOGGER.debug(
+                            "Skipping duplicate hub shadow hid=%s mid=%s keys=%s",
+                            hid,
+                            hub.get("mid"),
+                            sorted(identity_keys),
+                        )
+                        continue
+                    seen_hub_keys.update(identity_keys)
                     hub_copy = dict(hub)
                     hub_copy["hid"] = hid
                     hub_copy["homeName"] = home_name_by_hid.get(int(hid), "")
                     hub_copy["brand"] = "RainPoint"
+                    hub_model = hub_copy.get("model") or hub_copy.get("displayModel") or "Unknown"
+                    hub_copy["model"] = hub_model
+                    hub_copy["name"] = (
+                        hub_copy.get("name")
+                        or hub_copy.get("displayModel")
+                        or (hub_model if hub_model != "Unknown" else None)
+                        or "RainPoint Hub"
+                    )
                     hubs.append(hub_copy)
 
             # Use efficient multipleDeviceStatus API if available, fall back to individual calls
@@ -278,7 +341,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                                     "addr": 0,
                                     "home_name": hub.get("homeName"),
                                     "hub_name": hub.get("name", "Hub"),
-                                    "sub_name": hub.get("name", hub_model),
+                                    "sub_name": hub.get("name") or hub_model,
                                     "model": hub_model,
                                     "firmware_version": hub.get("softVer"),
                                     "raw_status": d00,

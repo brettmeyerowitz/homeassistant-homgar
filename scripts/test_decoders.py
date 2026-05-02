@@ -227,6 +227,10 @@ check("no error",          "error" not in r)
 check("has rain fields",   any(k in r for k in ("precipitation_total", "precipitation_1h", "precipitation_24h")))
 check("battery present",   r.get("battery_level") is not None)
 check("signal present",    r.get("signal_strength") is not None)
+dean_rain = decode_payload("HCS012ARF", "1,0,1;R=100(0/70/100)")
+check("Dean sample total=10.0mm", dean_rain.get("precipitation_total") == 10.0, str(dean_rain.get("precipitation_total")))
+check("Dean sample 24h=7.0mm", dean_rain.get("precipitation_24h") == 7.0, str(dean_rain.get("precipitation_24h")))
+check("Dean sample 7d=10.0mm", dean_rain.get("precipitation_7d") == 10.0, str(dean_rain.get("precipitation_7d")))
 
 
 # ── Temperature conversion regression (issue #21 root cause) ─────────────────

@@ -42,6 +42,7 @@ class SensorDef:
     entity_category: EntityCategory | None = None
     icon: str | None = None
     name: str | None = None
+    suggested_display_precision: int | None = None
 
 
 FIELD_SENSOR_MAP: dict[str, SensorDef | None] = {
@@ -130,6 +131,7 @@ FIELD_SENSOR_MAP: dict[str, SensorDef | None] = {
         unit=UnitOfLength.MILLIMETERS,
         state_class=SensorStateClass.TOTAL_INCREASING,
         name="Rain Total",
+        suggested_display_precision=2,
     ),
     "precipitation_1h": SensorDef(
         device_class=SensorDeviceClass.PRECIPITATION,
@@ -137,6 +139,7 @@ FIELD_SENSOR_MAP: dict[str, SensorDef | None] = {
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:weather-rainy",
         name="Rain Last Hour",
+        suggested_display_precision=2,
     ),
     "precipitation_24h": SensorDef(
         device_class=SensorDeviceClass.PRECIPITATION,
@@ -144,6 +147,7 @@ FIELD_SENSOR_MAP: dict[str, SensorDef | None] = {
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:weather-rainy",
         name="Rain Last 24h",
+        suggested_display_precision=2,
     ),
     "precipitation_7d": SensorDef(
         device_class=SensorDeviceClass.PRECIPITATION,
@@ -151,6 +155,7 @@ FIELD_SENSOR_MAP: dict[str, SensorDef | None] = {
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:weather-rainy",
         name="Rain Last 7 Days",
+        suggested_display_precision=2,
     ),
 
     # --- Diagnostics ---

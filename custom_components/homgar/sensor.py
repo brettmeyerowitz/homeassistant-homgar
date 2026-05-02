@@ -299,6 +299,8 @@ class HomGarGenericSensor(HomGarSensorBase):
                 self._attr_entity_category = sdef.entity_category
             if sdef.icon:
                 self._attr_icon = sdef.icon
+            if sdef.suggested_display_precision is not None:
+                self._attr_suggested_display_precision = sdef.suggested_display_precision
 
         sub_name = sensor_info.get("sub_name") or "Sensor"
         label = (sdef.name if sdef and sdef.name else field_name.replace("_", " ").title())

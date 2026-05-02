@@ -560,7 +560,13 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
 
     bat_or_rssi = leg.get("_p1_bat_or_rssi")
     rssi = leg.get("_p1_rssi")
-    if not is_display_hub_v2:
+    # HCS012ARF reports a legacy status slot rather than a useful battery
+    # percentage; the app presents it as full.
+    if model_str.upper() == "HCS012ARF":
+        result["battery_level"] = 100
+        if rssi is not None:
+            result["signal_strength"] = rssi
+    elif not is_display_hub_v2:
         if bat_or_rssi is not None:
             if bat_or_rssi < 0:
                 result["signal_strength"] = bat_or_rssi
