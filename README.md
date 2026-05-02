@@ -117,7 +117,11 @@ This gives you a simple "smart irrigation" control panel directly in Home Assist
 
 Whether you're troubleshooting a device, requesting a new model, or just want to show off your irrigation automation — come say hi!
 
+For reproducible bugs and new device support, please open a GitHub issue rather than a discussion so logs, device details, and payload samples are captured in the right format.
+
 **HomGar** is the mobile app and cloud platform. **RainPoint** is the hardware manufacturer. All device models (HCS\*, HTV\*, HWG\*, etc.) are RainPoint hardware accessible via either mobile app.
+
+This integration supports the **HomGar** app and **RainPoint Smart+** app cloud accounts only. The legacy **RainPoint-TY** app appears to use the Tuya platform and is not supported by this integration.
 
 ---
 
@@ -160,6 +164,8 @@ If nothing appears, check logs under:
 2. Select your app type — **HomGar** or **RainPoint Smart+** (choose whichever you use on your phone)
 3. Enter your account credentials (email and country code)
 4. Select which homes to include
+
+The **RainPoint-TY** app is not the same as **RainPoint Smart+**. If your device is paired only in RainPoint-TY, this integration will not be able to authenticate or discover it.
 
 > **⚠️ API session conflict:** Logging in via this integration will log you out of the mobile app. The API only supports one active session per account. **Create a dedicated API account** (invite it as a home member) to avoid this — see [Multiple Accounts](#multiple-accounts--sites) below.
 
@@ -304,6 +310,7 @@ If your device model isn't in the supported list, the integration will log a war
 
 - **Logged out of mobile app**: Use a dedicated API account (see above)
 - **No devices found**: Ensure you selected the correct app type (HomGar vs RainPoint) — the two apps use separate account systems
+- **RainPoint-TY account fails to log in**: RainPoint-TY appears to be a legacy Tuya app and is not supported; use a HomGar or RainPoint Smart+ account with compatible devices
 - **Entities unavailable after upgrade**: Follow the clean install steps in [Upgrading from v2.x](#upgrading-from-v2x)
 - **Wrong app type configured**: Go to the integration → three-dot menu → **Reconfigure**
 
