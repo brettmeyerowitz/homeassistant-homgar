@@ -12,6 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
@@ -20,6 +21,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     CONF_APP_TYPE,
     CONF_HIDS,
+    controller_device_identifier,
     zone_device_identifier,
 )
 from .coordinator import HomGarCoordinator
@@ -211,6 +213,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up services
     await async_setup_services(hass)
 
+    _ensure_device_registry_parents(hass, entry, coordinator)
+
     _LOGGER.info("Setting up platforms: %s for entry: %s", PLATFORMS, entry.entry_id)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _LOGGER.info("Completed platform setup for entry: %s", entry.entry_id)
@@ -244,18 +248,73 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+def _fallback_hub_name(hub_info: dict) -> str:
+    model = hub_info.get("model")
+    return (
+        hub_info.get("name")
+        or hub_info.get("displayModel")
+        or (model if model and model != "Unknown" else None)
+        or "RainPoint Hub"
+    )
+
+
+def _ensure_device_registry_parents(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    coordinator,
+) -> None:
+    """Create parent devices before grouped child entities reference them."""
+    data = coordinator.data
+    if not data:
+        return
+
+    device_reg = dr.async_get(hass)
+    hubs = data.get("hubs", [])
+    if isinstance(hubs, dict):
+        hubs = list(hubs.values())
+
+    for hub_info in hubs:
+        mid = hub_info.get("mid")
+        if mid is None:
+            continue
+        device_reg.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, f"rainpoint_hub_{mid}")},
+            manufacturer="RainPoint",
+            model=hub_info.get("model") or hub_info.get("displayModel") or "Unknown",
+            name=_fallback_hub_name(hub_info),
+            suggested_area=hub_info.get("homeName"),
+        )
+
+    if not entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False):
+        return
+
+    sensors = data.get("sensors", {})
+    for sensor_info in sensors.values():
+        mid = sensor_info.get("mid")
+        addr = sensor_info.get("addr")
+        model = sensor_info.get("model")
+        if mid is None or addr is None or not model:
+            continue
+        if len(get_valve_ports(model)) <= 1 and len(get_switch_ports(model)) <= 1:
+            continue
+        if sensor_info.get("type_flag") == 1:
+            continue
+
+        device_reg.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, controller_device_identifier(sensor_info))},
+            manufacturer="RainPoint",
+            model=model,
+            name=sensor_info.get("sub_name") or f"Controller {addr}",
+            suggested_area=sensor_info.get("home_name"),
+            via_device=(DOMAIN, f"rainpoint_hub_{mid}"),
+        )
+
+
 def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
     """Create HA Areas for each home and assign all homgar devices to them."""
     from homeassistant.helpers import area_registry as ar, device_registry as dr
-
-    def _fallback_hub_name(hub_info: dict) -> str:
-        model = hub_info.get("model")
-        return (
-            hub_info.get("name")
-            or hub_info.get("displayModel")
-            or (model if model and model != "Unknown" else None)
-            or "RainPoint Hub"
-        )
 
     data = coordinator.data
     if not data:
