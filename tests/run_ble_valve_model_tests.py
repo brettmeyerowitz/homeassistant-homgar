@@ -91,6 +91,10 @@ def main() -> int:
         decoder.uses_ble_valve_control("HTV224B") is True,
     )
     check(
+        "HTV157B uses DP valve control override",
+        decoder.uses_ble_valve_control("HTV157B") is True,
+    )
+    check(
         "HTV203FRF is not detected as BLE-backed",
         decoder.uses_ble_valve_control("HTV203FRF") is False,
     )
