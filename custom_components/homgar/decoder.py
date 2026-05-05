@@ -97,8 +97,17 @@ def get_valve_ports(model: str) -> list[int]:
     return []
 
 
+DP_VALVE_CONTROL_MODELS: frozenset[str] = frozenset({
+    # HTV157B exposes CTL_WATER rather than CTL_BT_WATER in product metadata,
+    # but the legacy controlWorkMode endpoint returns code=3 for this model.
+    "HTV157B",
+})
+
+
 def uses_ble_valve_control(model: str) -> bool:
-    """Return True when the model exposes BLE valve control datapoints."""
+    """Return True when the model should use the DP valve control endpoint."""
+    if model.upper() in DP_VALVE_CONTROL_MODELS:
+        return True
     info = get_model_info(model)
     if not info:
         return False
