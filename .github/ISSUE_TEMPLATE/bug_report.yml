@@ -10,6 +10,8 @@ body:
         
         Please provide as much detail as possible to help us identify and fix the issue.
 
+        **Compatibility note:** This integration supports HomGar / RainPoint Smart+ / RainPoint Home H-series devices. RainPoint-TY / Tuya T-series devices are not supported; login or discovery failures for RainPoint-TY accounts are expected and should not be filed as integration bugs.
+
         **Latest released integration version:** `3.0.24`
         
         Please update to the latest release and restart Home Assistant before opening a bug report.
@@ -162,6 +164,8 @@ body:
         - label: I have provided steps to reproduce the issue
           required: true
         - label: I have included the integration version
+          required: true
+        - label: I am not using a RainPoint-TY / Tuya T-series device or account
           required: true
         - label: For sensor value bugs, I have attached screenshots from the RainPoint/HomGar app showing the correct values
           required: false

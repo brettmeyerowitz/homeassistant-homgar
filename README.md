@@ -119,9 +119,13 @@ Whether you're troubleshooting a device, requesting a new model, or just want to
 
 For reproducible bugs and new device support, please open a GitHub issue rather than a discussion so logs, device details, and payload samples are captured in the right format.
 
-**HomGar** is the mobile app and cloud platform. **RainPoint** is the hardware manufacturer. All device models (HCS\*, HTV\*, HWG\*, etc.) are RainPoint hardware accessible via either mobile app.
+## Compatibility
 
-This integration supports the **HomGar** app and **RainPoint Smart+** app cloud accounts only. The legacy **RainPoint-TY** app appears to use the Tuya platform and is not supported by this integration.
+**HomGar** is the mobile app and cloud platform. **RainPoint** is the hardware manufacturer. This integration supports the **HomGar** app and **RainPoint Smart+ / RainPoint Home** app cloud accounts for RainPoint **H-series / Home ecosystem** devices, such as HCS\*, HTV\*, and HWG\* models.
+
+The **RainPoint-TY / Tuya** app and **T-series / Tuya ecosystem** devices are not supported by this integration. RainPoint's own compatibility guide explains that Tuya devices use T-series model numbers, Home devices use H-series model numbers, and the two ecosystems use different hardware protocols and incompatible hubs: [RainPoint Smart Irrigation Timer Guide: Tuya vs. Home APP](https://www.rainpointonline.com/blogs/lawn-garden/rainpoint-smart-irrigation-timer-guide-how-to-distinguish-between-tuya-vs-home-app-compatible-devices).
+
+Examples of unsupported Tuya/T-series models include TTV\*, TTP\*, TWG\*, and TCS\* devices. These cannot be added by selecting **RainPoint Smart+** in this integration; they need a Tuya-compatible Home Assistant integration or a separate RainPoint-TY/Tuya integration.
 
 ---
 
@@ -165,7 +169,7 @@ If nothing appears, check logs under:
 3. Enter your account credentials (email and country code)
 4. Select which homes to include
 
-The **RainPoint-TY** app is not the same as **RainPoint Smart+**. If your device is paired only in RainPoint-TY, this integration will not be able to authenticate or discover it.
+The **RainPoint-TY** app is not the same as **RainPoint Smart+ / RainPoint Home**. If your device is paired only in RainPoint-TY, or the model number starts with `T`, this integration will not be able to authenticate or discover it.
 
 > **⚠️ API session conflict:** Logging in via this integration will log you out of the mobile app. The API only supports one active session per account. **Create a dedicated API account** (invite it as a home member) to avoid this — see [Multiple Accounts](#multiple-accounts--sites) below.
 
@@ -310,7 +314,7 @@ If your device model isn't in the supported list, the integration will log a war
 
 - **Logged out of mobile app**: Use a dedicated API account (see above)
 - **No devices found**: Ensure you selected the correct app type (HomGar vs RainPoint) — the two apps use separate account systems
-- **RainPoint-TY account fails to log in**: RainPoint-TY appears to be a legacy Tuya app and is not supported; use a HomGar or RainPoint Smart+ account with compatible devices
+- **RainPoint-TY account fails to log in**: RainPoint-TY/Tuya accounts and T-series devices are not supported; use a HomGar or RainPoint Smart+ / RainPoint Home account with compatible H-series devices
 - **Entities unavailable after upgrade**: Follow the clean install steps in [Upgrading from v2.x](#upgrading-from-v2x)
 - **Wrong app type configured**: Go to the integration → three-dot menu → **Reconfigure**
 

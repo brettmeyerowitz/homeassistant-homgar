@@ -9,6 +9,8 @@ body:
         ## Thanks for suggesting a feature!
         
         Please describe the feature you'd like to see added to the integration.
+
+        **Compatibility note:** This integration supports HomGar / RainPoint Smart+ / RainPoint Home H-series devices. RainPoint-TY / Tuya T-series devices are outside the scope of this integration because RainPoint documents them as a separate ecosystem with different hardware protocols and incompatible hubs.
   
   - type: textarea
     id: feature_description

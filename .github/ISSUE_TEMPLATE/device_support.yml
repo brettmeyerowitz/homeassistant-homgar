@@ -14,6 +14,8 @@ body:
         
         The more payload+screenshot pairs you provide (in different states), the faster and more accurate the implementation will be.
 
+        **Compatibility note:** This integration supports HomGar / RainPoint Smart+ / RainPoint Home H-series devices. RainPoint-TY / Tuya T-series devices are not supported by this integration. If your model starts with `T` or only pairs with the RainPoint-TY app, please try a Tuya-compatible Home Assistant integration instead.
+
         **Latest released integration version:** `3.0.24`
         
         Please update to the latest release and restart Home Assistant before opening a new device support request.
@@ -186,4 +188,6 @@ body:
         - label: I have described what the device should display in Home Assistant
           required: true
         - label: I have checked that this device is not already supported
+          required: true
+        - label: My device is not a RainPoint-TY / Tuya T-series device
           required: true
