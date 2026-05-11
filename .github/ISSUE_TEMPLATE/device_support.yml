@@ -14,7 +14,7 @@ body:
         
         The more payload+screenshot pairs you provide (in different states), the faster and more accurate the implementation will be.
 
-        **Compatibility note:** This integration supports HomGar / RainPoint Smart+ / RainPoint Home H-series devices. RainPoint-TY / Tuya T-series devices are not supported by this integration. If your model starts with `T` or only pairs with the RainPoint-TY app, please try a Tuya-compatible Home Assistant integration instead.
+        **Compatibility note:** This integration supports HomGar / RainPoint Smart+ / RainPoint Home H-series devices. RainPoint-TY / Tuya T-series devices are not supported by this integration. If your model starts with `T` or only pairs with the RainPoint-TY app, please try a Tuya-compatible Home Assistant integration instead. See the wiki compatibility guide: https://github.com/brettmeyerowitz/homeassistant-homgar/wiki/RainPoint-App-and-Device-Compatibility
 
         **Latest released integration version:** `3.0.24`
         

@@ -127,6 +127,8 @@ The **RainPoint-TY / Tuya** app and **T-series / Tuya ecosystem** devices are no
 
 Examples of unsupported Tuya/T-series models include TTV\*, TTP\*, TWG\*, and TCS\* devices. These cannot be added by selecting **RainPoint Smart+** in this integration; they need a Tuya-compatible Home Assistant integration or a separate RainPoint-TY/Tuya integration.
 
+See the wiki for a longer explanation: [RainPoint App and Device Compatibility](https://github.com/brettmeyerowitz/homeassistant-homgar/wiki/RainPoint-App-and-Device-Compatibility).
+
 ---
 
 ## Quick sanity check
