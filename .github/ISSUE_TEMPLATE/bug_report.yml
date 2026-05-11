@@ -10,7 +10,7 @@ body:
         
         Please provide as much detail as possible to help us identify and fix the issue.
 
-        **Compatibility note:** This integration supports HomGar / RainPoint Smart+ / RainPoint Home H-series devices. RainPoint-TY / Tuya T-series devices are not supported; login or discovery failures for RainPoint-TY accounts are expected and should not be filed as integration bugs.
+        **Compatibility note:** This integration supports HomGar / RainPoint Smart+ / RainPoint Home H-series devices. RainPoint-TY / Tuya T-series devices are not supported; login or discovery failures for RainPoint-TY accounts are expected and should not be filed as integration bugs. See the wiki compatibility guide: https://github.com/brettmeyerowitz/homeassistant-homgar/wiki/RainPoint-App-and-Device-Compatibility
 
         **Latest released integration version:** `3.0.24`
         
