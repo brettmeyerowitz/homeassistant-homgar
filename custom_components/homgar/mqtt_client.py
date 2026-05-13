@@ -373,16 +373,30 @@ class HomGarMQTTClient:
                     _LOGGER.warning("HomGar MQTT failed to parse device updates: %s", rest[:100])
                 return
             
-            device_count = sum(1 for key in d_updates if isinstance(key, str) and key.startswith("D"))
+            device_count = sum(
+                1
+                for key, val in d_updates.items()
+                if isinstance(key, str)
+                and (
+                    key.startswith("D")
+                    or (
+                        key == "state"
+                        and _looks_like_device_payload(
+                            val.get("value", "") if isinstance(val, dict) else val
+                        )
+                    )
+                )
+            )
             _LOGGER.debug(
                 "HomGar MQTT update for hub_mid=%s: %d device(s)",
                 hub_mid,
                 device_count,
             )
             
-            # Process each device update (D01, D02, D03, D04, etc.)
+            # Process each device update (D01, D02, D03, D04, etc.) and WiFi
+            # hub-as-device payloads carried in state.
             for key, val in d_updates.items():
-                if not key.startswith("D"):
+                if not key.startswith("D") and key != "state":
                     continue
                 
                 raw_val = val.get("value", "") if isinstance(val, dict) else val

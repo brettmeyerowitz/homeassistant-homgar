@@ -40,6 +40,11 @@ def _hub_status_entries(coordinator: HomGarCoordinator, mid: int | str) -> list[
     return entries if isinstance(entries, list) else []
 
 
+def _looks_like_device_payload(value: Any) -> bool:
+    """Return True for raw device payload frames such as ``10#...``."""
+    return isinstance(value, str) and "#" in value
+
+
 class HomGarHubDevice(Entity):
     """Mixin providing device_info for HomGar hub entities."""
 
@@ -177,6 +182,17 @@ class HomGarHubRawStatusSensor(HomGarHubSensorBase):
             )
             if value is not None:
                 return str(value)
+        state_value = next(
+            (
+                entry.get("value")
+                for entry in entries
+                if entry.get("id") == "state"
+                and _looks_like_device_payload(entry.get("value"))
+            ),
+            None,
+        )
+        if state_value is not None:
+            return str(state_value)
         for entry in entries:
             status_id = str(entry.get("id", ""))
             value = entry.get("value")

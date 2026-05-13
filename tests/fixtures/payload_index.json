@@ -15,6 +15,7 @@
     {"model": "HTV0537FRF", "file": "payloads/HTV0537FRF.json", "sample_count": 2},
     {"model": "HTV0542FRF", "file": "payloads/HTV0542FRF.json", "sample_count": 2},
     {"model": "HIC801W", "file": "payloads/HIC801W.json", "sample_count": 1},
+    {"model": "HTP159W", "file": "payloads/HTP159W.json", "sample_count": 1},
     {"model": "HTP115FRF", "file": "payloads/HTP115FRF.json", "sample_count": 1},
     {"model": "HCS012ARF", "file": "payloads/HCS012ARF.json", "sample_count": 2},
     {"model": "HWS019WRF-V2", "file": "payloads/HWS019WRF-V2.json", "sample_count": 2}
