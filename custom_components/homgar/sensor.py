@@ -38,6 +38,9 @@ from .hub_entities import (
     HomGarHubDeviceIDSensor,
     HomGarHubFirmwareSensor,
     HomGarHubMACSensor,
+    HomGarHubMqttFriendlySensor,
+    HomGarHubMqttRawPayloadSensor,
+    HomGarHubRawStatusSensor,
     HomGarHubChannelSelect,
     HomGarHubBroadcastSwitch,
 )
@@ -100,6 +103,9 @@ async def async_setup_entry(
         entities.append(HomGarHubDeviceIDSensor(coordinator, hub_info))
         entities.append(HomGarHubFirmwareSensor(coordinator, hub_info))
         entities.append(HomGarHubMACSensor(coordinator, hub_info))
+        entities.append(HomGarHubRawStatusSensor(coordinator, hub_info))
+        entities.append(HomGarHubMqttRawPayloadSensor(coordinator, hub_info))
+        entities.append(HomGarHubMqttFriendlySensor(coordinator, hub_info))
         entities.append(HomGarHubChannelSelect(coordinator, hub_info))
         entities.append(HomGarHubBroadcastSwitch(coordinator, hub_info))
 

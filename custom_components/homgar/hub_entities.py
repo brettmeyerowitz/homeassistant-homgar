@@ -29,6 +29,17 @@ def _hub_model(hub_info: dict) -> str:
     return hub_info.get("model") or hub_info.get("displayModel") or "Unknown"
 
 
+def _hub_status_payload(coordinator: HomGarCoordinator, mid: int | str) -> dict:
+    status_by_mid = coordinator.data.get("status", {}) if coordinator.data else {}
+    return status_by_mid.get(mid) or status_by_mid.get(str(mid)) or {}
+
+
+def _hub_status_entries(coordinator: HomGarCoordinator, mid: int | str) -> list[dict]:
+    status = _hub_status_payload(coordinator, mid)
+    entries = status.get("subDeviceStatus", [])
+    return entries if isinstance(entries, list) else []
+
+
 class HomGarHubDevice(Entity):
     """Mixin providing device_info for HomGar hub entities."""
 
@@ -138,6 +149,134 @@ class HomGarHubMACSensor(HomGarHubSensorBase):
     @property
     def native_value(self) -> str | None:
         return self._hub_info.get("mac")
+
+
+class HomGarHubRawStatusSensor(HomGarHubSensorBase):
+    """Raw cloud status payload for a hub/main WiFi device."""
+
+    _attr_icon = "mdi:code-braces"
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
+        super().__init__(coordinator, hub_info)
+        self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_raw_status"
+        self._attr_name = f"{_hub_name(hub_info)} Raw Status"
+
+    @property
+    def native_value(self) -> str | None:
+        entries = _hub_status_entries(self.coordinator, self._hub_info.get("mid"))
+        preferred_ids = ("D00", "D0")
+        for preferred_id in preferred_ids:
+            value = next(
+                (
+                    entry.get("value")
+                    for entry in entries
+                    if entry.get("id") == preferred_id and entry.get("value")
+                ),
+                None,
+            )
+            if value is not None:
+                return str(value)
+        for entry in entries:
+            status_id = str(entry.get("id", ""))
+            value = entry.get("value")
+            if status_id.startswith("D") and value:
+                return str(value)
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        entries = _hub_status_entries(self.coordinator, self._hub_info.get("mid"))
+        raw_status_by_id = {
+            str(entry.get("id")): entry.get("value")
+            for entry in entries
+            if entry.get("id") is not None and entry.get("value") is not None
+        }
+        return {
+            "mid": self._hub_info.get("mid"),
+            "model": _hub_model(self._hub_info),
+            "status_ids": [entry.get("id") for entry in entries if entry.get("id")],
+            "raw_status_by_id": raw_status_by_id,
+            "status_payload": _hub_status_payload(self.coordinator, self._hub_info.get("mid")),
+        }
+
+
+class HomGarHubMqttRawPayloadSensor(HomGarHubSensorBase):
+    """Last raw MQTT payload seen for a hub/main WiFi device."""
+
+    _attr_icon = "mdi:antenna"
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
+        super().__init__(coordinator, hub_info)
+        self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_mqtt_raw"
+        self._attr_name = f"{_hub_name(hub_info)} Last MQTT Payload"
+
+    @property
+    def available(self) -> bool:
+        diag = self.coordinator._mqtt_diagnostics.get(self._diag_key)
+        return bool(diag and diag.get("raw_payload"))
+
+    @property
+    def _diag_key(self) -> str:
+        return f"rainpoint_hub_{self._hub_info.get('mid')}"
+
+    @property
+    def native_value(self) -> str | None:
+        diag = self.coordinator._mqtt_diagnostics.get(self._diag_key) or {}
+        payload = diag.get("raw_payload")
+        return str(payload) if payload is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        diag = self.coordinator._mqtt_diagnostics.get(self._diag_key) or {}
+        return {
+            "last_received": diag.get("last_received"),
+            "device_key": diag.get("device_key"),
+            "hub_mid": diag.get("hub_mid"),
+            "connected": diag.get("connected"),
+            "messages_received": diag.get("messages_received"),
+            "last_message_age_seconds": diag.get("last_message_age_seconds"),
+        }
+
+
+class HomGarHubMqttFriendlySensor(HomGarHubSensorBase):
+    """Last MQTT message summary for a hub/main WiFi device."""
+
+    _attr_icon = "mdi:message-text"
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: HomGarCoordinator, hub_info: dict):
+        super().__init__(coordinator, hub_info)
+        self._attr_unique_id = f"rainpoint_hub_{hub_info.get('mid', 'unknown')}_mqtt_friendly"
+        self._attr_name = f"{_hub_name(hub_info)} Last MQTT Summary"
+
+    @property
+    def available(self) -> bool:
+        diag = self.coordinator._mqtt_diagnostics.get(self._diag_key)
+        return bool(diag and diag.get("friendly_summary"))
+
+    @property
+    def _diag_key(self) -> str:
+        return f"rainpoint_hub_{self._hub_info.get('mid')}"
+
+    @property
+    def native_value(self) -> str | None:
+        diag = self.coordinator._mqtt_diagnostics.get(self._diag_key) or {}
+        summary = diag.get("friendly_summary")
+        return str(summary) if summary is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        diag = self.coordinator._mqtt_diagnostics.get(self._diag_key) or {}
+        return {
+            "last_received": diag.get("last_received"),
+            "device_key": diag.get("device_key"),
+            "hub_mid": diag.get("hub_mid"),
+            "connected": diag.get("connected"),
+            "messages_received": diag.get("messages_received"),
+            "last_message_age_seconds": diag.get("last_message_age_seconds"),
+        }
 
 
 class HomGarHubChannelSelect(CoordinatorEntity, SelectEntity, HomGarHubDevice):

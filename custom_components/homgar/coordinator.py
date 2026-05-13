@@ -386,7 +386,8 @@ class HomGarCoordinator(DataUpdateCoordinator):
             for hub in hubs:
                 hub_key = f"rainpoint_hub_{hub.get('mid')}"
                 if hub.get("productKey") and hub.get("deviceName"):
-                    self._mqtt_diagnostics[hub_key] = diagnostics
+                    existing = self._mqtt_diagnostics.get(hub_key, {})
+                    self._mqtt_diagnostics[hub_key] = {**existing, **diagnostics}
                 else:
                     # Remove diagnostics for hubs without MQTT
                     self._mqtt_diagnostics.pop(hub_key, None)

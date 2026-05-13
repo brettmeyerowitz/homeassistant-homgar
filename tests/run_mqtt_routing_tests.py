@@ -101,7 +101,7 @@ class FakeCoordinator:
         self.data = data
 
 
-async def _run_case() -> tuple[bool, dict, dict]:
+async def _run_case() -> tuple[bool, dict, dict, dict]:
     coordinator = FakeCoordinator()
     await coordinator_mqtt.handle_mqtt_update(
         coordinator,
@@ -114,7 +114,8 @@ async def _run_case() -> tuple[bool, dict, dict]:
     )
     sensor = coordinator.data["sensors"]["39929_0"]
     diag = coordinator._mqtt_diagnostics.get("39929_0", {})
-    return coordinator.updated, sensor, diag
+    hub_diag = coordinator._mqtt_diagnostics.get("rainpoint_hub_39929", {})
+    return coordinator.updated, sensor, diag, hub_diag
 
 
 async def _run_no_change_case() -> tuple[bool, dict, dict]:
@@ -145,13 +146,42 @@ async def _run_no_change_case() -> tuple[bool, dict, dict]:
     return coordinator.updated, sensor, diag
 
 
+async def _run_missing_sensor_case() -> tuple[bool, dict]:
+    coordinator = FakeCoordinator()
+    coordinator.data["sensors"] = {}
+    await coordinator_mqtt.handle_mqtt_update(
+        coordinator,
+        {
+            "hub_mid": "139929",
+            "hub_mid_candidates": ["139929", "39929"],
+            "device_key": "D00",
+            "payload": "10#108800AF00000000B700204200D800F700000000F9FF00",
+        },
+    )
+    hub_diag = coordinator._mqtt_diagnostics.get("rainpoint_hub_39929", {})
+    return coordinator.updated, hub_diag
+
+
 def main() -> int:
     print("\n🧪 MQTT routing regression tests")
-    updated, sensor, diag = asyncio.run(_run_case())
+    updated, sensor, diag, hub_diag = asyncio.run(_run_case())
     check("routes D00 update using MID candidate alias", updated)
     check("updates hub-as-device sensor key", sensor["raw_status"]["value"].startswith("10#1088"), repr(sensor))
     check("decoded idle zone 1 state", sensor["data"].get("port_1", {}).get("is_watering") is False, repr(sensor["data"]))
     check("records mqtt diagnostics", bool(diag), repr(diag))
+    check(
+        "records hub-level mqtt diagnostics",
+        hub_diag.get("raw_payload", "").startswith("10#1088"),
+        repr(hub_diag),
+    )
+
+    missing_sensor_updated, missing_sensor_hub_diag = asyncio.run(_run_missing_sensor_case())
+    check("notifies entities when only hub-level mqtt diagnostics update", missing_sensor_updated)
+    check(
+        "records hub-level mqtt diagnostics without sensor key",
+        missing_sensor_hub_diag.get("raw_payload", "").startswith("10#1088"),
+        repr(missing_sensor_hub_diag),
+    )
 
     hic = FakeCoordinator()
     hic.data = {

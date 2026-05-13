@@ -58,6 +58,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
 
     matched_mid = str(target_hub.get("mid"))
     hub_name = target_hub.get("name", "Hub")
+    now_iso = datetime.now(timezone.utc).isoformat()
 
     _LOGGER.debug(
         "HomGar MQTT: Found hub mid=%s name=%s model=%s sub_devices=%d",
@@ -73,6 +74,19 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
     except (ValueError, IndexError):
         _LOGGER.warning("HomGar MQTT: Invalid device_key format: %s", device_key)
         return
+
+    hub_diag_key = f"rainpoint_hub_{matched_mid}"
+    hub_diag = dict(coordinator._mqtt_diagnostics.get(hub_diag_key) or {})
+    hub_diag.update(
+        {
+            "raw_payload": payload,
+            "friendly_summary": f"{device_key}: payload received",
+            "last_received": now_iso,
+            "device_key": device_key,
+            "hub_mid": matched_mid,
+        }
+    )
+    coordinator._mqtt_diagnostics[hub_diag_key] = hub_diag
     
     _LOGGER.debug(
         "HomGar MQTT: Processing update for hub_mid=%s name=%s addr=%d model=%s",
@@ -122,6 +136,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
                 pass
         if "error" in decoded:
             _LOGGER.debug("HomGar MQTT: No decoder for model=%s (sub_model=%s)", model, sub_model)
+            coordinator.async_set_updated_data(coordinator.data)
             return
         top_fields = [k for k in decoded if not k.startswith("port_") and k not in ("port_number", "dp_flag")]
         _LOGGER.debug(
@@ -139,8 +154,6 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         decoded_sensors = coordinator.data.get("sensors", {})
         
         if sensor_key in decoded_sensors:
-            now_iso = datetime.now(timezone.utc).isoformat()
-
             # Determine status message based on decoded fields (v3 field names)
             watering_ports = [
                 p
@@ -272,6 +285,7 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
                 sub_name or model,
                 available_keys
             )
+            coordinator.async_set_updated_data(coordinator.data)
     
     except Exception as e:
         _LOGGER.error("HomGar MQTT: Failed to decode payload: %s", e, exc_info=True)

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.33] - 2026-05-13
+
+### 🔧 Diagnostics
+- **Hub raw status diagnostics** — added disabled-by-default `Raw Status`, `Last MQTT Payload`, and `Last MQTT Summary` entities for hub/main WiFi devices so unsupported main-device models can expose troubleshooting payloads even before a decoded child sensor exists.
+- **MQTT fallback capture** — MQTT payloads are now retained at the hub level when a message cannot be routed to an existing device sensor key, making it possible to debug newly discovered WiFi models such as `HTP159W`.
+
+### 🧪 Tests
+- **MQTT routing regression coverage** — added checks that hub-level MQTT diagnostics are stored and entity updates are emitted even when the device-specific sensor is missing.
+
+---
+
 ## [3.0.29] - 2026-04-24
 
 ### 🐛 Bug Fixes
