@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 
 def _find_repo_root() -> Path:
@@ -54,6 +56,19 @@ def check(name: str, condition: bool, detail: str = "") -> None:
         FAIL += 1
 
 
+def collect_mqtt_callbacks(param: str) -> list[dict]:
+    """Run _on_message without opening a real MQTT connection."""
+    callbacks: list[dict] = []
+    client = mqtt_client.HomGarMQTTClient.__new__(mqtt_client.HomGarMQTTClient)
+    client._messages_received = 0
+    client._last_message_time = None
+    client._on_message_callback = callbacks.append
+    payload = json.dumps({"params": {"param": param}}).encode()
+    msg = SimpleNamespace(topic="test/topic", payload=payload)
+    client._on_message(None, None, msg)
+    return callbacks
+
+
 def main() -> int:
     print("\n🧪 MQTT parser regression tests")
 
@@ -86,11 +101,25 @@ def main() -> int:
         not looks_like_device_payload("1|1776014190215|103441486619"),
         "expected False",
     )
+    check("rejects hub RSSI state", not looks_like_device_payload("0,-68"), "expected False")
 
     last6, candidates = extract_hub_mid_candidates("P260412163703000017280081139929")
     check("mid extraction keeps raw candidate", last6 == "139929", repr((last6, candidates)))
     check("mid extraction includes raw mid", candidates and candidates[0] == "139929", repr(candidates))
     check("mid extraction includes stripped-leading-1 alias", "39929" in candidates, repr(candidates))
+
+    callbacks = collect_mqtt_callbacks(
+        '#P260513201756000017870151267334|{"state":{"time":1778701510269,'
+        '"value":"10#DC0103E1C900D82020B778445B19AF00000000"}}|0|0#'
+    )
+    check("emits MQTT callback for state device payload", len(callbacks) == 1, repr(callbacks))
+    check("preserves state device key", callbacks and callbacks[0]["device_key"] == "state", repr(callbacks))
+    check("preserves state raw payload", callbacks and callbacks[0]["payload"].startswith("10#DC01"), repr(callbacks))
+
+    callbacks = collect_mqtt_callbacks(
+        '#P260513201756000017870151267334|{"state":{"time":1778701510269,"value":"0,-68"}}|0|0#'
+    )
+    check("ignores MQTT RSSI-only state", callbacks == [], repr(callbacks))
 
     total = PASS + FAIL
     print(f"\n{'=' * 50}")

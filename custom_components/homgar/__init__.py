@@ -35,6 +35,11 @@ PLATFORMS: list[str] = ["sensor", "binary_sensor", "valve", "switch", "number"]
 _MQTT_RENEWAL_BACKOFF_SECONDS = (30, 60, 300, 900)
 
 
+def _select_mqtt_subscription_hid(hubs: list[dict], hids: list) -> int | str | None:
+    """Prefer a selected home that actually has a hub for MQTT subscription."""
+    return next((hub.get("hid") for hub in hubs if hub.get("hid")), hids[0] if hids else None)
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Legacy YAML setup - not used."""
     return True
@@ -103,9 +108,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 hubs = coordinator.data.get("hubs", []) if coordinator.data else []
                 hids = entry.data.get(CONF_HIDS, [])
                 sub_creds = {}
-                if hubs and hids:
+                subscription_hid = _select_mqtt_subscription_hid(hubs, hids)
+                if hubs and subscription_hid:
                     try:
-                        sub_creds = await client.subscribe_status(hids[0], hubs)
+                        sub_creds = await client.subscribe_status(subscription_hid, hubs, hids)
                         _LOGGER.info(
                             "HomGar [%s]: subscribeStatus returned device=%s productKey=%s host=%s",
                             entry.title,
@@ -403,11 +409,12 @@ async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry
         # Get fresh credentials via subscribeStatus
         hubs = coordinator.data.get("hubs", []) if coordinator.data else []
         hids = entry.data.get(CONF_HIDS, [])
-        if not hubs or not hids:
+        subscription_hid = _select_mqtt_subscription_hid(hubs, hids)
+        if not hubs or not subscription_hid:
             _LOGGER.warning("HomGar [%s]: Cannot renew MQTT - no hubs or hids", entry.title)
             return False
             
-        sub_creds = await client.subscribe_status(hids[0], hubs)
+        sub_creds = await client.subscribe_status(subscription_hid, hubs, hids)
         _LOGGER.info(
             "HomGar [%s]: MQTT renewal - subscribeStatus returned device=%s productKey=%s host=%s",
             entry.title,

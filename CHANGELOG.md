@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.34] - 2026-05-13
+
+### 🐛 Bug Fixes
+- **HTP159W WiFi valve discovery** — fixed `HTP159W` main WiFi valve/tap timer support by recognizing raw device payloads delivered in the cloud `state` field. These devices do not expose a child `subDevice[]` or a `D00`/`D0` status entry, so they were previously visible only as a hub diagnostic device with `Raw Status` stuck at `unknown`.
+- **HTP159W realtime MQTT routing** — MQTT payloads carried in `state` are now routed to the hub-as-device sensor key (`addr=0`) while normal hub RSSI state strings such as `0,-68` are still ignored as non-device payloads.
+- **HTP159W command routing** — Home Assistant initiated open/close commands now use the DP valve control endpoint for `HTP159W`. The legacy `controlWorkMode` endpoint rejects this model with `code=1`, so it needs the same little-endian runtime payload style used by other DP-backed valve models.
+- **MQTT subscription home selection** — `subscribeStatus` now prefers the selected home that actually contains a discovered hub, while still sending the full selected home list. This avoids subscribing with an empty first home when the device lives under a later selected home.
+
+### 🧪 Tests
+- **HTP159W payload fixture** — added the issue #55 `HTP159W` payload to the fixture corpus, covering battery, RSSI, valve state, session duration, event time, and alarm decoding.
+- **State-payload MQTT regressions** — added parser and routing coverage for `state`-carried device payloads, including a guard that RSSI-only `state` messages remain ignored.
+- **DP command regression** — added `HTP159W` command-routing coverage so a 60-second open command builds the expected DP payload (`3c000000`) for `addr=0`, `port=1`.
+
+### ⚠️ Notes
+- **Home Assistant device layout** — `HTP159W` may appear as a parent hub/diagnostic device plus a controllable valve child device. This matches the existing hub-as-device layout used by WiFi controllers and preserves stable entity/device identities.
+- **Live validation scope** — realtime open/close state updates and Home Assistant initiated DP open/close commands have both been validated with a live `HTP159W`.
+
+---
+
 ## [3.0.33] - 2026-05-13
 
 ### 🔧 Diagnostics

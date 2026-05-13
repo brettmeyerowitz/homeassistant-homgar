@@ -68,12 +68,16 @@ async def handle_mqtt_update(coordinator: "HomGarCoordinator", data: dict) -> No
         len(target_hub.get("subDevices", []))
     )
     
-    # Extract address from device_key (D01 -> addr 1, D02 -> addr 2, etc.)
-    try:
-        addr = int(device_key[1:])
-    except (ValueError, IndexError):
-        _LOGGER.warning("HomGar MQTT: Invalid device_key format: %s", device_key)
-        return
+    # Extract address from device_key (D01 -> addr 1, D02 -> addr 2, etc.).
+    # Some WiFi hub-as-device models publish their own payload under state.
+    if device_key == "state":
+        addr = 0
+    else:
+        try:
+            addr = int(device_key[1:])
+        except (ValueError, IndexError, TypeError):
+            _LOGGER.warning("HomGar MQTT: Invalid device_key format: %s", device_key)
+            return
 
     hub_diag_key = f"rainpoint_hub_{matched_mid}"
     hub_diag = dict(coordinator._mqtt_diagnostics.get(hub_diag_key) or {})

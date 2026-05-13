@@ -220,6 +220,16 @@ else
     exit 1
 fi
 
+# ── Test: BLE/DP valve control regressions ─────────────────────────────────
+echo "🧪 Running BLE/DP valve control regression tests..."
+docker cp tests/run_ble_valve_model_tests.py ha-test:/tmp/tests/run_ble_valve_model_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_ble_valve_model_tests.py; then
+    echo "✅ BLE/DP valve control regression tests passed"
+else
+    echo "❌ ERROR: BLE/DP valve control regression tests failed"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null

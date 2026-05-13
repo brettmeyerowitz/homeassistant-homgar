@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.components.persistent_notification import async_create
@@ -37,6 +38,25 @@ def _extract_state_rssi(raw_state: str | None) -> int | None:
         return int(parts[1])
     except (TypeError, ValueError):
         return None
+
+
+def _looks_like_device_payload(value: Any) -> bool:
+    """Return True for raw device payload frames such as ``10#...``."""
+    return isinstance(value, str) and "#" in value
+
+
+def _select_hub_as_device_status(sub_status: dict[str, dict]) -> dict | None:
+    """Find the status entry for a WiFi hub that also acts as a device."""
+    for status_id in ("D00", "D0"):
+        entry = sub_status.get(status_id)
+        if entry and entry.get("value"):
+            return entry
+
+    state = sub_status.get("state")
+    if state and _looks_like_device_payload(state.get("value")):
+        return state
+
+    return None
 
 
 def _is_empty_hub_placeholder(hub: dict) -> bool:
@@ -323,15 +343,16 @@ class HomGarCoordinator(DataUpdateCoordinator):
 
                     _LOGGER.debug("Sensor entity key=%s info=%s", sensor_key, decoded_sensors[sensor_key])
 
-                # Handle WiFi hub-as-device (e.g. HIC801W): the hub itself is a
-                # controllable device whose status arrives as D00 in subDeviceStatus.
-                # It never appears in subDevices[], so the loop above skips it.
+                # Handle WiFi hub-as-device (e.g. HIC801W/HTP159W): the hub
+                # itself is a controllable device that never appears in
+                # subDevices[]. Status may arrive as D00/D0 or as a raw
+                # device payload in state.
                 hub_model = hub.get("model") or hub.get("displayModel")
                 if hub_model:
                     if get_valve_ports(hub_model) or get_switch_ports(hub_model):
-                        d00 = sub_status.get("D00") or sub_status.get("D0")
-                        if d00:
-                            raw_value = d00.get("value")
+                        hub_device_status = _select_hub_as_device_status(sub_status)
+                        if hub_device_status:
+                            raw_value = hub_device_status.get("value")
                             decoded = decode_payload(hub_model, raw_value) if raw_value else None
                             sensor_key = f"{mid}_0"
                             if sensor_key not in decoded_sensors:
@@ -344,7 +365,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                                     "sub_name": hub.get("name") or hub_model,
                                     "model": hub_model,
                                     "firmware_version": hub.get("softVer"),
-                                    "raw_status": d00,
+                                    "raw_status": hub_device_status,
                                     "data": decoded,
                                     "type_flag": 0,
                                 }

@@ -331,7 +331,12 @@ class HomGarClient:
             raise HomGarApiError(f"getDeviceStatus failed: {data}")
         return data.get("data", {})
 
-    async def subscribe_status(self, hid: int, hubs: list[dict]) -> dict:
+    async def subscribe_status(
+        self,
+        hid: int,
+        hubs: list[dict],
+        hid_list: list[int] | None = None,
+    ) -> dict:
         """Call /app/device/subscribeStatus to get fresh per-session MQTT credentials.
 
         Returns the full response data dict including:
@@ -345,9 +350,24 @@ class HomGarClient:
             {"deviceName": h.get("deviceName", ""), "mid": h["mid"], "productKey": h.get("productKey", "")}
             for h in hubs
         ]
+        selected_hids: list[str] = []
+
+        def add_hid(value) -> None:
+            if value is None or str(value) == "":
+                return
+            value = str(value)
+            if value not in selected_hids:
+                selected_hids.append(value)
+
+        for candidate in hid_list or []:
+            add_hid(candidate)
+        for hub in hubs:
+            add_hid(hub.get("hid"))
+        add_hid(hid)
+
         payload = {
             "hid": str(hid),
-            "hidList": [str(hid)],
+            "hidList": selected_hids,
             "subscribe": subscribe_list,
             "unsubscribe": [],
             "userInfo": {

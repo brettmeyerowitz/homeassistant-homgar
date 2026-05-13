@@ -232,6 +232,8 @@ BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HC
 
 Valve devices additionally get a **valve open/close** entity and a **duration (minutes)** number entity per zone.
 
+Some WiFi valve controllers and tap timers are also their own controllable device. In Home Assistant these may appear as a parent hub/diagnostic device plus a child valve device, even when the hardware is a single physical unit. This preserves stable diagnostics, valve entities, and device identifiers across hub-as-device models such as `HIC801W` and `HTP159W`.
+
 ### Optional multi-zone device grouping
 
 For multi-zone controllers, you can enable **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options** and turn on:
@@ -259,7 +261,7 @@ The MQTT session is renewed automatically before it expires (based on the `expir
 
 | Device type | MQTT updates | Pattern |
 |---|---|---|
-| Valves (HTV\*, HIC\*) | ✅ Yes | Event-driven on open/close |
+| Valves (HTV\*, HIC\*, HTP159W) | ✅ Yes | Event-driven on open/close |
 | CO₂ sensors (HCS0530THO) | ✅ Yes | ~45 s periodic |
 | Soil moisture (HCS021FRF, HCS026FRF) | ✅ Yes | ~45 s periodic |
 | Flow meters (HCS008FRF) | ✅ Yes | Event-driven when water flows |
@@ -268,6 +270,8 @@ The MQTT session is renewed automatically before it expires (based on the `expir
 | Weather stations (HWS\*) | ✅ Yes | Periodic |
 
 All other models fall back to 2-minute REST polling.
+
+Some main WiFi devices publish their own valve payload under `state` rather than a `D00`/`D01` child status. The integration treats `state` values that look like raw device payloads as realtime device updates, while ignoring normal hub RSSI state strings.
 
 Short `Cycle&Soak` and mist schedules can transition faster than RainPoint’s cloud updates are delivered. In those cases `Current Step End Time` may briefly appear stale until the next MQTT or REST update arrives. `Irrigation End Time` is usually the more stable indicator of the overall run.
 

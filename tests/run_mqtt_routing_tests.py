@@ -162,6 +162,50 @@ async def _run_missing_sensor_case() -> tuple[bool, dict]:
     return coordinator.updated, hub_diag
 
 
+async def _run_state_payload_case() -> tuple[bool, dict, dict, dict]:
+    coordinator = FakeCoordinator()
+    coordinator.data = {
+        "hubs": [
+            {
+                "mid": 267334,
+                "hid": 207006,
+                "name": "Kitchen Plants",
+                "model": "HTP159W",
+                "softVer": "1.1.1020",
+                "subDevices": [],
+            }
+        ],
+        "sensors": {
+            "267334_0": {
+                "hid": 207006,
+                "mid": 267334,
+                "addr": 0,
+                "home_name": "My Home",
+                "hub_name": "Kitchen Plants",
+                "sub_name": "Kitchen Plants",
+                "model": "HTP159W",
+                "firmware_version": "1.1.1020",
+                "raw_status": {"id": "state", "value": "10#DC0103E1C900D82020B778445B19AF00000000"},
+                "data": {},
+                "type_flag": 0,
+            }
+        },
+    }
+    await coordinator_mqtt.handle_mqtt_update(
+        coordinator,
+        {
+            "hub_mid": "267334",
+            "hub_mid_candidates": ["267334"],
+            "device_key": "state",
+            "payload": "10#DC0103E1C900D82020B778445B19AF00000000",
+        },
+    )
+    sensor = coordinator.data["sensors"]["267334_0"]
+    diag = coordinator._mqtt_diagnostics.get("267334_0", {})
+    hub_diag = coordinator._mqtt_diagnostics.get("rainpoint_hub_267334", {})
+    return coordinator.updated, sensor, diag, hub_diag
+
+
 def main() -> int:
     print("\n🧪 MQTT routing regression tests")
     updated, sensor, diag, hub_diag = asyncio.run(_run_case())
@@ -181,6 +225,21 @@ def main() -> int:
         "records hub-level mqtt diagnostics without sensor key",
         missing_sensor_hub_diag.get("raw_payload", "").startswith("10#1088"),
         repr(missing_sensor_hub_diag),
+    )
+
+    state_updated, state_sensor, state_diag, state_hub_diag = asyncio.run(_run_state_payload_case())
+    check("routes state payload update to hub-as-device addr 0", state_updated)
+    check(
+        "updates HTP159W state raw_status",
+        state_sensor["raw_status"]["value"].startswith("10#DC01"),
+        repr(state_sensor),
+    )
+    check("decodes HTP159W state valve idle", state_sensor["data"].get("is_watering") is False, repr(state_sensor["data"]))
+    check("records HTP159W state mqtt diagnostics", bool(state_diag), repr(state_diag))
+    check(
+        "records HTP159W hub-level mqtt diagnostics",
+        state_hub_diag.get("raw_payload", "").startswith("10#DC01"),
+        repr(state_hub_diag),
     )
 
     hic = FakeCoordinator()

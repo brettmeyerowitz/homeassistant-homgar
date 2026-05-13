@@ -95,6 +95,10 @@ def main() -> int:
         decoder.uses_ble_valve_control("HTV157B") is True,
     )
     check(
+        "HTP159W uses DP valve control override",
+        decoder.uses_ble_valve_control("HTP159W") is True,
+    )
+    check(
         "HTV203FRF is not detected as BLE-backed",
         decoder.uses_ble_valve_control("HTV203FRF") is False,
     )
@@ -150,6 +154,27 @@ def main() -> int:
             "addr": 1,
             "port": 1,
             "param": "00000000",
+            "dpCode": 1,
+        },
+    )
+    check(
+        "HTP159W open payload uses addr 0 and 60s runtime",
+        client._build_control_work_mode_dp_payload(
+            mid=267334,
+            addr=0,
+            device_name="MAC-9451DCF58178",
+            product_key="k0k0dAkMR17",
+            port=1,
+            mode=1,
+            duration=60,
+        ) == {
+            "mid": "267334",
+            "productKey": "k0k0dAkMR17",
+            "deviceName": "MAC-9451DCF58178",
+            "mode": 1,
+            "addr": 0,
+            "port": 1,
+            "param": "3c000000",
             "dpCode": 1,
         },
     )

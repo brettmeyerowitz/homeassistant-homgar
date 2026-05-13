@@ -98,9 +98,10 @@ def get_valve_ports(model: str) -> list[int]:
 
 
 DP_VALVE_CONTROL_MODELS: frozenset[str] = frozenset({
-    # HTV157B exposes CTL_WATER rather than CTL_BT_WATER in product metadata,
-    # but the legacy controlWorkMode endpoint returns code=3 for this model.
+    # These models expose CTL_WATER rather than CTL_BT_WATER in product
+    # metadata, but the legacy controlWorkMode endpoint rejects them.
     "HTV157B",
+    "HTP159W",
 })
 
 
