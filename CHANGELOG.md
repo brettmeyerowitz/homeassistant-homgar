@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.35] - 2026-05-15
+
+### ✨ Features
+- **Valve duration unit option** — added an integration option to show valve duration number entities in either minutes or seconds. Existing installs continue to default to minutes for backward compatibility, while users who need short watering runs can switch to seconds from the HomGar/RainPoint Options screen.
+
+### 🐛 Bug Fixes
+- **Duration restore safety** — restored duration values preserve their previous unit, so a restored `10 min` duration becomes `600 s` when switching to seconds mode instead of silently becoming `10 s`.
+
+### 🧪 Tests
+- **Duration unit regressions** — added coverage for minute/second conversion, bounds, default behavior, and the one-second minimum in seconds mode.
+- **Docker pre-commit wait** — made the Docker validation gate wait for HomGar setup with a short poll loop instead of a fixed startup sleep.
+
+---
+
 ## [3.0.34] - 2026-05-13
 
 ### 🐛 Bug Fixes

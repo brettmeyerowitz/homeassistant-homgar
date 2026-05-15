@@ -22,8 +22,12 @@ from .const import (
     CONF_HIDS,
     CONF_APP_TYPE,
     CONF_GROUP_MULTI_ZONE_DEVICES,
+    CONF_VALVE_DURATION_UNIT,
     APP_TYPE_HOMGAR,
     APP_TYPE_RAINPOINT,
+    DEFAULT_VALVE_DURATION_UNIT,
+    VALVE_DURATION_UNIT_MINUTES,
+    VALVE_DURATION_UNIT_SECONDS,
 )
 from .country_codes import get_default_country_code
 from .api import HomGarClient, HomGarApiError
@@ -355,6 +359,16 @@ class HomGarOptionsFlow(config_entries.OptionsFlow):
                     CONF_GROUP_MULTI_ZONE_DEVICES,
                     default=self._config_entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False),
                 ): bool,
+                vol.Optional(
+                    CONF_VALVE_DURATION_UNIT,
+                    default=self._config_entry.options.get(
+                        CONF_VALVE_DURATION_UNIT,
+                        DEFAULT_VALVE_DURATION_UNIT,
+                    ),
+                ): vol.In({
+                    VALVE_DURATION_UNIT_MINUTES: "Minutes",
+                    VALVE_DURATION_UNIT_SECONDS: "Seconds",
+                }),
             }
         )
 

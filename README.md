@@ -230,7 +230,7 @@ BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HC
 | Irrigation End Time | Timestamp | — |
 | precipitation_total / _1h / _24h / _7d | Precipitation | mm |
 
-Valve devices additionally get a **valve open/close** entity and a **duration (minutes)** number entity per zone.
+Valve devices additionally get a **valve open/close** entity and a **duration** number entity per zone. By default the duration is shown in minutes for backward compatibility. You can switch it to seconds in **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options**.
 
 Some WiFi valve controllers and tap timers are also their own controllable device. In Home Assistant these may appear as a parent hub/diagnostic device plus a child valve device, even when the hardware is a single physical unit. This preserves stable diagnostics, valve entities, and device identifiers across hub-as-device models such as `HIC801W` and `HTP159W`.
 

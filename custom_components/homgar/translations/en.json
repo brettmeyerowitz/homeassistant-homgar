@@ -62,12 +62,14 @@
         "step": {
             "init": {
                 "title": "HomGar/RainPoint Options",
-                "description": "Adjust how multi-zone controllers are presented in Home Assistant.",
+                "description": "Adjust how HomGar/RainPoint devices are presented in Home Assistant.",
                 "data": {
-                    "group_multi_zone_devices": "Create a separate Home Assistant device for each controller zone"
+                    "group_multi_zone_devices": "Create a separate Home Assistant device for each controller zone",
+                    "valve_duration_unit": "Valve duration control unit"
                 },
                 "data_description": {
-                    "group_multi_zone_devices": "When enabled, per-zone valves, durations, and per-port sensors are grouped under child devices. Shared diagnostics stay on the parent controller device."
+                    "group_multi_zone_devices": "When enabled, per-zone valves, durations, and per-port sensors are grouped under child devices. Shared diagnostics stay on the parent controller device.",
+                    "valve_duration_unit": "Choose whether valve duration number entities are shown in minutes or seconds. Existing installs default to minutes."
                 }
             }
         }

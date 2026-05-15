@@ -37,7 +37,14 @@ docker cp custom_components/homgar ha-test:/config/custom_components/ > /dev/nul
 echo "🔄 Restarting Docker container..."
 docker restart ha-test > /dev/null 2>&1
 echo "⏳ Waiting for HA to start..."
-sleep 25
+SETUP_FOUND=0
+for i in {1..12}; do
+    sleep 5
+    if docker exec ha-test tail -1000 /config/home-assistant.log 2>&1 | grep -q "Setup of domain homgar took"; then
+        SETUP_FOUND=1
+        break
+    fi
+done
 
 # Check HA log file (HA logs to file, not stdout)
 # Use more lines since log accumulates across restarts
@@ -59,10 +66,10 @@ if echo "$RECENT_LOGS" | grep -q "No module named"; then
     echo "$RECENT_LOGS" | grep "No module named" -A 2 | tail -10
     exit 1
 fi
-if echo "$RECENT_LOGS" | grep -q "Setup of domain homgar took"; then
+if [ "$SETUP_FOUND" -eq 1 ] || echo "$RECENT_LOGS" | grep -q "Setup of domain homgar took"; then
     echo "✅ HomGar integration setup successfully"
 else
-    echo "❌ ERROR: Integration did not set up within 30s"
+    echo "❌ ERROR: Integration did not set up within 60s"
     echo "$RECENT_LOGS" | grep -i "homgar" | tail -5
     exit 1
 fi
@@ -217,6 +224,16 @@ if docker exec ha-test python3 /tmp/tests/run_zone_device_tests.py; then
     echo "✅ Zone device regression tests passed"
 else
     echo "❌ ERROR: Zone device regression tests failed"
+    exit 1
+fi
+
+# ── Test: duration unit option regressions ─────────────────────────────────
+echo "🧪 Running duration unit regression tests..."
+docker cp tests/run_duration_unit_tests.py ha-test:/tmp/tests/run_duration_unit_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_duration_unit_tests.py; then
+    echo "✅ Duration unit regression tests passed"
+else
+    echo "❌ ERROR: Duration unit regression tests failed"
     exit 1
 fi
 
