@@ -15,6 +15,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     CONF_GROUP_MULTI_ZONE_DEVICES,
+    CONF_VALVE_DURATION_UNIT,
+    DEFAULT_VALVE_DURATION_UNIT,
+    VALVE_DURATION_UNIT_SECONDS,
     controller_device_identifier,
     format_port_device_name,
     format_port_entity_name,
@@ -25,8 +28,7 @@ from .decoder import get_valve_ports, uses_ble_valve_control
 
 _LOGGER = logging.getLogger(__name__)
 
-# Default run duration used when HA opens a valve without an explicit duration.
-# Users can override by calling the valve.open_valve service with a duration attr.
+# Default run duration used when HA opens a valve without a duration entity.
 DEFAULT_DURATION_SECONDS = 600  # 10 minutes
 
 
@@ -210,8 +212,9 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
     # ------------------------------------------------------------------
 
     def _get_configured_duration_seconds(self) -> int:
-        """Look up the companion duration number entity for this zone and convert
-        its value (minutes) to seconds.  Falls back to DEFAULT_DURATION_SECONDS
+        """Look up the companion duration number entity and convert its value to seconds.
+
+        Falls back to DEFAULT_DURATION_SECONDS
         if the entity is not yet available.
 
         Uses the entity registry to resolve unique_id -> entity_id so the lookup
@@ -226,8 +229,14 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
             state = self.hass.states.get(entity_id)
             if state is not None:
                 try:
-                    minutes = float(state.state)
-                    return max(1, int(minutes * 60))
+                    value = float(state.state)
+                    duration_unit = self.coordinator._entry.options.get(
+                        CONF_VALVE_DURATION_UNIT,
+                        DEFAULT_VALVE_DURATION_UNIT,
+                    )
+                    if duration_unit == VALVE_DURATION_UNIT_SECONDS:
+                        return max(1, int(value))
+                    return max(1, int(value * 60))
                 except (ValueError, TypeError):
                     pass
         _LOGGER.debug(
