@@ -48,7 +48,16 @@ def _install_aiohttp_stub() -> None:
     class ClientSession:
         pass
 
+    class ClientTimeout:
+        def __init__(self, total=None, connect=None, sock_connect=None, sock_read=None):
+            self.total = total
+            self.connect = connect
+            self.sock_connect = sock_connect
+            self.sock_read = sock_read
+
     aiohttp.ClientSession = ClientSession
+    aiohttp.ClientTimeout = ClientTimeout
+    aiohttp.ClientError = type("ClientError", (Exception,), {})
     sys.modules["aiohttp"] = aiohttp
 
 
