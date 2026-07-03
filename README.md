@@ -1,8 +1,8 @@
 # HomGar / RainPoint Cloud Integration for Home Assistant
 
-[![Release](https://img.shields.io/github/release/brettmeyerowitz/homeassistant-homgar.svg)](https://github.com/brettmeyerowitz/homeassistant-homgar/releases)
-[![License](https://img.shields.io/github/license/brettmeyerowitz/homeassistant-homgar.svg)](LICENSE)
-[![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![Release](https://img.shields.io/github/v/release/brettmeyerowitz/homeassistant-homgar.svg)](https://github.com/brettmeyerowitz/homeassistant-homgar/releases)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![HACS](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 
 Unofficial Home Assistant integration for RainPoint Smart+ devices via the HomGar/RainPoint cloud API.
 
@@ -147,9 +147,11 @@ If nothing appears, check logs under:
 
 ### Via HACS (recommended)
 
+This integration is part of the **default HACS store** — no custom repository needed.
+
 [![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=brettmeyerowitz&repository=homeassistant-homgar&category=integration)
 
-1. Click the button above, or in HACS search for **HomGar/RainPoint Cloud**
+1. In HACS, search for **HomGar/RainPoint Cloud** (or click the button above)
 2. Install the integration
 3. Restart Home Assistant
 4. Go to **Settings → Devices & Services → Add Integration**, search for **HomGar/RainPoint Cloud**

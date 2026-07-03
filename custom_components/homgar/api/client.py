@@ -14,6 +14,11 @@ import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
+# Explicit per-request timeout. Without this, requests inherit aiohttp's 300s
+# default total timeout, which lets a single stalled/poisoned connection wedge a
+# whole coordinator cycle for up to 5 minutes during upstream flakiness.
+_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10, sock_connect=10)
+
 
 class HomGarApiError(Exception):
     pass
@@ -48,6 +53,18 @@ class HomGarClient:
         """Generate a deterministic deviceId for authentication."""
         # Device ID is required; generate deterministic 16 bytes hex from email+areaCode
         return hashlib.md5(f"{self._email}{self._area_code}".encode("utf-8")).hexdigest()
+
+    # --- request helpers ---
+
+    def _get(self, url: str, **kwargs):
+        """Issue a GET via the shared session with an explicit timeout."""
+        kwargs.setdefault("timeout", _REQUEST_TIMEOUT)
+        return self._session.get(url, **kwargs)
+
+    def _post(self, url: str, **kwargs):
+        """Issue a POST via the shared session with an explicit timeout."""
+        kwargs.setdefault("timeout", _REQUEST_TIMEOUT)
+        return self._session.post(url, **kwargs)
 
     # --- token state helpers ---
 
@@ -145,7 +162,7 @@ class HomGarClient:
         
         _LOGGER.debug("API call: login URL=%s appCode=%s deviceId=%s", url, self._app_code, self._device_id)
         
-        async with self._session.post(url, json=payload, headers=headers) as resp:
+        async with self._post(url, json=payload, headers=headers) as resp:
             if resp.status != 200:
                 _LOGGER.error("Login failed: %d %s", resp.status, await resp.text())
                 return False
@@ -208,7 +225,7 @@ class HomGarClient:
         payload = {
             "refreshToken": self._refresh_token,
         }
-        async with self._session.post(url, json=payload) as resp:
+        async with self._post(url, json=payload) as resp:
             if resp.status != 200:
                 _LOGGER.warning("Token refresh failed: %d %s", resp.status, await resp.text())
                 return await self.login()
@@ -243,14 +260,14 @@ class HomGarClient:
         url = f"{self._base_url}/app/member/appHome/list"
         _LOGGER.debug("API call: list_homes URL=%s", url)
         
-        async with self._session.get(url, headers=self._auth_headers()) as resp:
+        async with self._get(url, headers=self._auth_headers()) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"list_homes HTTP {resp.status}")
             data = await resp.json()
             _LOGGER.debug("API response: list_homes data=%s", data)
         if data.get("code") in (1001, 1004):
             await self._reauth()
-            async with self._session.get(url, headers=self._auth_headers()) as resp2:
+            async with self._get(url, headers=self._auth_headers()) as resp2:
                 data = await resp2.json()
         if data.get("code") != 0:
             raise HomGarApiError(f"list_homes failed: {data}")
@@ -262,14 +279,14 @@ class HomGarClient:
         url = f"{self._base_url}/app/device/getDeviceByHid"
         params = {"hid": hid}
         _LOGGER.debug("API call: get_devices_by_hid URL=%s params=%s", url, params)
-        async with self._session.get(url, headers=self._auth_headers(), params=params) as resp:
+        async with self._get(url, headers=self._auth_headers(), params=params) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"getDeviceByHid HTTP {resp.status}")
             data = await resp.json()
         _LOGGER.debug("API response: get_devices_by_hid data=%s", data)
         if data.get("code") in (1001, 1004):
             await self._reauth()
-            async with self._session.get(url, headers=self._auth_headers(), params=params) as resp2:
+            async with self._get(url, headers=self._auth_headers(), params=params) as resp2:
                 data = await resp2.json()
         if data.get("code") != 0:
             raise HomGarApiError(f"getDeviceByHid failed: {data}")
@@ -291,14 +308,14 @@ class HomGarClient:
         
         payload = {"devices": device_list}
         _LOGGER.debug("API call: get_multiple_device_status URL=%s payload=%s", url, payload)
-        async with self._session.post(url, headers=self._auth_headers(), json=payload) as resp:
+        async with self._post(url, headers=self._auth_headers(), json=payload) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"Failed to get device status: {resp.status}")
             data = await resp.json()
         _LOGGER.debug("API response: get_multiple_device_status data=%s", data)
         if data.get("code") in (1001, 1004):
             await self._reauth()
-            async with self._session.post(url, headers=self._auth_headers(), json=payload) as resp2:
+            async with self._post(url, headers=self._auth_headers(), json=payload) as resp2:
                 data = await resp2.json()
         if data.get("code") != 0:
             raise HomGarApiError(f"Device status API error: {data.get('msg')}")
@@ -322,7 +339,7 @@ class HomGarClient:
         url = f"{self._base_url}/app/device/getDeviceStatus"
         params = {"mid": mid}
         _LOGGER.debug("API call: get_device_status URL=%s params=%s", url, params)
-        async with self._session.get(url, headers=self._auth_headers(), params=params) as resp:
+        async with self._get(url, headers=self._auth_headers(), params=params) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"getDeviceStatus HTTP {resp.status}")
             data = await resp.json()
@@ -379,7 +396,7 @@ class HomGarClient:
             },
         }
         _LOGGER.debug("API call: subscribe_status URL=%s payload=%s", url, payload)
-        async with self._session.post(url, headers=self._auth_headers(), json=payload) as resp:
+        async with self._post(url, headers=self._auth_headers(), json=payload) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"subscribeStatus HTTP {resp.status}")
             data = await resp.json()
@@ -399,7 +416,7 @@ class HomGarClient:
             "productKey": product_key,
             "status": state,
         }
-        async with self._session.post(url, headers=self._auth_headers(), json=payload) as resp:
+        async with self._post(url, headers=self._auth_headers(), json=payload) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"Failed to set device state: {resp.status}")
             data = await resp.json()
@@ -417,7 +434,7 @@ class HomGarClient:
         params = {"version": version}
         
         _LOGGER.debug("API call: get_product_models URL=%s params=%s", url, params)
-        async with self._session.get(url, headers=self._auth_headers(), params=params) as resp:
+        async with self._get(url, headers=self._auth_headers(), params=params) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"2026-04-10 21:22:21.337 DEBUG (MainThread) [custom_components.homgar.api.client] API call: get_product_models URL=https://region3.homgarus.com/app/common/core/productModel params={'version': 0} HTTP {resp.status}")
             data = await resp.json()
@@ -526,7 +543,7 @@ class HomGarClient:
             payload["hid"] = str(hid)
         _LOGGER.debug("API call: control_work_mode URL=%s payload=%s", url, payload)
 
-        async with self._session.post(url, json=payload, headers=self._auth_headers()) as resp:
+        async with self._post(url, json=payload, headers=self._auth_headers()) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"controlWorkMode HTTP {resp.status}")
             data = await resp.json()
@@ -577,7 +594,7 @@ class HomGarClient:
 
         _LOGGER.debug("API call: control_work_mode_dp URL=%s payload=%s", url, payload)
 
-        async with self._session.post(url, json=payload, headers=headers) as resp:
+        async with self._post(url, json=payload, headers=headers) as resp:
             if resp.status != 200:
                 raise HomGarApiError(f"controlWorkModeDP HTTP {resp.status}")
             data = await resp.json()

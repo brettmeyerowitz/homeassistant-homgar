@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.36] - 2026-07-02
+
+### ✨ Features
+- **12-hour valve durations** — the duration number entity now allows run times up to 12 hours (720 minutes / 43200 seconds), matching what devices such as the Diivoo WT-09W accept natively in the HomGar app. Durations were previously capped at 60 minutes and silently clamped above that. ([#62](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/62))
+
+### 🐛 Bug Fixes
+- **Request timeouts** — every HomGar cloud API request now carries an explicit 30-second total timeout (10-second connect). Previously requests inherited aiohttp's 300-second default, so a single stalled connection could wedge an entire coordinator cycle for up to 5 minutes during upstream flakiness.
+- **MQTT renewal resilience** — MQTT subscription renewal now reschedules a retry on every failure path, including non-network errors (for example an API error from `subscribeStatus` during an outage). Previously such a failure silently killed real-time MQTT until a full integration reload.
+
+### 🧪 Tests
+- **Timeout regressions** — added coverage asserting every client request passes the shared `_REQUEST_TIMEOUT`.
+- **Duration bounds** — updated duration unit coverage for the raised 12-hour ceiling.
+- **Docker gate reliability** — fixed the pre-commit Docker gate so it detects setup via HomGar's own completion marker (current HA no longer emits the old `Setup of domain homgar took` line) and creates the container test directory before copying fixtures. The gate previously reported a false failure even when setup succeeded.
+
+### 📝 Docs
+- **HACS default store** — updated README install instructions and badge for inclusion in the default HACS store (no custom repository required); fixed the broken release badge (deprecated shields endpoint) and license badge.
+
+---
+
 ## [3.0.35] - 2026-05-15
 
 ### ✨ Features
