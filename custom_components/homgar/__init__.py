@@ -157,15 +157,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     try:
                         expire_ts = int(expire_ms) / 1000.0
                         now = time.time()
-                        renew_in = max(60, expire_ts - now - 60)
-                        # Enforce minimum 30 min renewal interval to prevent excessive reloads
-                        MIN_RENEWAL_INTERVAL = 1800  # 30 minutes
-                        if renew_in < MIN_RENEWAL_INTERVAL:
-                            _LOGGER.info(
-                                "HomGar [%s]: MQTT renewal would be in %.0fs (too frequent), extending to %.0fs",
-                                entry.title, renew_in, MIN_RENEWAL_INTERVAL
-                            )
-                            renew_in = MIN_RENEWAL_INTERVAL
+                        # subscribeStatus credentials expire ~570s after issue;
+                        # schedule the renewal shortly BEFORE expiry (small
+                        # anti-thrash floor) so the MQTT feed never runs on
+                        # lapsed credentials. A fixed 30-minute floor left MQTT
+                        # dead from ~570s to 1800s after every (re)subscribe:
+                        # states went stale and the coordinator poll reverted
+                        # optimistic valve opens ~2 minutes in.
+                        renew_in = max(120, expire_ts - now - 60)
                         actual_expire = datetime.fromtimestamp(expire_ts).isoformat()
                         _LOGGER.info(
                             "HomGar [%s]: MQTT subscription expires at %s (in %.0fs), scheduling renewal in %.0fs",
@@ -517,10 +516,9 @@ async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry
             try:
                 expire_ts = int(expire_ms) / 1000.0
                 now = time.time()
-                renew_in = max(60, expire_ts - now - 60)
-                MIN_RENEWAL_INTERVAL = 1800  # 30 minutes
-                if renew_in < MIN_RENEWAL_INTERVAL:
-                    renew_in = MIN_RENEWAL_INTERVAL
+                # Renew shortly before the real credential expiry — see the
+                # matching comment in async_setup_entry.
+                renew_in = max(120, expire_ts - now - 60)
                 _LOGGER.info(
                     "HomGar [%s]: MQTT renewal complete - next renewal scheduled in %.0fs",
                     entry.title, renew_in
