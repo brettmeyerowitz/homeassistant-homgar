@@ -28,12 +28,14 @@ from .decoder import get_valve_ports
 
 _LOGGER = logging.getLogger(__name__)
 
+# Devices such as the Diivoo WT-09W accept run times up to 12 hours natively in
+# the HomGar app, so the number entity mirrors that ceiling (see issue #62).
 DURATION_MIN_SECONDS = 1
-DURATION_MAX_SECONDS = 3600
+DURATION_MAX_SECONDS = 43200  # 12 hours
 DURATION_STEP_SECONDS = 1
 DURATION_DEFAULT_SECONDS = 600
 DURATION_MIN_MINUTES = 1
-DURATION_MAX_MINUTES = 60
+DURATION_MAX_MINUTES = 720  # 12 hours
 DURATION_STEP_MINUTES = 1
 
 

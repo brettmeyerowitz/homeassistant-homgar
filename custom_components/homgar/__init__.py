@@ -40,6 +40,35 @@ def _select_mqtt_subscription_hid(hubs: list[dict], hids: list) -> int | str | N
     return next((hub.get("hid") for hub in hubs if hub.get("hid")), hids[0] if hids else None)
 
 
+def _schedule_mqtt_renewal_retry(
+    hass: HomeAssistant, entry: ConfigEntry, entry_data: dict, reason: object
+) -> None:
+    """Reschedule an MQTT renewal attempt with capped backoff.
+
+    Any transient failure must reschedule; otherwise the renewal chain dies and
+    real-time MQTT silently stays dead until a full integration reload. The
+    missing-client guard in ``_async_renew_mqtt_subscription`` terminates the
+    chain naturally if the entry has been unloaded.
+    """
+    retry_count = int(entry_data.get("_mqtt_renewal_retry_count", 0))
+    retry_in = _MQTT_RENEWAL_BACKOFF_SECONDS[
+        min(retry_count, len(_MQTT_RENEWAL_BACKOFF_SECONDS) - 1)
+    ]
+    entry_data["_mqtt_renewal_retry_count"] = retry_count + 1
+    _LOGGER.warning(
+        "HomGar [%s]: MQTT renewal failed (%s); retrying in %ss (attempt %s)",
+        entry.title,
+        reason,
+        retry_in,
+        retry_count + 1,
+    )
+
+    async def _retry_renewal(hass=hass, entry=entry):
+        await _async_renew_mqtt_subscription(hass, entry)
+
+    hass.loop.call_later(retry_in, lambda: hass.async_create_task(_retry_renewal()))
+
+
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Legacy YAML setup - not used."""
     return True
@@ -426,6 +455,7 @@ async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry
         # Extract credentials
         if not sub_creds.get("deviceName") or not sub_creds.get("deviceSecret"):
             _LOGGER.error("HomGar [%s]: MQTT renewal - incomplete credentials from subscribeStatus", entry.title)
+            _schedule_mqtt_renewal_retry(hass, entry, entry_data, "incomplete credentials")
             return False
             
         mqtt_host = sub_creds.get("mqttHostUrl", "")
@@ -466,6 +496,7 @@ async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry
         connected = await hass.async_add_executor_job(new_mqtt_client.connect)
         if not connected:
             _LOGGER.error("HomGar [%s]: MQTT renewal - failed to connect new client", entry.title)
+            _schedule_mqtt_renewal_retry(hass, entry, entry_data, "new client failed to connect")
             return False
             
         # Update hass.data with new client
@@ -497,24 +528,14 @@ async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry
         return True
         
     except (asyncio.TimeoutError, ClientError) as e:
-        retry_count = int(entry_data.get("_mqtt_renewal_retry_count", 0))
-        retry_in = _MQTT_RENEWAL_BACKOFF_SECONDS[min(retry_count, len(_MQTT_RENEWAL_BACKOFF_SECONDS) - 1)]
-        entry_data["_mqtt_renewal_retry_count"] = retry_count + 1
-        _LOGGER.warning(
-            "HomGar [%s]: MQTT renewal timed out: %s; retrying in %ss (attempt %s)",
-            entry.title,
-            e,
-            retry_in,
-            retry_count + 1,
-        )
-
-        async def _retry_renewal(hass=hass, entry=entry):
-            await _async_renew_mqtt_subscription(hass, entry)
-
-        hass.loop.call_later(retry_in, lambda: hass.async_create_task(_retry_renewal()))
+        _schedule_mqtt_renewal_retry(hass, entry, entry_data, e)
         return False
     except Exception as e:
+        # Previously this path logged and returned without rescheduling, so a
+        # non-network failure (e.g. HomGarApiError from subscribeStatus during an
+        # outage) permanently killed real-time MQTT until a full reload.
         _LOGGER.error("HomGar [%s]: MQTT renewal failed: %s", entry.title, e, exc_info=True)
+        _schedule_mqtt_renewal_retry(hass, entry, entry_data, e)
         return False
 
 

@@ -34,13 +34,32 @@ for f in $DELETED_FILES; do
 done
 docker exec ha-test find /config/custom_components/homgar/__pycache__ -name "*.pyc" -delete 2>/dev/null || true
 docker cp custom_components/homgar ha-test:/config/custom_components/ > /dev/null 2>&1
+
+# Ensure HomGar setup completion is detectable. HA does not emit an INFO-level
+# "Setup of domain homgar took" line on current versions, and this container's
+# default log level suppresses INFO, so we poll for HomGar's own completion
+# marker and make sure that logger is at INFO. Idempotent; skipped if the config
+# already defines a logger block.
+if ! docker exec ha-test grep -q "custom_components.homgar" /config/configuration.yaml 2>/dev/null; then
+    if docker exec ha-test grep -q "^logger:" /config/configuration.yaml 2>/dev/null; then
+        echo "⚠️  Existing logger: block found; not modifying. Setup detection relies on it exposing custom_components.homgar at INFO."
+    else
+        echo "🔧 Enabling custom_components.homgar INFO logging for setup detection..."
+        docker exec ha-test sh -c 'printf "\nlogger:\n  default: warning\n  logs:\n    custom_components.homgar: info\n" >> /config/configuration.yaml'
+    fi
+fi
+
+# Markers that indicate HomGar finished setting up (new HA emits the first; the
+# legacy HA-core string is kept as a fallback for older versions).
+SETUP_MARKER="Completed platform setup for entry|Setup of domain homgar took"
+
 echo "🔄 Restarting Docker container..."
 docker restart ha-test > /dev/null 2>&1
 echo "⏳ Waiting for HA to start..."
 SETUP_FOUND=0
-for i in {1..12}; do
+for i in {1..24}; do
     sleep 5
-    if docker exec ha-test tail -1000 /config/home-assistant.log 2>&1 | grep -q "Setup of domain homgar took"; then
+    if docker exec ha-test tail -1000 /config/home-assistant.log 2>&1 | grep -qE "$SETUP_MARKER"; then
         SETUP_FOUND=1
         break
     fi
@@ -66,10 +85,10 @@ if echo "$RECENT_LOGS" | grep -q "No module named"; then
     echo "$RECENT_LOGS" | grep "No module named" -A 2 | tail -10
     exit 1
 fi
-if [ "$SETUP_FOUND" -eq 1 ] || echo "$RECENT_LOGS" | grep -q "Setup of domain homgar took"; then
+if [ "$SETUP_FOUND" -eq 1 ] || echo "$RECENT_LOGS" | grep -qE "$SETUP_MARKER"; then
     echo "✅ HomGar integration setup successfully"
 else
-    echo "❌ ERROR: Integration did not set up within 60s"
+    echo "❌ ERROR: Integration did not set up within 120s"
     echo "$RECENT_LOGS" | grep -i "homgar" | tail -5
     exit 1
 fi
@@ -178,6 +197,10 @@ fi
 
 # ── Test: fixture-driven payload corpus ───────────────────────────────────
 echo "🧪 Running fixture-driven payload corpus..."
+# Create /tmp/tests first so `docker cp tests/fixtures` nests into
+# /tmp/tests/fixtures. Without this, a first run on a fresh container copies the
+# fixtures directory *as* /tmp/tests, so the test can't find fixtures/ beside it.
+docker exec ha-test mkdir -p /tmp/tests
 docker cp tests/fixtures ha-test:/tmp/tests/ > /dev/null
 docker cp tests/run_payload_fixture_tests.py ha-test:/tmp/tests/run_payload_fixture_tests.py > /dev/null
 if docker exec ha-test python3 /tmp/tests/run_payload_fixture_tests.py; then

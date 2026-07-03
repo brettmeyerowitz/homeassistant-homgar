@@ -92,8 +92,16 @@ def main() -> int:
         number._clamp_duration_seconds(0, VALVE_DURATION_UNIT_SECONDS) == 1,
     )
     check(
-        "seconds mode clamps to one-hour maximum",
-        number._clamp_duration_seconds(7200, VALVE_DURATION_UNIT_SECONDS) == 3600,
+        "seconds mode allows up to the 12-hour maximum",
+        number._clamp_duration_seconds(7200, VALVE_DURATION_UNIT_SECONDS) == 7200,
+    )
+    check(
+        "seconds mode clamps to the 12-hour maximum",
+        number._clamp_duration_seconds(50000, VALVE_DURATION_UNIT_SECONDS) == 43200,
+    )
+    check(
+        "minutes mode clamps to the 12-hour maximum",
+        number._clamp_duration_seconds(50000, VALVE_DURATION_UNIT_MINUTES) == 43200,
     )
 
     total = PASS + FAIL
