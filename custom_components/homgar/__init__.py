@@ -348,7 +348,14 @@ def _ensure_device_registry_parents(
 
 
 def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
-    """Create HA Areas for each home and assign all homgar devices to them."""
+    """Create an HA Area per home and seed devices into it on first discovery.
+
+    Area assignment only happens for devices that do not already have an area
+    (``area_id is None``). A device the user has manually moved to another area
+    keeps that area across restarts and reloads; we never overwrite a user's
+    choice here. Device name/model backfill still runs unconditionally (see
+    issue #63).
+    """
     from homeassistant.helpers import area_registry as ar, device_registry as dr
 
     data = coordinator.data
@@ -377,7 +384,7 @@ def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinato
         hub_device = device_reg.async_get_device(identifiers={(DOMAIN, f"rainpoint_hub_{mid}")})
         if hub_device:
             update: dict = {}
-            if hub_device.area_id != area.id:
+            if hub_device.area_id is None:
                 update["area_id"] = area.id
             if not hub_device.name:
                 update["name"] = _fallback_hub_name(hub_info)
@@ -402,7 +409,7 @@ def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinato
             area = area_reg.async_create(home_name)
 
         device = device_reg.async_get_device(identifiers={(DOMAIN, f"{mid}_{addr}")})
-        if device and device.area_id != area.id:
+        if device and device.area_id is None:
             device_reg.async_update_device(device.id, area_id=area.id)
 
         model = sensor_info.get("model")
@@ -411,7 +418,7 @@ def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinato
                 zone_device = device_reg.async_get_device(
                     identifiers={(DOMAIN, zone_device_identifier(mid, addr, port))}
                 )
-                if zone_device and zone_device.area_id != area.id:
+                if zone_device and zone_device.area_id is None:
                     device_reg.async_update_device(zone_device.id, area_id=area.id)
 
 

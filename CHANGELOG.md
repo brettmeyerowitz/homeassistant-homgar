@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.37] - 2026-07-03
+
+### 🐛 Bug Fixes
+- **Preserve manual device areas** — the integration no longer forces devices back to the home-named area on every startup/reload. Areas are now seeded only on first discovery (when a device has no area yet), so a device you move to a different area keeps that area across restarts and reloads. ([#63](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/63))
+
+---
+
 ## [3.0.36] - 2026-07-02
 
 ### ✨ Features
