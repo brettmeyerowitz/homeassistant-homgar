@@ -1,0 +1,90 @@
+blueprint:
+  name: HomGar/RainPoint – Scheduled watering
+  description: >
+    Water a HomGar/RainPoint valve on a Home Assistant **Schedule**, with an
+    optional rain‑skip.
+
+
+    Scheduling lives in Home Assistant, not in this blueprint — so you get all of
+    HA's flexibility (any recurrence, conditions, weather, moisture) *and* the
+    Schedule helper's `next_event` attribute becomes your "next watering" time,
+    ready to use in other automations (close the blinds, send a notification,
+    etc.). See the integration README for a ready‑made `next_watering` sensor.
+
+
+    How it works: the valve **opens** when the schedule turns on and **closes**
+    when it turns off, so the length of each schedule block is the watering
+    duration. Closing is always safe, and it survives a Home Assistant restart
+    mid‑run better than a fixed delay.
+
+
+    Tip: also set the valve's **Duration** number entity as a failsafe, so the
+    device still stops on its own even if Home Assistant is offline.
+  domain: automation
+  homeassistant:
+    min_version: "2024.6.0"
+  source_url: https://github.com/brettmeyerowitz/homeassistant-homgar/blob/main/blueprints/automation/homgar/scheduled_watering.yaml
+  input:
+    watering_schedule:
+      name: Watering schedule
+      description: >
+        A Schedule helper that defines when (and for how long) to water. Create
+        one under Settings → Devices & Services → Helpers → Schedule.
+      selector:
+        entity:
+          filter:
+            - domain: schedule
+    valve:
+      name: Valve
+      description: The HomGar/RainPoint valve to open and close.
+      selector:
+        entity:
+          filter:
+            - domain: valve
+              integration: homgar
+    rain_sensor:
+      name: Rain‑skip sensor (optional)
+      description: >
+        Optional. If set and this binary sensor is on (wet) when the schedule
+        starts, that watering run is skipped. Works well with a RainPoint rain
+        sensor or any weather/rain binary sensor.
+      default:
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+
+mode: single
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input watering_schedule
+    to: "on"
+    id: start
+  - platform: state
+    entity_id: !input watering_schedule
+    to: "off"
+    id: stop
+
+variables:
+  rain_sensor: !input rain_sensor
+
+action:
+  - choose:
+      # Schedule block started → open the valve, unless it is raining.
+      - conditions:
+          - condition: trigger
+            id: start
+          - condition: template
+            value_template: >
+              {{ rain_sensor in [none, ''] or is_state(rain_sensor, 'off') }}
+        sequence:
+          - service: valve.open_valve
+            target:
+              entity_id: !input valve
+    # Schedule block ended, or the run was rain‑skipped → make sure it is closed.
+    default:
+      - service: valve.close_valve
+        target:
+          entity_id: !input valve

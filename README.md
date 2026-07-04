@@ -92,6 +92,67 @@ Adjust entity IDs (e.g. `sensor.your_device_soil_moisture`, `switch.your_irrigat
 ### Water usage tracking
 Track daily/weekly water usage and optimise irrigation over time.
 
+### Scheduled watering — let Home Assistant own the timing
+
+Home Assistant already has a first‑class scheduler (the **Schedule** helper), so this integration deliberately doesn't try to reimplement the app's timers. Instead, drive your valves from a Schedule and you get the best of both worlds: any recurrence HA supports, plus a **"next watering"** time you can use in *other* automations (close the blinds, pull in the washing, send a heads‑up).
+
+A ready‑made blueprint is included:
+
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fbrettmeyerowitz%2Fhomeassistant-homgar%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fhomgar%2Fscheduled_watering.yaml)
+
+**Setup:**
+1. Create a **Schedule** helper (Settings → Devices & Services → Helpers → **Schedule**) and draw the blocks when you want to water — the length of each block is the watering duration.
+2. Import the blueprint (button above), then create an automation from it and pick your **Schedule** and **valve** (optionally a rain‑skip binary sensor).
+3. Turn off the equivalent schedule in the RainPoint/HomGar app so the two don't both fire.
+
+The valve **opens** when the schedule turns on and **closes** when it turns off. Closing is always safe and survives an HA restart mid‑run better than a fixed delay.
+
+> **Failsafe tip:** also set the valve's **Duration** number entity to your run length. Then the device stops on its own even if Home Assistant happens to be offline when the block ends.
+
+**Rain‑skip sensor** — the blueprint's optional rain‑skip expects a `binary_sensor` (on = wet), but a RainPoint rain sensor reports precipitation as regular `sensor` entities (`…_rain_last_hour`, `…_rain_last_24h`). Turn one into a wet/dry `binary_sensor` with a template:
+
+```yaml
+template:
+  - binary_sensor:
+      - name: Recent rain
+        unique_id: recent_rain
+        device_class: moisture   # on = wet
+        state: >
+          {{ states('sensor.your_rain_sensor_rain_last_hour') | float(0) > 0 }}
+```
+
+Then pick `binary_sensor.recent_rain` as the blueprint's rain‑skip input. Point it at `…_rain_last_24h` (and/or a threshold like `> 1`) if you'd rather skip watering for a day after meaningful rain. You can equally use any weather integration's rain `binary_sensor`.
+
+**Expose "next watering" as a sensor** (great for pre‑emptive automations and dashboards) — the Schedule helper already knows it via `next_event`:
+
+```yaml
+template:
+  - sensor:
+      - name: Next watering
+        unique_id: next_watering
+        device_class: timestamp
+        state: "{{ state_attr('schedule.watering', 'next_event') }}"
+```
+
+Replace `schedule.watering` with your own Schedule helper's entity id (e.g. `schedule.scheduler`). After adding it, restart Home Assistant or reload template entities (Developer Tools → YAML → **Template entities**), then find it under Developer Tools → States → `sensor.next_watering`. It reads `unknown` for a second or two at startup until the schedule initialises, then shows the next start time (and renders as a friendly "in X hours" on a dashboard).
+
+**Example — close the blinds 5 minutes before watering:**
+
+```yaml
+alias: Close blinds before watering
+trigger:
+  - platform: template
+    value_template: >
+      {{ states('sensor.next_watering') not in ('unknown', 'unavailable')
+         and 0 <= (as_timestamp(states('sensor.next_watering')) - as_timestamp(now())) <= 300 }}
+action:
+  - service: cover.close_cover
+    target:
+      entity_id: cover.your_blinds
+```
+
+Adjust `schedule.watering`, `sensor.next_watering`, and `cover.your_blinds` to match your setup.
+
 ## Example dashboard
 
 A simple control panel combining valve control and live sensor data:
