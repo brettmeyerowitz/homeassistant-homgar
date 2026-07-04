@@ -18,13 +18,18 @@ from pathlib import Path
 
 
 def _find_repo_root() -> Path:
-    current = Path(__file__).resolve().parent
-    while True:
-        if (current / "custom_components" / "homgar" / "__init__.py").exists():
-            return current
-        if current.parent == current:
-            raise RuntimeError("Could not locate repository root")
-        current = current.parent
+    # Candidates cover both host runs (repo checkout) and the ha-test container,
+    # where the integration is deployed under /config.
+    candidates = [Path(__file__).resolve().parent, Path.cwd(), Path("/config")]
+    for start in candidates:
+        current = start
+        while True:
+            if (current / "custom_components" / "homgar" / "areas.py").exists():
+                return current
+            if current.parent == current:
+                break
+            current = current.parent
+    raise RuntimeError("Could not locate repository root containing custom_components/homgar")
 
 
 ROOT = _find_repo_root()
