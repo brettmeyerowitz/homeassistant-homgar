@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.39] - 2026-07-04
+
+### 🐛 Bug Fixes
+- **Deleted "My Home" area no longer comes back after a reload** — the integration created its per-home area and re-assigned devices to it on *every* setup. Deleting an area in Home Assistant nulls the `area_id` of every device that was in it, which the old code read as "unseeded" and used to recreate the area and re-home the devices on the next reload. Area creation and assignment now happen only on the **first setup** of a config entry; reloads leave areas alone, so an area you remove stays removed. Device name/model backfill still runs on every reload. New devices added later are still grouped via `suggested_area` at registration time. ([#70](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/70))
+
 ## [3.0.38] - 2026-07-04
 
 ### 🐛 Bug Fixes

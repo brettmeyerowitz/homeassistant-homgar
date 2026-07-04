@@ -22,8 +22,8 @@ from .const import (
     CONF_APP_TYPE,
     CONF_HIDS,
     controller_device_identifier,
-    zone_device_identifier,
 )
+from .areas import seed_device_areas, _fallback_hub_name
 from .coordinator import HomGarCoordinator
 from .decoder import _MODELS, get_switch_ports, get_valve_ports  # noqa: F401 — imported here to trigger eager file load in executor
 from .api import HomGarClient
@@ -247,6 +247,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up services
     await async_setup_services(hass)
 
+    # Detect a fresh install BEFORE any devices are created this cycle. Areas are
+    # seeded only on first setup; on reloads we leave areas untouched so a
+    # user-deleted area is not recreated (issue #70).
+    is_first_setup = not dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+
     _ensure_device_registry_parents(hass, entry, coordinator)
 
     _LOGGER.info("Setting up platforms: %s for entry: %s", PLATFORMS, entry.entry_id)
@@ -266,7 +271,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.info("HomGar [%s]: Finalizing device layout", entry.title)
             await async_merge_wifi_devices(hass, entry, coordinator)
             await async_rehome_multi_zone_entities(hass, entry, coordinator)
-            _assign_devices_to_areas(hass, entry, coordinator)
+            seed_device_areas(hass, entry, coordinator, is_first_setup)
             _LOGGER.info("HomGar [%s]: Device layout finalized", entry.title)
         except Exception as ex:  # noqa: BLE001
             _LOGGER.warning("HomGar [%s]: Device layout finalization failed: %s", entry.title, ex, exc_info=True)
@@ -280,16 +285,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(async_call_later(hass, 2, _async_finalize_device_layout_later))
 
     return True
-
-
-def _fallback_hub_name(hub_info: dict) -> str:
-    model = hub_info.get("model")
-    return (
-        hub_info.get("name")
-        or hub_info.get("displayModel")
-        or (model if model and model != "Unknown" else None)
-        or "RainPoint Hub"
-    )
 
 
 def _ensure_device_registry_parents(
@@ -344,81 +339,6 @@ def _ensure_device_registry_parents(
             suggested_area=sensor_info.get("home_name"),
             via_device=(DOMAIN, f"rainpoint_hub_{mid}"),
         )
-
-
-def _assign_devices_to_areas(hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
-    """Create an HA Area per home and seed devices into it on first discovery.
-
-    Area assignment only happens for devices that do not already have an area
-    (``area_id is None``). A device the user has manually moved to another area
-    keeps that area across restarts and reloads; we never overwrite a user's
-    choice here. Device name/model backfill still runs unconditionally (see
-    issue #63).
-    """
-    from homeassistant.helpers import area_registry as ar, device_registry as dr
-
-    data = coordinator.data
-    if not data:
-        return
-
-    area_reg = ar.async_get(hass)
-    device_reg = dr.async_get(hass)
-
-    hubs = data.get("hubs", [])
-    if isinstance(hubs, dict):
-        hubs = list(hubs.values())
-
-    for hub_info in hubs:
-        home_name = hub_info.get("homeName") or ""
-        if not home_name:
-            continue
-        mid = hub_info.get("mid")
-        if not mid:
-            continue
-
-        area = area_reg.async_get_area_by_name(home_name)
-        if not area:
-            area = area_reg.async_create(home_name)
-
-        hub_device = device_reg.async_get_device(identifiers={(DOMAIN, f"rainpoint_hub_{mid}")})
-        if hub_device:
-            update: dict = {}
-            if hub_device.area_id is None:
-                update["area_id"] = area.id
-            if not hub_device.name:
-                update["name"] = _fallback_hub_name(hub_info)
-            if not hub_device.model:
-                update["model"] = hub_info.get("model") or hub_info.get("displayModel") or "Unknown"
-            if update:
-                device_reg.async_update_device(hub_device.id, **update)
-
-    sensors = data.get("sensors", {})
-    group_multi_zone = entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)
-    for sensor_info in sensors.values():
-        home_name = sensor_info.get("home_name") or ""
-        if not home_name:
-            continue
-        mid = sensor_info.get("mid")
-        addr = sensor_info.get("addr")
-        if mid is None or addr is None:
-            continue
-
-        area = area_reg.async_get_area_by_name(home_name)
-        if not area:
-            area = area_reg.async_create(home_name)
-
-        device = device_reg.async_get_device(identifiers={(DOMAIN, f"{mid}_{addr}")})
-        if device and device.area_id is None:
-            device_reg.async_update_device(device.id, area_id=area.id)
-
-        model = sensor_info.get("model")
-        if group_multi_zone and model and len(get_valve_ports(model)) > 1:
-            for port in get_valve_ports(model):
-                zone_device = device_reg.async_get_device(
-                    identifiers={(DOMAIN, zone_device_identifier(mid, addr, port))}
-                )
-                if zone_device and zone_device.area_id is None:
-                    device_reg.async_update_device(zone_device.id, area_id=area.id)
 
 
 async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry) -> bool:
