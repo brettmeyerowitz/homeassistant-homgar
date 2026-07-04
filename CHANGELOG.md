@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.38] - 2026-07-04
+
+### 🐛 Bug Fixes
+- **Renew MQTT subscription before credentials expire** — `subscribeStatus` credentials expire ~570 seconds after they are issued, but both renewal-scheduling sites forced the renewal up to a fixed 30-minute (1800s) floor. Credentials therefore lapsed ~9.5 minutes after every (re)subscribe and the renewal did not fire for another ~20 minutes, so the real-time MQTT feed silently ran on expired credentials during that window: device state went stale and the 120-second coordinator poll reverted optimistic valve opens ~2 minutes after each command (while the physical valve kept running). Renewal is now scheduled ~60 seconds before the real credential expiry with a 120-second anti-thrash floor. The v3.0.36 retry backoff already guards every failure path, so this only changes the success-path cadence (~7 lightweight renewals/hour). ([#68](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/68), [#69](https://github.com/brettmeyerowitz/homeassistant-homgar/pull/69))
+
+---
+
 ## [3.0.37] - 2026-07-03
 
 ### 🐛 Bug Fixes
