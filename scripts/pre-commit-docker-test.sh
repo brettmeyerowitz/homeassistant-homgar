@@ -210,6 +210,16 @@ else
     exit 1
 fi
 
+# ── Test: area seeding regressions ────────────────────────────────────────
+echo "🧪 Running area seeding regression tests..."
+docker cp tests/run_area_seeding_tests.py ha-test:/tmp/tests/run_area_seeding_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_area_seeding_tests.py; then
+    echo "✅ Area seeding regression tests passed"
+else
+    echo "❌ ERROR: Area seeding regression tests failed"
+    exit 1
+fi
+
 # ── Test: MQTT parser regressions ─────────────────────────────────────────
 echo "🧪 Running MQTT parser regression tests..."
 docker cp tests/run_mqtt_parser_tests.py ha-test:/tmp/tests/run_mqtt_parser_tests.py > /dev/null
