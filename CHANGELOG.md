@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.40] - 2026-07-24
+
+### 🐛 Bug Fixes
+- **Cloud 403 — send an app User-Agent** — as of ~mid-July 2026 the HomGar cloud (`region3.homgarus.com`, plain nginx) returns `403 Forbidden` to any request whose `User-Agent` contains the substring `HomeAssistant`. Home Assistant's shared aiohttp session (`async_get_clientsession`) stamps `HomeAssistant/<ver> aiohttp/… Python/…` by default, so **every** call was blocked: login and token refresh 403'd on every coordinator cycle, all entities went `unavailable`, while the vendor phone app kept working (making it look like a credentials problem). The client now sends a neutral, app-style `User-Agent` (`okhttp/4.9.2`, matching the RainPoint/HomGar app) on every request, forced in the `_get`/`_post` chokepoint so it covers login, auth headers, token refresh, and MQTT credential renewal. The block is a pure UA substring match (not IP- or TLS-fingerprint-based), verified single-variable against the live cloud: `HomeAssistant/…` → 403, `okhttp/4.9.2` → 200. ([#75](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/75), [#76](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/76), [#77](https://github.com/brettmeyerowitz/homeassistant-homgar/pull/77))
+
+---
+
 ## [3.0.39] - 2026-07-04
 
 ### 🐛 Bug Fixes
