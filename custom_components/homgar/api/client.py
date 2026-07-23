@@ -19,6 +19,15 @@ _LOGGER = logging.getLogger(__name__)
 # whole coordinator cycle for up to 5 minutes during upstream flakiness.
 _REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10, sock_connect=10)
 
+# HomGar's cloud (region3.homgarus.com, plain nginx) returns 403 Forbidden to any
+# request whose User-Agent contains "HomeAssistant". HA's shared aiohttp session
+# stamps "HomeAssistant/<ver> aiohttp/... Python/..." by default, so every call
+# was blocked (login/token-refresh 403 on every coordinator cycle). Send a
+# neutral, app-style User-Agent on every request instead. The block is purely the
+# UA substring — not IP- or TLS-fingerprint-based — so any non-"HomeAssistant"
+# value works; this mirrors the RainPoint/HomGar phone app. See issue #76.
+_USER_AGENT = "okhttp/4.9.2"
+
 
 class HomGarApiError(Exception):
     pass
@@ -59,11 +68,15 @@ class HomGarClient:
     def _get(self, url: str, **kwargs):
         """Issue a GET via the shared session with an explicit timeout."""
         kwargs.setdefault("timeout", _REQUEST_TIMEOUT)
+        # Force the app User-Agent last so it always overrides HA's session default.
+        kwargs["headers"] = {**(kwargs.get("headers") or {}), "User-Agent": _USER_AGENT}
         return self._session.get(url, **kwargs)
 
     def _post(self, url: str, **kwargs):
         """Issue a POST via the shared session with an explicit timeout."""
         kwargs.setdefault("timeout", _REQUEST_TIMEOUT)
+        # Force the app User-Agent last so it always overrides HA's session default.
+        kwargs["headers"] = {**(kwargs.get("headers") or {}), "User-Agent": _USER_AGENT}
         return self._session.post(url, **kwargs)
 
     # --- token state helpers ---

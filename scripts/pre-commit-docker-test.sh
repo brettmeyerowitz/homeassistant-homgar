@@ -280,6 +280,16 @@ else
     exit 1
 fi
 
+# ── Test: User-Agent regressions ──────────────────────────────────────────
+echo "🧪 Running User-Agent regression tests..."
+docker cp tests/run_user_agent_tests.py ha-test:/tmp/tests/run_user_agent_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_user_agent_tests.py; then
+    echo "✅ User-Agent regression tests passed"
+else
+    echo "❌ ERROR: User-Agent regression tests failed"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null
