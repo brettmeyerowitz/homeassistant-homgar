@@ -357,6 +357,12 @@ class HomGarClient:
                 raise HomGarApiError(f"getDeviceStatus HTTP {resp.status}")
             data = await resp.json()
         _LOGGER.debug("API response: get_device_status data=%s", data)
+        if data.get("code") in (1001, 1004):
+            await self._reauth()
+            async with self._get(url, headers=self._auth_headers(), params=params) as resp2:
+                if resp2.status != 200:
+                    raise HomGarApiError(f"getDeviceStatus HTTP {resp2.status}")
+                data = await resp2.json()
         if data.get("code") != 0:
             raise HomGarApiError(f"getDeviceStatus failed: {data}")
         return data.get("data", {})
@@ -414,6 +420,16 @@ class HomGarClient:
                 raise HomGarApiError(f"subscribeStatus HTTP {resp.status}")
             data = await resp.json()
         _LOGGER.debug("API response: subscribe_status data=%s", data)
+        # A rejected token (1001 NOT_TOKEN / 1004) here strands the periodic MQTT
+        # renewal in a retry storm, since ensure_auth only checks the local clock.
+        # Re-auth and retry once, as the read endpoints do.
+        if data.get("code") in (1001, 1004):
+            await self._reauth()
+            async with self._post(url, headers=self._auth_headers(), json=payload) as resp2:
+                if resp2.status != 200:
+                    raise HomGarApiError(f"subscribeStatus HTTP {resp2.status}")
+                data = await resp2.json()
+            _LOGGER.debug("API response (after reauth): subscribe_status data=%s", data)
         if data.get("code") != 0:
             raise HomGarApiError(f"subscribeStatus failed: {data}")
         return data.get("data", {})
@@ -433,9 +449,15 @@ class HomGarClient:
             if resp.status != 200:
                 raise HomGarApiError(f"Failed to set device state: {resp.status}")
             data = await resp.json()
-            if data.get("code") != 0:
-                raise HomGarApiError(f"Set device state API error: {data.get('msg')}")
-            return True
+        if data.get("code") in (1001, 1004):
+            await self._reauth()
+            async with self._post(url, headers=self._auth_headers(), json=payload) as resp2:
+                if resp2.status != 200:
+                    raise HomGarApiError(f"Failed to set device state: {resp2.status}")
+                data = await resp2.json()
+        if data.get("code") != 0:
+            raise HomGarApiError(f"Set device state API error: {data.get('msg')}")
+        return True
 
     async def get_product_models(self, version: int = 0) -> list[dict]:
         """Get full product model list from API.
@@ -453,7 +475,16 @@ class HomGarClient:
             data = await resp.json()
         
         _LOGGER.warning("API response: get_product_models received, code=%s", data.get('code'))
-        
+
+        if isinstance(data, dict) and data.get("code") in (1001, 1004):
+            await self._reauth()
+            async with self._get(url, headers=self._auth_headers(), params=params) as resp2:
+                if resp2.status != 200:
+                    raise HomGarApiError(f"get_product_models HTTP {resp2.status}")
+                data = await resp2.json()
+            _LOGGER.warning("API response (after reauth): get_product_models code=%s",
+                            data.get('code') if isinstance(data, dict) else None)
+
         # Log full response to file for inspection
         try:
             with open('/tmp/product_models.json', 'w') as f:
@@ -563,6 +594,19 @@ class HomGarClient:
 
         _LOGGER.debug("API response: control_work_mode data=%s", data)
 
+        # Token rejected server-side (expired/rotated). Re-auth and retry once, as
+        # the read endpoints do — otherwise a stale token turns a valve command
+        # into a hard "code=1004 token error" even though a fresh login would
+        # succeed. Surfaced once the #75/#76 User-Agent fix let control calls
+        # actually reach the cloud.
+        if data.get("code") in (1001, 1004):
+            await self._reauth()
+            async with self._post(url, json=payload, headers=self._auth_headers()) as resp2:
+                if resp2.status != 200:
+                    raise HomGarApiError(f"controlWorkMode HTTP {resp2.status}")
+                data = await resp2.json()
+            _LOGGER.debug("API response (after reauth): control_work_mode data=%s", data)
+
         code = data.get("code")
         if code == 4:
             _LOGGER.warning(
@@ -613,6 +657,22 @@ class HomGarClient:
             data = await resp.json()
 
         _LOGGER.debug("API response: control_work_mode_dp data=%s", data)
+
+        # Token rejected server-side (expired/rotated). Re-auth and retry once, as
+        # the read endpoints do — otherwise a stale token turns a valve command
+        # into a hard "code=1004 token error" even though a fresh login would
+        # succeed. Surfaced once the #75/#76 User-Agent fix let control calls
+        # actually reach the cloud.
+        if data.get("code") in (1001, 1004):
+            await self._reauth()
+            headers = self._auth_headers()
+            if hid is not None:
+                headers["hid"] = str(hid)
+            async with self._post(url, json=payload, headers=headers) as resp2:
+                if resp2.status != 200:
+                    raise HomGarApiError(f"controlWorkModeDP HTTP {resp2.status}")
+                data = await resp2.json()
+            _LOGGER.debug("API response (after reauth): control_work_mode_dp data=%s", data)
 
         code = data.get("code")
         if code == 4:

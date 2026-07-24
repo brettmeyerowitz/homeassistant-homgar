@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.41] - 2026-07-24
+
+### 🐛 Bug Fixes
+- **Every cloud call now recovers from a rejected token** — two related failures surfaced after v3.0.40 let requests reach the cloud again: controlling a valve failed with `controlWorkMode failed: code=1004 msg=token error`, and the MQTT renewal loop got stuck on `subscribeStatus failed: {'code': 1001, 'msg': 'NOT_TOKEN'}`, retrying every 30–300s without ever recovering. Root cause: only the three list/status **read** endpoints re-authenticated and retried once on a server-rejected token; the rest (`controlWorkMode`, `controlWorkModeDP`, `subscribeStatus`, `getDeviceStatus`, `setDeviceStatus`, `productModel`) raised or degraded instead. Because `ensure_logged_in()`/`_ensure_auth()` only check the **local** expiry clock, the cloud can reject a token (rotation, or the refresh path overstating token lifetime) while Home Assistant still believes it is valid — so the coordinator's read cycles silently re-authenticated and kept entities updating, while valve commands threw and the independent MQTT-renewal schedule spun in a `NOT_TOKEN` retry storm. All authenticated endpoints now perform the same `1001/1004 → re-auth → retry once` recovery. Thanks to [@shaundekok](https://github.com/shaundekok) for reporting both symptoms and providing the logs that pinned it down. ([#75](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/75), [#76](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/76))
+
+### 🧪 Tests
+- Added `tests/run_token_reauth_tests.py` (23 checks): a `1004`/`1001` on any of the control, subscribe, status, set, and product-model endpoints triggers exactly one fresh login and one retry; a clean response never re-authenticates; and non-token errors still raise. Wired into the pre-commit Docker gate.
+
+---
+
 ## [3.0.40] - 2026-07-24
 
 ### 🐛 Bug Fixes
