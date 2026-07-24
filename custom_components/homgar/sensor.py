@@ -34,6 +34,7 @@ from .diagnostic_sensors import (
     HomGarMqttRawPayloadSensor,
     HomGarMqttFriendlySensor,
 )
+from .diagnostic_token_sensors import build_token_diagnostic_sensors
 from .hub_entities import (
     HomGarHubDeviceIDSensor,
     HomGarHubFirmwareSensor,
@@ -108,6 +109,14 @@ async def async_setup_entry(
         entities.append(HomGarHubMqttFriendlySensor(coordinator, hub_info))
         entities.append(HomGarHubChannelSelect(coordinator, hub_info))
         entities.append(HomGarHubBroadcastSwitch(coordinator, hub_info))
+
+    # Account-level token diagnostic sensors: one set per config entry, attached
+    # to the first hub's device. Guarded so entries with no hub add nothing.
+    if hubs_dict:
+        first_hub_info = next(iter(hubs_dict.values()))
+        entities.extend(
+            build_token_diagnostic_sensors(coordinator, first_hub_info, entry.entry_id)
+        )
 
     # Create sensor entities for sub-devices
     for key, info in sensors_cfg.items():
