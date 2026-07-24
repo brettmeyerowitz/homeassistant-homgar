@@ -11,15 +11,15 @@ All notable changes to this project will be documented in this file.
 - Added `tests/run_token_reauth_tests.py` (23 checks): a `1004`/`1001` on any of the control, subscribe, status, set, and product-model endpoints triggers exactly one fresh login and one retry; a clean response never re-authenticates; and non-token errors still raise. Wired into the pre-commit Docker gate.
 
 ### 🔎 Diagnostics
-- **Token re-auth visibility** — three local-only diagnostic sensors on the Hub device make token re-authentication measurable: `Token re-auth count` (a `total_increasing` value whose history-graph slope shows how often the cloud is rejecting the token), `Last token re-auth` (timestamp, with `trigger_endpoint` and `last_error_code` attributes), and `Token expires at` (a far-future value here means the token is long-lived and any churn is external session invalidation, not expiry). Enabled by default, no data leaves Home Assistant. Find them under Settings → Devices & Services → HomGar/RainPoint → Hub → Diagnostic. To watch the rhythm on one graph:
+- **Token re-auth visibility** — three local-only diagnostic sensors on the Hub device make token re-authentication measurable: `Token re-auth count` (a `total_increasing` value whose history-graph slope shows how often the cloud is rejecting the token), `Last token re-auth` (timestamp, with `trigger_endpoint` and `last_error_code` attributes), and `Token expires at` (a far-future value here means the token is long-lived and any churn is external session invalidation, not expiry). Enabled by default, no data leaves Home Assistant. Find them under Settings → Devices & Services → HomGar/RainPoint → Hub → Diagnostic. To watch the rhythm on one graph, add a history-graph card and pick the three "Token …" sensors from the entity list (their entity IDs are derived from your hub's name, e.g. if the hub is named *Hub* they are `sensor.hub_token_re_auth_count`, `sensor.hub_last_token_re_auth`, `sensor.hub_token_expires_at` — replace with your own):
 
     ```yaml
     type: history-graph
     hours_to_show: 6
     entities:
-      - sensor.homgar_token_reauth_count
-      - sensor.homgar_last_token_reauth
-      - sensor.homgar_token_expires_at
+      - sensor.hub_token_re_auth_count
+      - sensor.hub_last_token_re_auth
+      - sensor.hub_token_expires_at
     ```
 
 ---
