@@ -100,9 +100,11 @@ _LOGIN_PAYLOAD = {
 class _SequencedSession:
     def __init__(self, queues):
         self._queues = {u: list(p) for u, p in queues.items()}
+        self.login_posts = 0
 
     def _next(self, url):
         if url.endswith("/auth/basic/app/login"):
+            self.login_posts += 1
             return _FakeResp(_LOGIN_PAYLOAD)
         for key, queue in self._queues.items():
             if url.endswith(key) and queue:
@@ -155,11 +157,38 @@ async def _test_reauth_count_is_monotonic():
           f"got {client.last_reauth_trigger!r}")
 
 
+async def _test_concurrent_reauth_single_login():
+    # Two callers whose in-flight requests used the same (now-rejected) token both
+    # trigger a re-auth in the same window. The auth lock must collapse them into
+    # ONE login instead of a re-login storm.
+    client = _make_client({})
+    used = client._token  # both in-flight requests used this (now-rejected) token
+    await asyncio.gather(
+        client._reauth(trigger="multipleDeviceStatus", code=1001, rejected_token=used),
+        client._reauth(trigger="subscribeStatus", code=1001, rejected_token=used),
+    )
+    check("concurrent re-auth performs exactly one login",
+          client._session.login_posts == 1, f"got {client._session.login_posts}")
+    check("concurrent re-auth counted once (no double increment)",
+          client.reauth_count == 1, f"got {client.reauth_count}")
+
+
+async def _test_single_reauth_still_logs_in():
+    # A lone re-auth (no concurrent refresher) must still perform its login.
+    client = _make_client({})
+    await client._reauth(trigger="controlWorkMode", code=1004)
+    check("single re-auth performs one login", client._session.login_posts == 1,
+          f"got {client._session.login_posts}")
+    check("single re-auth counted once", client.reauth_count == 1, f"got {client.reauth_count}")
+
+
 def main() -> int:
     print("Token diagnostic telemetry tests")
     _test_initial_state()
     asyncio.run(_test_reauth_records_telemetry())
     asyncio.run(_test_reauth_count_is_monotonic())
+    asyncio.run(_test_concurrent_reauth_single_login())
+    asyncio.run(_test_single_reauth_still_logs_in())
     print(f"\n{PASS} passed, {FAIL} failed")
     return 1 if FAIL else 0
 
