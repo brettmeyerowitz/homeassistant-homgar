@@ -52,6 +52,12 @@ class HomGarClient:
         self._token_expires_at: datetime | None = None
         self._mqtt_credentials: dict = {}
 
+        # Session-scoped token re-auth telemetry (exposed via diagnostic sensors).
+        self._reauth_count = 0
+        self._last_reauth_at: datetime | None = None
+        self._last_reauth_trigger: str | None = None
+        self._last_reauth_code: int | None = None
+
         # region host: you had region3; we can later make this configurable
         self._base_url = "https://region3.homgarus.com"
         
@@ -257,13 +263,40 @@ class HomGarClient:
             if not await self.refresh_token():
                 raise HomGarApiError("Authentication failed")
 
-    async def _reauth(self) -> None:
+    async def _reauth(self, trigger: str | None = None, code: int | None = None) -> None:
         """Force a fresh login, invalidating the current token."""
-        _LOGGER.info("HomGar: token rejected by server, forcing fresh login")
+        self._reauth_count += 1
+        self._last_reauth_at = datetime.now(timezone.utc)
+        self._last_reauth_trigger = trigger
+        self._last_reauth_code = code
+        _LOGGER.info(
+            "HomGar: token rejected by server (trigger=%s code=%s), forcing fresh login (reauth #%d)",
+            trigger, code, self._reauth_count,
+        )
         self._token = None
         self._token_expires_at = None
         if not await self.login():
             raise HomGarApiError("Re-authentication failed")
+
+    @property
+    def reauth_count(self) -> int:
+        return self._reauth_count
+
+    @property
+    def last_reauth_at(self) -> datetime | None:
+        return self._last_reauth_at
+
+    @property
+    def last_reauth_trigger(self) -> str | None:
+        return self._last_reauth_trigger
+
+    @property
+    def last_reauth_code(self) -> int | None:
+        return self._last_reauth_code
+
+    @property
+    def token_expires_at(self) -> datetime | None:
+        return self._token_expires_at
 
     # --- API calls ---
 
@@ -279,7 +312,7 @@ class HomGarClient:
             data = await resp.json()
             _LOGGER.debug("API response: list_homes data=%s", data)
         if data.get("code") in (1001, 1004):
-            await self._reauth()
+            await self._reauth(trigger="list_homes", code=data.get("code"))
             async with self._get(url, headers=self._auth_headers()) as resp2:
                 data = await resp2.json()
         if data.get("code") != 0:
@@ -298,7 +331,7 @@ class HomGarClient:
             data = await resp.json()
         _LOGGER.debug("API response: get_devices_by_hid data=%s", data)
         if data.get("code") in (1001, 1004):
-            await self._reauth()
+            await self._reauth(trigger="getDeviceByHid", code=data.get("code"))
             async with self._get(url, headers=self._auth_headers(), params=params) as resp2:
                 data = await resp2.json()
         if data.get("code") != 0:
@@ -327,7 +360,7 @@ class HomGarClient:
             data = await resp.json()
         _LOGGER.debug("API response: get_multiple_device_status data=%s", data)
         if data.get("code") in (1001, 1004):
-            await self._reauth()
+            await self._reauth(trigger="multipleDeviceStatus", code=data.get("code"))
             async with self._post(url, headers=self._auth_headers(), json=payload) as resp2:
                 data = await resp2.json()
         if data.get("code") != 0:
@@ -358,7 +391,7 @@ class HomGarClient:
             data = await resp.json()
         _LOGGER.debug("API response: get_device_status data=%s", data)
         if data.get("code") in (1001, 1004):
-            await self._reauth()
+            await self._reauth(trigger="getDeviceStatus", code=data.get("code"))
             async with self._get(url, headers=self._auth_headers(), params=params) as resp2:
                 if resp2.status != 200:
                     raise HomGarApiError(f"getDeviceStatus HTTP {resp2.status}")
@@ -424,7 +457,7 @@ class HomGarClient:
         # renewal in a retry storm, since ensure_auth only checks the local clock.
         # Re-auth and retry once, as the read endpoints do.
         if data.get("code") in (1001, 1004):
-            await self._reauth()
+            await self._reauth(trigger="subscribeStatus", code=data.get("code"))
             async with self._post(url, headers=self._auth_headers(), json=payload) as resp2:
                 if resp2.status != 200:
                     raise HomGarApiError(f"subscribeStatus HTTP {resp2.status}")
@@ -450,7 +483,7 @@ class HomGarClient:
                 raise HomGarApiError(f"Failed to set device state: {resp.status}")
             data = await resp.json()
         if data.get("code") in (1001, 1004):
-            await self._reauth()
+            await self._reauth(trigger="setDeviceStatus", code=data.get("code"))
             async with self._post(url, headers=self._auth_headers(), json=payload) as resp2:
                 if resp2.status != 200:
                     raise HomGarApiError(f"Failed to set device state: {resp2.status}")
@@ -477,7 +510,7 @@ class HomGarClient:
         _LOGGER.warning("API response: get_product_models received, code=%s", data.get('code'))
 
         if isinstance(data, dict) and data.get("code") in (1001, 1004):
-            await self._reauth()
+            await self._reauth(trigger="productModel", code=data.get("code"))
             async with self._get(url, headers=self._auth_headers(), params=params) as resp2:
                 if resp2.status != 200:
                     raise HomGarApiError(f"get_product_models HTTP {resp2.status}")
@@ -600,7 +633,7 @@ class HomGarClient:
         # succeed. Surfaced once the #75/#76 User-Agent fix let control calls
         # actually reach the cloud.
         if data.get("code") in (1001, 1004):
-            await self._reauth()
+            await self._reauth(trigger="controlWorkMode", code=data.get("code"))
             async with self._post(url, json=payload, headers=self._auth_headers()) as resp2:
                 if resp2.status != 200:
                     raise HomGarApiError(f"controlWorkMode HTTP {resp2.status}")
@@ -664,7 +697,7 @@ class HomGarClient:
         # succeed. Surfaced once the #75/#76 User-Agent fix let control calls
         # actually reach the cloud.
         if data.get("code") in (1001, 1004):
-            await self._reauth()
+            await self._reauth(trigger="controlWorkModeDP", code=data.get("code"))
             headers = self._auth_headers()
             if hid is not None:
                 headers["hid"] = str(hid)
