@@ -290,6 +290,35 @@ else
     exit 1
 fi
 
+# ── Test: token re-auth / retry regressions ───────────────────────────────
+echo "🧪 Running token re-auth regression tests..."
+docker cp tests/run_token_reauth_tests.py ha-test:/tmp/tests/run_token_reauth_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_token_reauth_tests.py; then
+    echo "✅ Token re-auth regression tests passed"
+else
+    echo "❌ ERROR: Token re-auth regression tests failed"
+    exit 1
+fi
+
+# ── Test: token telemetry + sensor regressions ────────────────────────────
+echo "🧪 Running token telemetry tests..."
+docker cp tests/run_token_diag_tests.py ha-test:/tmp/tests/run_token_diag_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_token_diag_tests.py; then
+    echo "✅ Token telemetry tests passed"
+else
+    echo "❌ ERROR: Token telemetry tests failed"
+    exit 1
+fi
+
+echo "🧪 Running token diagnostic sensor tests..."
+docker cp tests/run_token_sensor_tests.py ha-test:/tmp/run_token_sensor_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/run_token_sensor_tests.py; then
+    echo "✅ Token diagnostic sensor tests passed"
+else
+    echo "❌ ERROR: Token diagnostic sensor tests failed"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null
