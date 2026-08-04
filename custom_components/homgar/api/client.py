@@ -28,9 +28,27 @@ _REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10, sock_connect=10)
 # value works; this mirrors the RainPoint/HomGar phone app. See issue #76.
 _USER_AGENT = "okhttp/4.9.2"
 
+# Transient upstream failures worth retrying within a single coordinator poll:
+# connection resets, DNS/connect timeouts, and 5xx from the cloud. The cloud
+# (region3.homgarus.com) intermittently returns these while the RainPoint app
+# keeps working; a short in-poll backoff lets a blip self-heal instead of
+# blanking entities or spamming the log. Total wait stays well inside the 120s
+# poll interval. See issue #82.
+_TRANSIENT_RETRY_BACKOFF = (1, 2, 4)  # seconds between attempts (3 retries)
+
+# aiohttp raises ClientError for connector/DNS/disconnect failures; connection
+# and server timeouts subclass asyncio.TimeoutError.
+_TRANSIENT_NETWORK_ERRORS = (aiohttp.ClientError, asyncio.TimeoutError)
+
 
 class HomGarApiError(Exception):
     pass
+
+
+class HomGarTransientError(HomGarApiError):
+    """A transient upstream failure (network error or 5xx) that outlived its
+    retries. Kept distinct so callers can tell a passing cloud blip from a
+    genuine API/protocol error."""
 
 
 class HomGarClient:
@@ -88,6 +106,53 @@ class HomGarClient:
         # Force the app User-Agent last so it always overrides HA's session default.
         kwargs["headers"] = {**(kwargs.get("headers") or {}), "User-Agent": _USER_AGENT}
         return self._session.post(url, **kwargs)
+
+    async def _request_json(self, method: str, url: str, *, what: str,
+                            retry: bool = True, **kwargs) -> dict:
+        """Perform an HTTP request and return the parsed JSON body, retrying
+        transient upstream failures with a short backoff.
+
+        Transient = a network error (connection reset, DNS/connect timeout) or a
+        5xx response. When ``retry`` is true these are retried up to
+        ``len(_TRANSIENT_RETRY_BACKOFF)`` times; if still failing, a
+        ``HomGarTransientError`` is raised so the coordinator surfaces a single
+        ``UpdateFailed`` (which preserves last-good state) rather than treating
+        the blip as a real error mid-poll.
+
+        ``retry`` is false for write/control endpoints (valve open/close, set
+        state): those commands are absolute ("run for N seconds"), not
+        idempotent, so a post-send disconnect must NOT auto-resend and risk
+        re-actuating irrigation. They fail fast; a transient failure still
+        raises ``HomGarTransientError`` immediately.
+
+        Any other non-200 (e.g. 4xx) raises ``HomGarApiError`` immediately and is
+        never retried. This centralises the timeout + retry policy; callers keep
+        their own ``code``/token-reauth handling on the returned dict.
+        """
+        opener = self._get if method == "get" else self._post
+        attempts = len(_TRANSIENT_RETRY_BACKOFF) + 1 if retry else 1
+        last_error: HomGarTransientError | None = None
+        for attempt in range(attempts):
+            try:
+                async with opener(url, **kwargs) as resp:
+                    if resp.status >= 500:
+                        raise HomGarTransientError(f"{what} HTTP {resp.status}")
+                    if resp.status != 200:
+                        raise HomGarApiError(f"{what} HTTP {resp.status}")
+                    return await resp.json()
+            except _TRANSIENT_NETWORK_ERRORS as err:
+                last_error = HomGarTransientError(f"{what}: {err}")
+            except HomGarTransientError as err:
+                last_error = err
+            if attempt + 1 < attempts:
+                delay = _TRANSIENT_RETRY_BACKOFF[attempt]
+                _LOGGER.debug(
+                    "%s transient failure (attempt %d/%d), retrying in %ss: %s",
+                    what, attempt + 1, attempts, delay, last_error,
+                )
+                await asyncio.sleep(delay)
+        _LOGGER.warning("%s failed after %d attempts: %s", what, attempts, last_error)
+        raise last_error
 
     # --- token state helpers ---
 
@@ -336,15 +401,11 @@ class HomGarClient:
         _LOGGER.debug("API call: list_homes URL=%s", url)
 
         used_token = self._token
-        async with self._get(url, headers=self._auth_headers()) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"list_homes HTTP {resp.status}")
-            data = await resp.json()
-            _LOGGER.debug("API response: list_homes data=%s", data)
+        data = await self._request_json("get", url, what="list_homes", headers=self._auth_headers())
+        _LOGGER.debug("API response: list_homes data=%s", data)
         if data.get("code") in (1001, 1004):
             await self._reauth(trigger="list_homes", code=data.get("code"), rejected_token=used_token)
-            async with self._get(url, headers=self._auth_headers()) as resp2:
-                data = await resp2.json()
+            data = await self._request_json("get", url, what="list_homes", headers=self._auth_headers())
         if data.get("code") != 0:
             raise HomGarApiError(f"list_homes failed: {data}")
         return data.get("data", [])
@@ -356,15 +417,15 @@ class HomGarClient:
         params = {"hid": hid}
         _LOGGER.debug("API call: get_devices_by_hid URL=%s params=%s", url, params)
         used_token = self._token
-        async with self._get(url, headers=self._auth_headers(), params=params) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"getDeviceByHid HTTP {resp.status}")
-            data = await resp.json()
+        data = await self._request_json(
+            "get", url, what="getDeviceByHid", headers=self._auth_headers(), params=params
+        )
         _LOGGER.debug("API response: get_devices_by_hid data=%s", data)
         if data.get("code") in (1001, 1004):
             await self._reauth(trigger="getDeviceByHid", code=data.get("code"), rejected_token=used_token)
-            async with self._get(url, headers=self._auth_headers(), params=params) as resp2:
-                data = await resp2.json()
+            data = await self._request_json(
+                "get", url, what="getDeviceByHid", headers=self._auth_headers(), params=params
+            )
         if data.get("code") != 0:
             raise HomGarApiError(f"getDeviceByHid failed: {data}")
         return data.get("data", [])
@@ -386,15 +447,15 @@ class HomGarClient:
         payload = {"devices": device_list}
         _LOGGER.debug("API call: get_multiple_device_status URL=%s payload=%s", url, payload)
         used_token = self._token
-        async with self._post(url, headers=self._auth_headers(), json=payload) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"Failed to get device status: {resp.status}")
-            data = await resp.json()
+        data = await self._request_json(
+            "post", url, what="multipleDeviceStatus", headers=self._auth_headers(), json=payload
+        )
         _LOGGER.debug("API response: get_multiple_device_status data=%s", data)
         if data.get("code") in (1001, 1004):
             await self._reauth(trigger="multipleDeviceStatus", code=data.get("code"), rejected_token=used_token)
-            async with self._post(url, headers=self._auth_headers(), json=payload) as resp2:
-                data = await resp2.json()
+            data = await self._request_json(
+                "post", url, what="multipleDeviceStatus", headers=self._auth_headers(), json=payload
+            )
         if data.get("code") != 0:
             raise HomGarApiError(f"Device status API error: {data.get('msg')}")
         
@@ -418,17 +479,15 @@ class HomGarClient:
         params = {"mid": mid}
         _LOGGER.debug("API call: get_device_status URL=%s params=%s", url, params)
         used_token = self._token
-        async with self._get(url, headers=self._auth_headers(), params=params) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"getDeviceStatus HTTP {resp.status}")
-            data = await resp.json()
+        data = await self._request_json(
+            "get", url, what="getDeviceStatus", headers=self._auth_headers(), params=params
+        )
         _LOGGER.debug("API response: get_device_status data=%s", data)
         if data.get("code") in (1001, 1004):
             await self._reauth(trigger="getDeviceStatus", code=data.get("code"), rejected_token=used_token)
-            async with self._get(url, headers=self._auth_headers(), params=params) as resp2:
-                if resp2.status != 200:
-                    raise HomGarApiError(f"getDeviceStatus HTTP {resp2.status}")
-                data = await resp2.json()
+            data = await self._request_json(
+                "get", url, what="getDeviceStatus", headers=self._auth_headers(), params=params
+            )
         if data.get("code") != 0:
             raise HomGarApiError(f"getDeviceStatus failed: {data}")
         return data.get("data", {})
@@ -482,20 +541,18 @@ class HomGarClient:
         }
         _LOGGER.debug("API call: subscribe_status URL=%s payload=%s", url, payload)
         used_token = self._token
-        async with self._post(url, headers=self._auth_headers(), json=payload) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"subscribeStatus HTTP {resp.status}")
-            data = await resp.json()
+        data = await self._request_json(
+            "post", url, what="subscribeStatus", headers=self._auth_headers(), json=payload
+        )
         _LOGGER.debug("API response: subscribe_status data=%s", data)
         # A rejected token (1001 NOT_TOKEN / 1004) here strands the periodic MQTT
         # renewal in a retry storm, since ensure_auth only checks the local clock.
         # Re-auth and retry once, as the read endpoints do.
         if data.get("code") in (1001, 1004):
             await self._reauth(trigger="subscribeStatus", code=data.get("code"), rejected_token=used_token)
-            async with self._post(url, headers=self._auth_headers(), json=payload) as resp2:
-                if resp2.status != 200:
-                    raise HomGarApiError(f"subscribeStatus HTTP {resp2.status}")
-                data = await resp2.json()
+            data = await self._request_json(
+                "post", url, what="subscribeStatus", headers=self._auth_headers(), json=payload
+            )
             _LOGGER.debug("API response (after reauth): subscribe_status data=%s", data)
         if data.get("code") != 0:
             raise HomGarApiError(f"subscribeStatus failed: {data}")
@@ -513,16 +570,14 @@ class HomGarClient:
             "status": state,
         }
         used_token = self._token
-        async with self._post(url, headers=self._auth_headers(), json=payload) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"Failed to set device state: {resp.status}")
-            data = await resp.json()
+        data = await self._request_json(
+            "post", url, what="setDeviceStatus", retry=False, headers=self._auth_headers(), json=payload
+        )
         if data.get("code") in (1001, 1004):
             await self._reauth(trigger="setDeviceStatus", code=data.get("code"), rejected_token=used_token)
-            async with self._post(url, headers=self._auth_headers(), json=payload) as resp2:
-                if resp2.status != 200:
-                    raise HomGarApiError(f"Failed to set device state: {resp2.status}")
-                data = await resp2.json()
+            data = await self._request_json(
+                "post", url, what="setDeviceStatus", retry=False, headers=self._auth_headers(), json=payload
+            )
         if data.get("code") != 0:
             raise HomGarApiError(f"Set device state API error: {data.get('msg')}")
         return True
@@ -538,19 +593,17 @@ class HomGarClient:
         
         _LOGGER.debug("API call: get_product_models URL=%s params=%s", url, params)
         used_token = self._token
-        async with self._get(url, headers=self._auth_headers(), params=params) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"2026-04-10 21:22:21.337 DEBUG (MainThread) [custom_components.homgar.api.client] API call: get_product_models URL=https://region3.homgarus.com/app/common/core/productModel params={'version': 0} HTTP {resp.status}")
-            data = await resp.json()
+        data = await self._request_json(
+            "get", url, what="get_product_models", headers=self._auth_headers(), params=params
+        )
 
         _LOGGER.warning("API response: get_product_models received, code=%s", data.get('code'))
 
         if isinstance(data, dict) and data.get("code") in (1001, 1004):
             await self._reauth(trigger="productModel", code=data.get("code"), rejected_token=used_token)
-            async with self._get(url, headers=self._auth_headers(), params=params) as resp2:
-                if resp2.status != 200:
-                    raise HomGarApiError(f"get_product_models HTTP {resp2.status}")
-                data = await resp2.json()
+            data = await self._request_json(
+                "get", url, what="get_product_models", headers=self._auth_headers(), params=params
+            )
             _LOGGER.warning("API response (after reauth): get_product_models code=%s",
                             data.get('code') if isinstance(data, dict) else None)
 
@@ -657,10 +710,9 @@ class HomGarClient:
         _LOGGER.debug("API call: control_work_mode URL=%s payload=%s", url, payload)
 
         used_token = self._token
-        async with self._post(url, json=payload, headers=self._auth_headers()) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"controlWorkMode HTTP {resp.status}")
-            data = await resp.json()
+        data = await self._request_json(
+            "post", url, what="controlWorkMode", retry=False, json=payload, headers=self._auth_headers()
+        )
 
         _LOGGER.debug("API response: control_work_mode data=%s", data)
 
@@ -671,10 +723,9 @@ class HomGarClient:
         # actually reach the cloud.
         if data.get("code") in (1001, 1004):
             await self._reauth(trigger="controlWorkMode", code=data.get("code"), rejected_token=used_token)
-            async with self._post(url, json=payload, headers=self._auth_headers()) as resp2:
-                if resp2.status != 200:
-                    raise HomGarApiError(f"controlWorkMode HTTP {resp2.status}")
-                data = await resp2.json()
+            data = await self._request_json(
+                "post", url, what="controlWorkMode", retry=False, json=payload, headers=self._auth_headers()
+            )
             _LOGGER.debug("API response (after reauth): control_work_mode data=%s", data)
 
         code = data.get("code")
@@ -722,10 +773,9 @@ class HomGarClient:
         _LOGGER.debug("API call: control_work_mode_dp URL=%s payload=%s", url, payload)
 
         used_token = self._token
-        async with self._post(url, json=payload, headers=headers) as resp:
-            if resp.status != 200:
-                raise HomGarApiError(f"controlWorkModeDP HTTP {resp.status}")
-            data = await resp.json()
+        data = await self._request_json(
+            "post", url, what="controlWorkModeDP", retry=False, json=payload, headers=headers
+        )
 
         _LOGGER.debug("API response: control_work_mode_dp data=%s", data)
 
@@ -739,10 +789,9 @@ class HomGarClient:
             headers = self._auth_headers()
             if hid is not None:
                 headers["hid"] = str(hid)
-            async with self._post(url, json=payload, headers=headers) as resp2:
-                if resp2.status != 200:
-                    raise HomGarApiError(f"controlWorkModeDP HTTP {resp2.status}")
-                data = await resp2.json()
+            data = await self._request_json(
+                "post", url, what="controlWorkModeDP", retry=False, json=payload, headers=headers
+            )
             _LOGGER.debug("API response (after reauth): control_work_mode_dp data=%s", data)
 
         code = data.get("code")

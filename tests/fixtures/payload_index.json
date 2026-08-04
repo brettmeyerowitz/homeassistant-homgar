@@ -9,6 +9,7 @@
     {"model": "HCS030FRF", "file": "payloads/HCS030FRF.json", "sample_count": 1},
     {"model": "HCS0528ARF", "file": "payloads/HCS0528ARF.json", "sample_count": 2},
     {"model": "HCS0565ARF", "file": "payloads/HCS0565ARF.json", "sample_count": 2},
+    {"model": "HTV103FRF", "file": "payloads/HTV103FRF.json", "sample_count": 3},
     {"model": "HTV113FRF", "file": "payloads/HTV113FRF.json", "sample_count": 8},
     {"model": "HTV213FRF", "file": "payloads/HTV213FRF.json", "sample_count": 10},
     {"model": "HTV245FRF", "file": "payloads/HTV245FRF.json", "sample_count": 6},

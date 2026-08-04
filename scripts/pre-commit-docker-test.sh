@@ -319,6 +319,26 @@ else
     exit 1
 fi
 
+# ── Test: transient-error retry/backoff (issue #82) ───────────────────────
+echo "🧪 Running transient-error retry tests..."
+docker cp tests/run_transient_retry_tests.py ha-test:/tmp/tests/run_transient_retry_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_transient_retry_tests.py; then
+    echo "✅ Transient-error retry tests passed"
+else
+    echo "❌ ERROR: Transient-error retry tests failed"
+    exit 1
+fi
+
+# ── Test: coordinator last-good retention (issue #82) ─────────────────────
+echo "🧪 Running coordinator retention tests..."
+docker cp tests/run_coordinator_retention_tests.py ha-test:/tmp/run_coordinator_retention_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/run_coordinator_retention_tests.py; then
+    echo "✅ Coordinator retention tests passed"
+else
+    echo "❌ ERROR: Coordinator retention tests failed"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null

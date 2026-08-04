@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.42] - 2026-08-04
+
+### 🐛 Bug Fixes
+- **Single-zone RF water timers (e.g. HTV103FRF) bridged through a weather-station gateway no longer report garbage** — when a one-zone valve like the RainPoint HTV103FRF is read through a Bresser HWS388WRF-V7 (and similar) gateway, the cloud returns a **legacy** payload (`1,-55,1;0,124,0,0,0,0`) rather than the usual TLV frame. The decoder only ran valve semantics for **multi-port** valves (`portNumber > 1`), so a single-port valve fell through to the generic weather-sensor parser. That parser reinterpreted the data array as air temperature/humidity/water fields, producing impossible readings: temperatures like `-16 °C` (a flow-rate value run through the °F→°C formula), humidity of `124%`/`480%` (the session-volume value), and a "Last Session Volume" of `60.00 L` that was actually the 600-second target duration. Single-port valves now decode with valve semantics on the legacy path too — `[0]` flow rate (÷10 L/min), `[1]` session volume (÷10 L), `[3]` start timestamp + `[4]` target duration → irrigation end time — and the phantom temperature/humidity entities are gone (multi-zone valves and the TLV path are unchanged). Thanks to [@mm060488](https://github.com/mm060488) for the app-verified payload decode. ([#81](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/81))
+- **Transient cloud hiccups no longer flip entities Unavailable or spam the log** — the RainPoint cloud (`region3.homgarus.com`) intermittently returns connection timeouts, DNS timeouts, and HTTP 503s while the phone app keeps working and the next poll succeeds on its own. Previously any of these raised straight through: there was **no** network-level or 5xx retry anywhere (the existing `1001/1004` re-auth path only triggers on a `200` with a token-error body, so it can't cover a 503 or a DNS timeout). The API layer now retries transient network errors and 5xx responses with a short backoff (1s/2s/4s, comfortably inside the 120s poll), giving up only after the retries are exhausted. And when an individual device-status fetch still fails, the coordinator now **retains that hub's last-good status** for the cycle instead of substituting an empty reading — so entities hold their previous values through a passing blip rather than dropping to Unavailable. Thanks to [@thomasgraf99](https://github.com/thomasgraf99) for the detailed multi-error report. ([#82](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82))
+
+### 🧪 Tests
+- `tests/fixtures/payloads/HTV103FRF.json` — three app-verified legacy payloads (idle, watering, post-session) pin the single-zone valve decode: no temperature/humidity, correct flow rate, `12.4 L` session volume, and a computed irrigation end time. Runs in the fixture corpus.
+- `tests/run_transient_retry_tests.py` (22 checks) — a 503, a connection error, and a timeout each retry once then succeed; a persistent 503 gives up as `HomGarTransientError` after a bounded number of attempts with non-decreasing backoff; a `404` raises immediately without retry; a clean `200` never retries or sleeps.
+- `tests/run_coordinator_retention_tests.py` (3 checks) — a failed status fetch retains the prior reading, falls back to empty only when there is no prior reading, and never lets an empty prior masquerade as good data.
+- All three are wired into the pre-commit Docker gate.
+
+---
+
 ## [3.0.41] - 2026-07-24
 
 ### 🐛 Bug Fixes
