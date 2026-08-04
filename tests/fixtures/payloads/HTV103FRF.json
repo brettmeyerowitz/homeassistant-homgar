@@ -1,0 +1,58 @@
+{
+  "model": "HTV103FRF",
+  "samples": [
+    {
+      "id": "idle-before-session",
+      "source_issue": 81,
+      "source_type": "reporter_app_verified",
+      "format": "legacy",
+      "note": "Single-zone RF timer bridged via a Bresser HWS388WRF-V7 gateway emits a legacy payload. data=[flow, session_vol, _, start_ts, target_dur, _]. Idle: flow 0, no active session.",
+      "payload": "1,-54,1;0,480,0,0,0,0",
+      "expected": {
+        "temperature": {"present": false},
+        "humidity": {"present": false},
+        "is_watering": false,
+        "valve_state": "idle",
+        "flow_rate": 0.0,
+        "last_water_volume": 48.0,
+        "current_session_duration": {"present": false},
+        "irrigation_end_time": {"present": false}
+      }
+    },
+    {
+      "id": "watering-10min",
+      "source_issue": 81,
+      "source_type": "reporter_app_verified",
+      "format": "legacy",
+      "note": "Active 10-minute session: flow 3.3 L/min, start ts + 600s target duration -> end time.",
+      "payload": "1,-56,1;33,124,0,1784996333,600,0",
+      "expected": {
+        "temperature": {"present": false},
+        "humidity": {"present": false},
+        "is_watering": true,
+        "valve_state": "irrigation",
+        "flow_rate": 3.3,
+        "last_water_volume": 12.4,
+        "current_session_duration": 600,
+        "irrigation_end_time": "2026-07-25T16:28:53+00:00"
+      }
+    },
+    {
+      "id": "closed-after-session-12L",
+      "source_issue": 81,
+      "source_type": "reporter_app_verified",
+      "format": "legacy",
+      "note": "Directly after the session: official app reports 12.4 L consumed (data[1]=124 -> /10).",
+      "payload": "1,-55,1;0,124,0,0,0,0",
+      "expected": {
+        "temperature": {"present": false},
+        "humidity": {"present": false},
+        "is_watering": false,
+        "valve_state": "idle",
+        "flow_rate": 0.0,
+        "last_water_volume": 12.4,
+        "irrigation_end_time": {"present": false}
+      }
+    }
+  ]
+}

@@ -86,6 +86,36 @@ def _hub_metadata_score(hub: dict) -> int:
     )
 
 
+# How many consecutive failed status fetches a hub may coast on last-good data
+# before it is finally blanked (→ entities Unavailable). At the 120s poll
+# interval this is ~10 minutes: long enough to ride out a passing cloud blip,
+# short enough that a genuine outage still surfaces instead of showing stale
+# "watering" state forever. See issue #82.
+_MAX_STALE_STATUS_POLLS = 5
+
+
+def _status_on_fetch_failure(
+    previous_status: dict | None, consecutive_misses: int, max_misses: int
+) -> dict:
+    """Choose the status to use for a hub whose status fetch failed this poll.
+
+    A transient failure (e.g. an exhausted 503/timeout) should not immediately
+    blank the hub: substituting an empty status list flips every entity on it
+    Unavailable for a cycle. Retain the previous poll's status so entities hold
+    their last-good values through a passing cloud blip — but only up to
+    ``max_misses`` consecutive failures, after which the hub is blanked so a
+    genuine, sustained outage stops being masked. Also blanks when there is no
+    prior reading. See issue #82.
+    """
+    if (
+        previous_status
+        and previous_status.get("subDeviceStatus")
+        and consecutive_misses <= max_misses
+    ):
+        return previous_status
+    return {"subDeviceStatus": []}
+
+
 def _hub_identity_keys(hub: dict) -> set[tuple[str, str]]:
     """Return stable cloud identity keys that can reveal duplicate hub rows."""
     keys: set[tuple[str, str]] = set()
@@ -112,6 +142,9 @@ class HomGarCoordinator(DataUpdateCoordinator):
         self._notified_unknown_models: set[str] = set()
         self._mqtt_diagnostics: dict[str, dict] = {}
         self._last_good_data: dict[str, dict] = {}
+        # Consecutive failed status fetches per hub mid, used to cap how long a
+        # hub may coast on retained last-good status. See _status_on_fetch_failure.
+        self._status_miss_count: dict[int, int] = {}
     
     async def handle_mqtt_update(self, data: dict) -> None:
         """Handle MQTT message for real-time valve updates."""
@@ -203,6 +236,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         mid = device_data["mid"]
                         status_array = device_data.get("subDeviceStatus", [])
                         status_by_mid[mid] = {"subDeviceStatus": status_array}
+                        self._status_miss_count.pop(mid, None)  # fresh reading clears the staleness cap
                         _LOGGER.debug("Fetched status for mid=%s using multipleDeviceStatus", mid)
                         
                 except Exception as e:
@@ -214,10 +248,25 @@ class HomGarCoordinator(DataUpdateCoordinator):
                         try:
                             status = await self._client.get_device_status(mid)
                             status_by_mid[mid] = status
+                            self._status_miss_count.pop(mid, None)  # fresh reading clears the staleness cap
                             _LOGGER.debug("Fetched status for mid=%s using individual call", mid)
                         except Exception as individual_e:
-                            _LOGGER.error("Failed to get status for mid=%s: %s", mid, individual_e)
-                            status_by_mid[mid] = {"subDeviceStatus": []}
+                            # Transient upstream failure: keep the hub's last-good
+                            # status instead of blanking its entities for a cycle,
+                            # but only up to _MAX_STALE_STATUS_POLLS so a sustained
+                            # outage still surfaces. See issue #82.
+                            misses = self._status_miss_count.get(mid, 0) + 1
+                            self._status_miss_count[mid] = misses
+                            prev = (self.data or {}).get("status", {}).get(mid)
+                            retained = _status_on_fetch_failure(prev, misses, _MAX_STALE_STATUS_POLLS)
+                            if retained.get("subDeviceStatus"):
+                                _LOGGER.warning(
+                                    "Failed to get status for mid=%s (miss %d/%d), retaining last-good reading: %s",
+                                    mid, misses, _MAX_STALE_STATUS_POLLS, individual_e,
+                                )
+                            else:
+                                _LOGGER.error("Failed to get status for mid=%s: %s", mid, individual_e)
+                            status_by_mid[mid] = retained
 
             for hub in hubs:
                 mid = hub["mid"]

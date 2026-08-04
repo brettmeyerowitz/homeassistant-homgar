@@ -512,6 +512,60 @@ def _decode_legacy_port_section(section: str, unit: str) -> dict:
     return result
 
 
+def _decode_legacy_single_zone_valve(section: str, unit: str) -> dict:
+    """Decode a single-zone RF water-timer legacy payload (e.g. HTV103FRF).
+
+    Bridged through a weather-station gateway (e.g. a Bresser HWS388WRF-V7),
+    single-port valves emit a *legacy* payload. Its data array is neither the
+    temperature/humidity layout of a weather sensor nor the work-mode section
+    layout of a multi-zone valve — routing it through either produces bogus
+    negative temperatures and >100% humidity. The real layout is:
+
+      [0] flow rate        tenths of L/min  (0 when the valve is closed)
+      [1] session volume   tenths of L      (last / current session)
+      [2] reserved
+      [3] start_ts         Unix epoch of the current/last irrigation start
+      [4] target_duration  seconds
+      [5] reserved
+
+    Reported and app-verified in issue #81.
+    """
+    result: dict = {}
+    fields = section.split(",")
+
+    def fi(idx):
+        try:
+            v = fields[idx].strip()
+            if "(" in v:
+                v = v[:v.index("(")]
+            return int(v)
+        except (IndexError, ValueError):
+            return None
+
+    flow_raw = fi(0)
+    vol_raw = fi(1)
+    start_ts = fi(3)
+    dur_s = fi(4)
+
+    watering = bool(flow_raw)
+    result["is_watering"] = watering
+    result["valve_state"] = "irrigation" if watering else "idle"
+
+    if flow_raw is not None:
+        result["flow_rate"] = round(flow_raw / 10.0, 1)
+    if vol_raw is not None:
+        result["last_water_volume"] = _vol(vol_raw, unit)
+    if dur_s:
+        result["current_session_duration"] = dur_s
+    if start_ts and start_ts > 1_000_000_000:
+        end_ts = start_ts + (dur_s or 0)
+        result["irrigation_end_time"] = datetime.fromtimestamp(
+            end_ts, tz=timezone.utc
+        ).isoformat()
+
+    return result
+
+
 def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
                           port_number: int = 1, model_str: str = "") -> dict:
     result: dict = {}
@@ -519,16 +573,20 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
     is_display_hub_v2 = model_str == "HWS019WRF-V2"
     port_sections = leg.get("_leg_port_sections", [])
     has_multi_port_sections = port_number > 1 and len(port_sections) >= port_number
+    # A single-port valve reporting a legacy payload (bridged via a weather
+    # gateway) must use valve semantics, not the weather/positional parser.
+    is_single_zone_valve = is_valve_model and port_number == 1
+    suppress_weather = (is_valve_model and has_multi_port_sections) or is_single_zone_valve
 
-    if not (is_valve_model and has_multi_port_sections) and "_leg_temp_raw" in leg:
+    if not suppress_weather and "_leg_temp_raw" in leg:
         v = _leg_temp_display(leg["_leg_temp_raw"], temp_unit)
         if v is not None:
             result["temperature"] = v
 
-    if not (is_valve_model and has_multi_port_sections) and "_leg_rh" in leg and leg["_leg_rh"] is not None:
+    if not suppress_weather and "_leg_rh" in leg and leg["_leg_rh"] is not None:
         result["humidity"] = leg["_leg_rh"]
 
-    if not (is_valve_model and has_multi_port_sections) and "_leg_pressure_raw" in leg and leg["_leg_pressure_raw"] is not None:
+    if not suppress_weather and "_leg_pressure_raw" in leg and leg["_leg_pressure_raw"] is not None:
         result["air_pressure"] = round(leg["_leg_pressure_raw"] / 10.0, 1)
 
     if "_leg_co2" in leg and leg["_leg_co2"] is not None:
@@ -554,7 +612,7 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
     if "_leg_illuminance_raw10" in leg and leg["_leg_illuminance_raw10"] is not None:
         result["illuminance"] = round(leg["_leg_illuminance_raw10"] / 10.0, 1)
 
-    if not (is_valve_model and has_multi_port_sections):
+    if not suppress_weather:
         if leg.get("_leg_cur_water_raw") is not None:
             result["current_water_volume"] = _vol(leg["_leg_cur_water_raw"], unit)
         if leg.get("_leg_last_usage_raw") is not None:
@@ -598,6 +656,9 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
             section = port_sections[p - 1]
             if section:
                 result[f"port_{p}"] = _decode_legacy_port_section(section, unit)
+
+    if is_single_zone_valve and port_sections:
+        result.update(_decode_legacy_single_zone_valve(port_sections[0], unit))
 
     return result
 
