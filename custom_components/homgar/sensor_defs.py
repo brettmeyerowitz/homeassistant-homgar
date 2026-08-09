@@ -21,7 +21,6 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfElectricPotential,
     PERCENTAGE,
-    CONCENTRATION_PARTS_PER_MILLION,
     LIGHT_LUX,
     UnitOfPressure,
     UnitOfVolume,
@@ -30,6 +29,25 @@ from homeassistant.const import (
     UnitOfTime,
     UnitOfSpeed,
 )
+
+# ppm unit constant across three live HA regimes (see issue #84):
+#   <= 2026.6  UnitOfRatio does not exist anywhere in homeassistant; the legacy
+#              constant is a plain Final and emits no warning.
+#      2026.7  UnitOfRatio added; CONCENTRATION_PARTS_PER_MILLION rebased onto
+#              it but still live and silent.
+#   >= 2026.8  CONCENTRATION_PARTS_PER_MILLION deprecated, removal in Core
+#              2027.8. This is where the reported warning comes from.
+# Import the enum where it exists and fall back otherwise — an unconditional
+# import would break setup on every core below 2026.7, which is a far worse
+# failure than the log line it fixes. Both resolve to "ppm", so entity state is
+# identical either way. Once the supported floor reaches 2026.7 this guard can
+# be dropped for a direct import; the legacy constant survives until 2027.8.
+try:  # HA >= 2026.7
+    from homeassistant.const import UnitOfRatio
+
+    PPM = UnitOfRatio.PARTS_PER_MILLION
+except ImportError:  # pragma: no cover - exercised on HA < 2026.7
+    from homeassistant.const import CONCENTRATION_PARTS_PER_MILLION as PPM
 
 
 @dataclass
@@ -64,11 +82,11 @@ FIELD_SENSOR_MAP: dict[str, SensorDef | None] = {
     ),
     "carbon_dioxide": SensorDef(
         device_class=SensorDeviceClass.CO2,
-        unit=CONCENTRATION_PARTS_PER_MILLION,
+        unit=PPM,
         state_class=SensorStateClass.MEASUREMENT,
     ),
     "carbon_dioxide_warning_threshold": SensorDef(
-        unit=CONCENTRATION_PARTS_PER_MILLION,
+        unit=PPM,
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:molecule-co2",
         name="CO2 Warning Threshold",

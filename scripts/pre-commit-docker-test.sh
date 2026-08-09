@@ -339,6 +339,16 @@ else
     exit 1
 fi
 
+# ── Test: ppm unit constant (issue #84) ───────────────────────────────────
+echo "🧪 Running ppm unit constant tests..."
+docker cp tests/run_ppm_unit_tests.py ha-test:/tmp/tests/run_ppm_unit_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_ppm_unit_tests.py; then
+    echo "✅ ppm unit constant tests passed"
+else
+    echo "❌ ERROR: ppm unit constant tests failed"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null
