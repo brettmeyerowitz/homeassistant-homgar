@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### 🐛 Bug Fixes
+- **A transient cloud blip no longer blanks home names or logs the same failure twice** — follow-up to the v3.0.42 work on [#82](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82). v3.0.42 added transient retry and last-good retention for per-hub *status*, but the `hid → homeName` map was still rebuilt from scratch every cycle and left **empty** when `list_homes` failed. That is not cosmetic: `homeName` falls back to `""` and `areas.py` skips area seeding entirely for a blank name, so a passing blip could quietly suppress it. The coordinator now retains the last-good map. Home names are effectively static, so unlike hub status this needs no staleness cap — a stale name cannot mask an outage the way a stuck "watering" state would. Separately, one failure used to produce **two** WARNING entries for the same event (the client's "failed after N attempts" plus the coordinator's "could not fetch home names"); the coordinator line now drops to debug whenever a cached map covers the failure, and warns only when there is genuinely no map to fall back on. Thanks to [@thomasgraf99](https://github.com/thomasgraf99) for the interim report with the paired log excerpts.
+
+### 🧪 Tests
+- `tests/run_home_name_retention_tests.py` (8 checks) — retention returns the cached map on failure and a *copy* of it (so a later cycle cannot mutate the retained one), falls back to an empty map when nothing is cached, and the warn/debug predicate stays quiet only when a cache actually covers the blip. Wired into the pre-commit Docker gate.
+
+---
+
 ## [3.0.42] - 2026-08-04
 
 ### 🐛 Bug Fixes

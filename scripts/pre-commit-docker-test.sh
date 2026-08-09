@@ -339,6 +339,16 @@ else
     exit 1
 fi
 
+# ── Test: home-name retention (issue #82 follow-up) ───────────────────────
+echo "🧪 Running home-name retention tests..."
+docker cp tests/run_home_name_retention_tests.py ha-test:/tmp/tests/run_home_name_retention_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_home_name_retention_tests.py; then
+    echo "✅ Home-name retention tests passed"
+else
+    echo "❌ ERROR: Home-name retention tests failed"
+    exit 1
+fi
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null
