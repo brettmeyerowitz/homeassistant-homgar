@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.0.43] - 2026-08-09
 
 ### 🐛 Bug Fixes
 - **No more `CONCENTRATION_PARTS_PER_MILLION` deprecation warning on HA 2026.8+** — Home Assistant 2026.8 deprecated `CONCENTRATION_PARTS_PER_MILLION` in favour of `UnitOfRatio.PARTS_PER_MILLION` (removal scheduled for Core 2027.8), and logged `The deprecated constant CONCENTRATION_PARTS_PER_MILLION was used from homgar` on every start. The CO2 sensor definitions now use the enum. Note the fix is **not** a straight swap: `UnitOfRatio` was only added in Core **2026.7**, so an unconditional import would raise `ImportError` and break setup outright on every core below that — a far worse failure than the log line. `sensor_defs.py` therefore imports the enum where it exists and falls back to the legacy constant otherwise, covering all three regimes in the wild (≤2026.6 no enum, 2026.7 enum but no deprecation, ≥2026.8 deprecation). Both resolve to `"ppm"`, so CO2 entity state and history are unchanged. Thanks to [@thomasgraf99](https://github.com/thomasgraf99) for the report. ([#84](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/84))
