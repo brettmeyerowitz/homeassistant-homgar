@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### 🐛 Bug Fixes
+- **A valve command that never reached the cloud now retries itself instead of failing in your face** — follow-up to [#82](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82). Write commands (`controlWorkMode`, `controlWorkModeDP`, `setDeviceStatus`) were given a blanket no-retry policy in v3.0.42, deliberately: "run for N seconds" is absolute, not idempotent, so resending it after the cloud already accepted it could re-actuate irrigation. The cost showed up in a live report — manually opening a valve failed outright with `controlWorkMode: Connection timeout to host`, and an immediate manual retry succeeded. That particular failure never needed to fail: aiohttp raises it when the TCP connect times out, **before any request bytes are sent**, so the cloud provably never saw the command and a resend cannot double-actuate. Writes now get one short resend for exactly those provably pre-send failures (connect timeout, DNS/refused connect) and continue to fail fast on everything ambiguous — read timeouts, server disconnects, and 5xx, all of which may have been delivered. The no-double-actuation guarantee is unchanged. Also fixed: the "failed after N attempts" log line reported the attempt ceiling rather than the attempts actually made, so a fail-fast write claimed more tries than it had. Thanks to [@thomasgraf99](https://github.com/thomasgraf99) for the live valve-control report.
+
+### 🧪 Tests
+- `tests/run_write_presend_retry_tests.py` (22 checks) — pins the pre-send classifier against aiohttp's real exception hierarchy, including the two traps that would silently re-admit unsafe retries: `ClientConnectorError` subclasses `ClientOSError` (which also covers mid-flight errors), and `ConnectionTimeoutError` and `SocketTimeoutError` share `ServerTimeoutError` as a base. Also covers the write path end to end: a connect timeout retries once and succeeds, a read timeout/disconnect/503 is never retried, and a persistent connect timeout stops after two attempts. Wired into the pre-commit Docker gate.
+
+---
+
 ## [3.0.42] - 2026-08-04
 
 ### 🐛 Bug Fixes
