@@ -154,12 +154,23 @@ curl -s https://homgar-telemetry-worker.<subdomain>.workers.dev/__probe | python
 
 Expected: JSON showing `cf_present`, the full `keys` list, and which `values` are non-null.
 
-**This output is the deliverable.** Save it verbatim:
+**This output is the deliverable — but REDACT IT BEFORE COMMITTING.**
+
+The raw response contains *your own* approximate location: postal code, and
+latitude/longitude to five decimal places. This repo is public, and its entire
+subject is not collecting location data. Committing your home coordinates into
+it would be self-defeating.
+
+Record which fields are **populated**, not what they said:
 
 ```bash
-curl -s https://homgar-telemetry-worker.<subdomain>.workers.dev/__probe \
-  > /Users/brett/Code/homgar-telemetry-worker/docs/cf-probe-result.json
+mkdir -p /Users/brett/Code/homgar-telemetry-worker/docs
+# Inspect the raw output in the terminal, then hand-write a redacted record
+# to docs/cf-probe-result.json listing each field as POPULATED / ABSENT plus
+# the shape of the value (e.g. "5 decimal places"), with no real values.
 ```
+
+Never pipe the raw probe response straight into a file that will be committed.
 
 - [ ] **Step 5: Correct the spec's field table to match observed reality**
 

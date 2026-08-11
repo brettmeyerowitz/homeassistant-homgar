@@ -255,20 +255,24 @@ README and linked from the opt-in notification.
 
 ### What is available to any Cloudflare Worker
 
-> **Must be verified on the deployed Worker before the README ships.** This table
-> is from Cloudflare's documentation, which lists these under "All plans have
-> access to" (geolocation became free for all Workers developers in April 2021;
-> earlier, only `asn` and `colo` were available on the free plan). However,
-> `request.cf` is **not populated in `wrangler dev` local mode**, nor in the
-> dashboard editor or Playground preview — the fields are computed on the edge.
-> Local testing therefore shows only `CF-IPCountry`, which is easily mistaken for
-> a plan limitation.
+> **VERIFIED 2026-08-11** against the deployed Worker on the Workers free plan.
+> Result: `cf_present: true` with **every** geolocation field populated —
+> `country`, `city`, `region`, `regionCode`, `postalCode`, `latitude`,
+> `longitude`, `timezone`, `colo`, `continent`, `asn`, `asOrganization`. The
+> `CF-IPCountry` header is present as well. Redacted record:
+> `homgar-telemetry-worker/docs/cf-probe-result.json`.
 >
-> **Verification step (first task of the Worker build):** deploy a temporary
-> route returning `Object.keys(request.cf)` and the geo values, call it from a
-> real client, and correct this table to match observed reality. Publishing a
-> claim that overstates what Cloudflare exposes would undermine the very section
-> it appears in.
+> An earlier local observation that only `CF-IPCountry` arrives was **local-mode
+> behaviour, not a plan limitation** — `request.cf` is not populated by
+> `wrangler dev`, nor in the dashboard editor or Playground preview. The fields
+> are computed on the edge and only appear on a deployed Worker.
+>
+> Two details worth carrying into the README. `latitude`/`longitude` come back
+> with **five decimal places** — city-level, but far more precise than most
+> people expect from "an IP address". And `colo` reported a *different city* from
+> `city`: it is the nearest datacenter rather than the visitor's location, so it
+> is coarser, but it is still a location signal and remains on the never-read
+> list.
 
 `request.cf` carries, among other fields:
 
