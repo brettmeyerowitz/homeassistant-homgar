@@ -470,7 +470,18 @@ class HomGarCoordinator(DataUpdateCoordinator):
             
             # Update MQTT diagnostics
             self._update_mqtt_diagnostics(hubs)
-            
+
+            # Opt-in telemetry. Off by default; never raises. Placed last so a
+            # telemetry problem cannot affect the data this cycle produced.
+            from .telemetry import async_maybe_ping
+            from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+            result_for_telemetry = {"hubs": hubs}
+            await async_maybe_ping(
+                self.hass, self._entry, result_for_telemetry,
+                async_get_clientsession(self.hass),
+            )
+
             return {
                 "hubs": hubs,
                 "status": status_by_mid,

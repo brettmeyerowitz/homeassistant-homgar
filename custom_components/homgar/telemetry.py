@@ -107,3 +107,94 @@ def should_ping(
     if last_ping_at > now:
         return False
     return now - last_ping_at >= timedelta(hours=interval_hours)
+
+
+async def async_maybe_ping(hass, entry, coordinator_data, session) -> bool:
+    """Send one telemetry ping if enabled and due. Returns True if sent.
+
+    This function must NEVER raise. It runs inside the coordinator's poll
+    cycle, and a user's irrigation must not depend on a stats endpoint being
+    reachable. Every failure path is swallowed at debug level.
+    """
+    from uuid import uuid4
+
+    from .const import (
+        CONF_ANON_ID,
+        CONF_LAST_PING_AT,
+        CONF_TELEMETRY_COUNTRY,
+        CONF_TELEMETRY_MODELS,
+    )
+
+    try:
+        options = dict(getattr(entry, "options", {}) or {})
+        if not is_telemetry_enabled(options):
+            return False
+
+        data = dict(getattr(entry, "data", {}) or {})
+        now = datetime.now(timezone.utc)
+        if not should_ping(data.get(CONF_LAST_PING_AT), now):
+            return False
+
+        anon_id = data.get(CONF_ANON_ID)
+        if not anon_id:
+            anon_id = str(uuid4())
+            hass.config_entries.async_update_entry(
+                entry, data={**data, CONF_ANON_ID: anon_id}
+            )
+            data = {**data, CONF_ANON_ID: anon_id}
+
+        share_country = options.get(CONF_TELEMETRY_COUNTRY) is True
+        share_models = options.get(CONF_TELEMETRY_MODELS) is True
+
+        payload = build_payload(
+            anon_id,
+            await _async_integration_version(hass),
+            _hass_version(),
+            share_country,
+            share_models,
+            models_from_coordinator_data(coordinator_data) if share_models else None,
+        )
+
+        import aiohttp
+
+        async with session.post(
+            TELEMETRY_URL,
+            json=payload,
+            timeout=aiohttp.ClientTimeout(total=PING_TIMEOUT_SECONDS),
+        ) as resp:
+            if resp.status != 204:
+                _LOGGER.debug("Telemetry ping returned HTTP %s", resp.status)
+                return False
+
+        # Only stamp on success, so a failed ping retries on the next cycle
+        # rather than being silently skipped for a day.
+        hass.config_entries.async_update_entry(
+            entry, data={**data, CONF_LAST_PING_AT: now.isoformat()}
+        )
+        _LOGGER.debug("Telemetry ping sent")
+        return True
+    except Exception as err:  # noqa: BLE001 - telemetry must never break setup
+        _LOGGER.debug("Telemetry ping failed (ignored): %s", err)
+        return False
+
+
+def _hass_version() -> str:
+    try:
+        from homeassistant.const import __version__
+
+        return str(__version__)
+    except Exception:  # noqa: BLE001
+        return "unknown"
+
+
+async def _async_integration_version(hass) -> str:
+    """Read the version from manifest.json rather than duplicating it."""
+    try:
+        from homeassistant.loader import async_get_integration
+
+        from .const import DOMAIN
+
+        integration = await async_get_integration(hass, DOMAIN)
+        return str(integration.version)
+    except Exception:  # noqa: BLE001
+        return "unknown"
