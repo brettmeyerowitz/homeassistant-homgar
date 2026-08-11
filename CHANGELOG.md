@@ -2,13 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] - 3.0.43
+## [Unreleased]
 
 ### 🐛 Bug Fixes
-- **No more `CONCENTRATION_PARTS_PER_MILLION` deprecation warning on HA 2026.8+** — Home Assistant 2026.8 deprecated `CONCENTRATION_PARTS_PER_MILLION` in favour of `UnitOfRatio.PARTS_PER_MILLION` (removal scheduled for Core 2027.8), and logged `The deprecated constant CONCENTRATION_PARTS_PER_MILLION was used from homgar` on every start. The CO2 sensor definitions now use the enum. Note the fix is **not** a straight swap: `UnitOfRatio` was only added in Core **2026.7**, so an unconditional import would raise `ImportError` and break setup outright on every core below that — a far worse failure than the log line. `sensor_defs.py` therefore imports the enum where it exists and falls back to the legacy constant otherwise, covering all three regimes in the wild (≤2026.6 no enum, 2026.7 enum but no deprecation, ≥2026.8 deprecation). Both resolve to `"ppm"`, so CO2 entity state and history are unchanged. Thanks to [@thomasgraf99](https://github.com/thomasgraf99) for the report. ([#84](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/84))
+- **A transient cloud blip no longer blanks home names or logs the same failure twice** — follow-up to the v3.0.42 work on [#82](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82). v3.0.42 added transient retry and last-good retention for per-hub *status*, but the `hid → homeName` map was still rebuilt from scratch every cycle and left **empty** when `list_homes` failed. That is not cosmetic: `homeName` falls back to `""` and `areas.py` skips area seeding entirely for a blank name, so a passing blip could quietly suppress it. The coordinator now retains the last-good map. Home names are effectively static, so unlike hub status this needs no staleness cap — a stale name cannot mask an outage the way a stuck "watering" state would. Separately, one failure used to produce **two** WARNING entries for the same event (the client's "failed after N attempts" plus the coordinator's "could not fetch home names"); the coordinator line now drops to debug whenever a cached map covers the failure, and warns only when there is genuinely no map to fall back on. Thanks to [@thomasgraf99](https://github.com/thomasgraf99) for the interim report with the paired log excerpts.
 
 ### 🧪 Tests
-- `tests/run_ppm_unit_tests.py` (11 checks) — pins both import branches by injecting and removing `UnitOfRatio` on `homeassistant.const` and reloading the module: the modern path resolves to the enum member and emits no deprecation warning, the legacy path falls back without `ImportError`, and both CO2 sensor defs stay `"ppm"` either way. Wired into the pre-commit Docker gate.
+- `tests/run_home_name_retention_tests.py` (8 checks) — retention returns the cached map on failure and a *copy* of it (so a later cycle cannot mutate the retained one), falls back to an empty map when nothing is cached, and the warn/debug predicate stays quiet only when a cache actually covers the blip. Wired into the pre-commit Docker gate.
 
 ---
 

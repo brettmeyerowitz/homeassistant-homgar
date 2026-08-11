@@ -339,13 +339,13 @@ else
     exit 1
 fi
 
-# ── Test: ppm unit constant (issue #84) ───────────────────────────────────
-echo "🧪 Running ppm unit constant tests..."
-docker cp tests/run_ppm_unit_tests.py ha-test:/tmp/tests/run_ppm_unit_tests.py > /dev/null
-if docker exec ha-test python3 /tmp/tests/run_ppm_unit_tests.py; then
-    echo "✅ ppm unit constant tests passed"
+# ── Test: home-name retention (issue #82 follow-up) ───────────────────────
+echo "🧪 Running home-name retention tests..."
+docker cp tests/run_home_name_retention_tests.py ha-test:/tmp/tests/run_home_name_retention_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_home_name_retention_tests.py; then
+    echo "✅ Home-name retention tests passed"
 else
-    echo "❌ ERROR: ppm unit constant tests failed"
+    echo "❌ ERROR: Home-name retention tests failed"
     exit 1
 fi
 
