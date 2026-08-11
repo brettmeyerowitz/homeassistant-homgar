@@ -339,13 +339,13 @@ else
     exit 1
 fi
 
-# ── Test: home-name retention (issue #82 follow-up) ───────────────────────
-echo "🧪 Running home-name retention tests..."
-docker cp tests/run_home_name_retention_tests.py ha-test:/tmp/tests/run_home_name_retention_tests.py > /dev/null
-if docker exec ha-test python3 /tmp/tests/run_home_name_retention_tests.py; then
-    echo "✅ Home-name retention tests passed"
+# ── Test: write-path pre-send retry (issue #82 follow-up) ─────────────────
+echo "🧪 Running write-path pre-send retry tests..."
+docker cp tests/run_write_presend_retry_tests.py ha-test:/tmp/tests/run_write_presend_retry_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_write_presend_retry_tests.py; then
+    echo "✅ Write-path pre-send retry tests passed"
 else
-    echo "❌ ERROR: Home-name retention tests failed"
+    echo "❌ ERROR: Write-path pre-send retry tests failed"
     exit 1
 fi
 

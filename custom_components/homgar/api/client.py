@@ -40,6 +40,45 @@ _TRANSIENT_RETRY_BACKOFF = (1, 2, 4)  # seconds between attempts (3 retries)
 # and server timeouts subclass asyncio.TimeoutError.
 _TRANSIENT_NETWORK_ERRORS = (aiohttp.ClientError, asyncio.TimeoutError)
 
+# Write commands get one short resend, and only for provably pre-send failures.
+# A user is waiting on a button press, so this stays deliberately small. See
+# _is_pre_send_error and issue #82.
+_WRITE_PRE_SEND_RETRY_BACKOFF = (1,)
+
+# Failures that prove the request never left the client, so resending a
+# non-idempotent write cannot double-actuate:
+#   * ConnectionTimeoutError — aiohttp raises this when connector.connect()
+#     times out, before any request bytes are written.
+#   * ClientConnectorError — DNS failure or refused/unreachable TCP connect.
+# Deliberately narrow. Two nearby classes must NOT be included:
+#   * SocketTimeoutError shares ServerTimeoutError as a base but fires while
+#     reading the response, i.e. after the request was sent.
+#   * ClientOSError is ClientConnectorError's own base and also covers
+#     mid-flight socket errors, so matching on it would admit post-send cases.
+# ConnectionTimeoutError arrived in aiohttp 3.10; on older versions a connect
+# timeout is a plain ServerTimeoutError, indistinguishable from a read timeout,
+# so we fall back to the connector-error case only — fewer retries, never an
+# unsafe one.
+# Both names are resolved defensively: an absent one simply drops out of the
+# tuple, which costs a retry opportunity but can never make an unsafe one. An
+# empty tuple degrades cleanly to the old fail-fast-on-everything behaviour.
+_PRE_SEND_ERRORS = tuple(
+    err for err in (
+        getattr(aiohttp, "ConnectionTimeoutError", None),
+        getattr(aiohttp, "ClientConnectorError", None),
+    ) if isinstance(err, type) and issubclass(err, BaseException)
+)
+
+
+def _is_pre_send_error(err: BaseException) -> bool:
+    """Whether ``err`` proves the request never reached the server.
+
+    Used to decide if a non-idempotent write may be safely resent. Anything
+    ambiguous must answer False: failing a valve command is recoverable by the
+    user, re-actuating irrigation behind their back is not.
+    """
+    return isinstance(err, _PRE_SEND_ERRORS)
+
 
 class HomGarApiError(Exception):
     pass
@@ -122,17 +161,26 @@ class HomGarClient:
         ``retry`` is false for write/control endpoints (valve open/close, set
         state): those commands are absolute ("run for N seconds"), not
         idempotent, so a post-send disconnect must NOT auto-resend and risk
-        re-actuating irrigation. They fail fast; a transient failure still
-        raises ``HomGarTransientError`` immediately.
+        re-actuating irrigation.
+
+        Those endpoints are not entirely un-retried, though. A failure that
+        proves the request never left the client (see ``_is_pre_send_error``)
+        cannot have actuated anything, so it gets one short resend from
+        ``_WRITE_PRE_SEND_RETRY_BACKOFF`` — that turns a connect timeout from a
+        dead valve command the user must repeat by hand into a self-healing
+        one, with the no-double-actuation guarantee intact. Every ambiguous
+        failure (read timeout, disconnect, 5xx) still fails fast.
 
         Any other non-200 (e.g. 4xx) raises ``HomGarApiError`` immediately and is
         never retried. This centralises the timeout + retry policy; callers keep
         their own ``code``/token-reauth handling on the returned dict.
         """
         opener = self._get if method == "get" else self._post
-        attempts = len(_TRANSIENT_RETRY_BACKOFF) + 1 if retry else 1
+        backoff = _TRANSIENT_RETRY_BACKOFF if retry else _WRITE_PRE_SEND_RETRY_BACKOFF
+        attempts = len(backoff) + 1
         last_error: HomGarTransientError | None = None
         for attempt in range(attempts):
+            pre_send = False
             try:
                 async with opener(url, **kwargs) as resp:
                     if resp.status >= 500:
@@ -141,17 +189,25 @@ class HomGarClient:
                         raise HomGarApiError(f"{what} HTTP {resp.status}")
                     return await resp.json()
             except _TRANSIENT_NETWORK_ERRORS as err:
+                pre_send = _is_pre_send_error(err)
                 last_error = HomGarTransientError(f"{what}: {err}")
             except HomGarTransientError as err:
+                # A 5xx means the request was delivered and answered, so it is
+                # never pre-send.
                 last_error = err
+            made = attempt + 1
+            if not retry and not pre_send:
+                break
             if attempt + 1 < attempts:
-                delay = _TRANSIENT_RETRY_BACKOFF[attempt]
+                delay = backoff[attempt]
                 _LOGGER.debug(
                     "%s transient failure (attempt %d/%d), retrying in %ss: %s",
                     what, attempt + 1, attempts, delay, last_error,
                 )
                 await asyncio.sleep(delay)
-        _LOGGER.warning("%s failed after %d attempts: %s", what, attempts, last_error)
+        # Report attempts actually made, not the ceiling — a write that failed
+        # fast on an ambiguous error made one, not len(backoff) + 1.
+        _LOGGER.warning("%s failed after %d attempts: %s", what, made, last_error)
         raise last_error
 
     # --- token state helpers ---
