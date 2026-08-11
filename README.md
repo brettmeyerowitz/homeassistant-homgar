@@ -170,6 +170,22 @@ This gives you a simple "smart irrigation" control panel directly in Home Assist
 
 ---
 
+## Anonymous usage data (optional)
+
+This integration can optionally send an anonymous telemetry ping, **off by default**. Custom HACS integrations don't report to Home Assistant's own analytics, and HACS doesn't publish install counts, so there's currently no way to know how many people use this or which Home Assistant versions are worth supporting — this exists to answer that, nothing more.
+
+Enable it under **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options**. There are three independent toggles, all off unless you turn them on:
+
+- **Share anonymous usage data** — the master switch. With this off, no request is ever sent, regardless of the other two toggles. With it on, a ping (at most once per day, per account) sends a random ID unrelated to your account plus the Home Assistant and integration version numbers. Your IP address is never stored.
+- **Include my country** — the client never sends your location; the worker derives your country from the request at the edge and stores it only as a monthly aggregate count that cannot be traced back to your install.
+- **Include my device models** — sends just the RainPoint/HomGar model names you own (e.g. `HTV103FRF`), stored as monthly counts, never serial numbers or device names.
+
+If you upgrade from an earlier version, you'll see a one-time notification explaining this. Answering it any way — including declining — records your choice and it will not ask again.
+
+The receiving worker is open source: [homgar-telemetry-worker](https://github.com/brettmeyerowitz/homgar-telemetry-worker). Its README has the complete disclosure, including exactly what Cloudflare's edge sees about a request before any of the worker's code runs, and the retention policy (activity dates only, kept 13 months; inactive installs purged after 90 days; aggregate counts kept indefinitely).
+
+---
+
 ## 💬 Community & Support
 
 **[Join the Discord server](https://discord.gg/TtTvz9hWu5)** — the best place to get help, share your setup, discuss new device support, and chat with other HomGar/RainPoint users.

@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.44] - 2026-08-11
+
+### ✨ Features
+- **Optional, anonymous usage telemetry — off by default** — custom HACS integrations never report to Home Assistant's own analytics, and HACS itself publishes no install counts, so there has been no way to know how many people actually run this integration or which Home Assistant versions matter for support. This release adds a telemetry ping to answer that, gated behind three independent toggles under **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options**, all of them **off** unless you turn them on: a master switch, plus separate switches for sharing your country and your device models. With the master switch off, no request is ever made — the code path that builds and sends the payload is skipped entirely, not merely told to omit fields. Existing installs get a **one-time** persistent notification explaining the choice; answering it any way, including declining, records that answer and the notification never reappears — there is no re-prompt loop.
+  - **What is sent, precisely**: a random `anon_id` (a UUID4 generated locally, with no relationship to your account, email, or any device identifier), the integration version, and the Home Assistant version. That is the entire payload with both sub-toggles off. Enabling "include my country" adds nothing to the payload itself — the client never transmits location; the Cloudflare worker derives the country from the request at the edge and stores it only as a monthly aggregate count with no path back to an individual install. Enabling "include my device models" adds the distinct RainPoint/HomGar model names you own (never serial numbers, addresses, device names, or home IDs), also stored as monthly counts. Your IP address is never stored.
+  - **Frequency and failure behaviour**: at most one ping per day per config entry, piggybacked on the existing coordinator poll cycle rather than its own schedule. A failed or unreachable ping is swallowed silently and retried on the next cycle — telemetry can never raise, block setup, or affect your irrigation.
+  - **Retention — read this before opting in**: the worker stores pings in Cloudflare D1. Activity is recorded as **dates only, never times or payload contents**, and kept for **13 months**; installs that stop pinging are purged after 90 days of inactivity; the aggregate country/model counts are kept indefinitely since they cannot be traced back to any install. The worker is open source at [homgar-telemetry-worker](https://github.com/brettmeyerowitz/homgar-telemetry-worker) (repository may still be private/unpushed at release time — the link is the canonical disclosure location once it is), and its README documents this in full, including exactly what Cloudflare's edge sees about the request before any of our code runs.
+  - See the new **"Anonymous usage data (optional)"** section in the [README](README.md#anonymous-usage-data-optional) for the user-facing summary.
+
+### 🧪 Tests
+- `tests/run_telemetry_payload_tests.py` (31 checks) — payload construction never includes `models` unless `share_models` is true, an explicit allow-list check that no location-shaped field (`country`, `city`, `latitude`, `postal_code`, `ip`, `email`, `home_name`, …) can ever appear in the payload, the daily-guard clock math (never pinged, 1h, 23h59m, 24h01m, corrupt timestamp, future timestamp/clock-skew), and that the master switch alone gates sending — sub-toggles enabled without it never do.
+- `tests/run_telemetry_send_tests.py` (16 checks) — end-to-end send path: disabled/not-due paths make zero HTTP calls, a due+enabled ping posts the exact expected payload to the real endpoint and stamps `last_ping_at` only on a `204`, the `anon_id` is a genuine uuid4 generated on first send, a non-204 response and every exception class (connection error, timeout, unexpected) both leave `last_ping_at` untouched (so a failure retries next cycle) and are swallowed rather than raised.
+- `tests/run_telemetry_optin_tests.py` (7 checks) — the persistent notification fires exactly once when no choice has been recorded, discloses that it's optional/off-by-default/links to settings/mentions what's included, and never fires again once any choice (including "off") is present in options.
+- All three suites are wired into the pre-commit Docker gate.
+
+---
+
 ## [3.0.43] - 2026-08-11
 
 ### 🐛 Bug Fixes
