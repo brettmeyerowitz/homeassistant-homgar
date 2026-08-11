@@ -273,6 +273,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             await async_rehome_multi_zone_entities(hass, entry, coordinator)
             seed_device_areas(hass, entry, coordinator, is_first_setup)
             _LOGGER.info("HomGar [%s]: Device layout finalized", entry.title)
+
+            from .telemetry import async_prompt_for_telemetry_once
+
+            await async_prompt_for_telemetry_once(hass, entry)
         except Exception as ex:  # noqa: BLE001
             _LOGGER.warning("HomGar [%s]: Device layout finalization failed: %s", entry.title, ex, exc_info=True)
 

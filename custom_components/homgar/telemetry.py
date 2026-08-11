@@ -178,6 +178,56 @@ async def async_maybe_ping(hass, entry, coordinator_data, session) -> bool:
         return False
 
 
+def _async_create_notification(hass, message, title=None, notification_id=None):
+    """Indirection so tests can capture the notification without a real hass."""
+    from homeassistant.components import persistent_notification
+
+    persistent_notification.async_create(
+        hass, message, title=title, notification_id=notification_id
+    )
+
+
+TELEMETRY_NOTIFICATION_ID = "homgar_telemetry_optin"
+
+_OPTIN_MESSAGE = (
+    "This integration can optionally report **anonymous** usage data, so I can "
+    "see how many people use it and roughly where in the world they are. It is "
+    "**off by default** and entirely your choice.\n\n"
+    "If you switch it on you choose separately whether to include your country "
+    "and your device models. The base data is an anonymous random ID plus the "
+    "Home Assistant and integration version numbers.\n\n"
+    "No account details, no location beyond an optional country, and your IP is "
+    "never stored.\n\n"
+    "[Open settings](/config/integrations/integration/homgar) — or ignore this; "
+    "it will not ask again."
+)
+
+
+async def async_prompt_for_telemetry_once(hass, entry) -> bool:
+    """Show the opt-in prompt if the user has never answered. Returns True if
+    shown.
+
+    Fires only when no choice exists. Recording any answer — including "no" —
+    stops it permanently.
+    """
+    from .const import CONF_TELEMETRY_CHOICE
+
+    try:
+        options = dict(getattr(entry, "options", {}) or {})
+        if CONF_TELEMETRY_CHOICE in options:
+            return False
+        _async_create_notification(
+            hass,
+            _OPTIN_MESSAGE,
+            title="HomGar/RainPoint: optional anonymous usage data",
+            notification_id=TELEMETRY_NOTIFICATION_ID,
+        )
+        return True
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Telemetry opt-in prompt failed (ignored): %s", err)
+        return False
+
+
 def _hass_version() -> str:
     try:
         from homeassistant.const import __version__

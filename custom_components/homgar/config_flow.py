@@ -23,6 +23,9 @@ from .const import (
     CONF_APP_TYPE,
     CONF_GROUP_MULTI_ZONE_DEVICES,
     CONF_VALVE_DURATION_UNIT,
+    CONF_TELEMETRY_CHOICE,
+    CONF_TELEMETRY_COUNTRY,
+    CONF_TELEMETRY_MODELS,
     APP_TYPE_HOMGAR,
     APP_TYPE_RAINPOINT,
     DEFAULT_VALVE_DURATION_UNIT,
@@ -351,6 +354,14 @@ class HomGarOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Manage integration options."""
         if user_input is not None:
+            from homeassistant.components import persistent_notification
+
+            from .telemetry import TELEMETRY_NOTIFICATION_ID
+
+            persistent_notification.async_dismiss(
+                self.hass, TELEMETRY_NOTIFICATION_ID
+            )
+
             return self.async_create_entry(title="", data=user_input)
 
         data_schema = vol.Schema(
@@ -369,6 +380,18 @@ class HomGarOptionsFlow(config_entries.OptionsFlow):
                     VALVE_DURATION_UNIT_MINUTES: "Minutes",
                     VALVE_DURATION_UNIT_SECONDS: "Seconds",
                 }),
+                vol.Optional(
+                    CONF_TELEMETRY_CHOICE,
+                    default=self._config_entry.options.get(CONF_TELEMETRY_CHOICE, False),
+                ): bool,
+                vol.Optional(
+                    CONF_TELEMETRY_COUNTRY,
+                    default=self._config_entry.options.get(CONF_TELEMETRY_COUNTRY, False),
+                ): bool,
+                vol.Optional(
+                    CONF_TELEMETRY_MODELS,
+                    default=self._config_entry.options.get(CONF_TELEMETRY_MODELS, False),
+                ): bool,
             }
         )
 

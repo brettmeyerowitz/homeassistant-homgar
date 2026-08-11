@@ -369,6 +369,18 @@ else
     exit 1
 fi
 
+# ── Test: opt-in telemetry (v3.0.44) ──────────────────────────────────────
+for suite in run_telemetry_payload_tests run_telemetry_send_tests run_telemetry_optin_tests; do
+    echo "🧪 Running ${suite}..."
+    docker cp "tests/${suite}.py" "ha-test:/tmp/tests/${suite}.py" > /dev/null
+    if docker exec ha-test python3 "/tmp/tests/${suite}.py"; then
+        echo "✅ ${suite} passed"
+    else
+        echo "❌ ERROR: ${suite} failed"
+        exit 1
+    fi
+done
+
 # ── Test: decoder regression suite (scripts/test_decoders.py) ─────────────
 echo "🧪 Running decoder regression suite..."
 docker cp scripts/test_decoders.py ha-test:/tmp/test_decoders.py > /dev/null

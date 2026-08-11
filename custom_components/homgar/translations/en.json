@@ -65,7 +65,10 @@
                 "description": "Adjust how HomGar/RainPoint devices are presented in Home Assistant.",
                 "data": {
                     "group_multi_zone_devices": "Create a separate Home Assistant device for each controller zone",
-                    "valve_duration_unit": "Valve duration control unit"
+                    "valve_duration_unit": "Valve duration control unit",
+                    "telemetry_choice": "Share anonymous usage data (off by default)",
+                    "telemetry_share_country": "  └ Include my country",
+                    "telemetry_share_models": "  └ Include my device models"
                 },
                 "data_description": {
                     "group_multi_zone_devices": "When enabled, per-zone valves, durations, and per-port sensors are grouped under child devices. Shared diagnostics stay on the parent controller device.",
