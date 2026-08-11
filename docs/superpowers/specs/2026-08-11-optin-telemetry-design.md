@@ -232,12 +232,80 @@ and verifiable because the Worker is open source. Six rules:
 6. The Worker README states the schema verbatim and says plainly: *Cloudflare
    terminates the connection and therefore sees your IP address, as any web
    server does — we never read, log, or store it.* The same disclosure appears in
-   the opt-in notification text, and covers the two things a reader would not
+   the opt-in notification text, and covers the three things a reader would not
    otherwise guess: that the HA and integration versions are part of the base
-   payload, and that **the dates on which an install was active are retained for
-   13 months** (dates only, never times).
+   payload; that **the dates on which an install was active are retained for 13
+   months** (dates only, never times); and that **Cloudflare derives geolocation
+   at the edge automatically, before our code runs**, with a link to a
+   third-party demonstration (see *Transparency* below).
 7. `day` is derived from the **worker's** clock, never from client input, so a
    malformed or hostile payload cannot write arbitrary history.
+
+## Transparency: what Cloudflare provides before our code runs
+
+There is a non-obvious scenario for anyone who declines location sharing. They
+will reasonably assume that no location data exists anywhere in the transaction.
+In fact Cloudflare computes geolocation at the edge **automatically, before our
+Worker executes**, and hands it to any Worker as `request.cf`. We do not request
+it, cannot switch it off, and it exists whether or not the user opted in.
+
+Hiding that would be the kind of technically-true omission that destroys trust
+when someone eventually discovers it. It must be documented plainly, in the
+README and linked from the opt-in notification.
+
+### What is available to any Cloudflare Worker
+
+`request.cf` carries, among other fields:
+
+| Field | Example | Note |
+|---|---|---|
+| `country` | `"ZA"` | The only field we ever read, and only on opt-in |
+| `city` | `"Cape Town"` | Never read |
+| `region` / `regionCode` | `"Western Cape"` / `"WC"` | Never read |
+| `postalCode` | `"8001"` | Never read |
+| `latitude` / `longitude` | `"-33.92500"` / `"18.42410"` | City-level precision. Never read |
+| `timezone` | `"Africa/Johannesburg"` | Never read — an indirect location signal |
+| `colo` | `"CPT"` | Datacenter code, a coarse location hint. Never read |
+| `asn` / `asOrganization` | `"AS37457"` / ISP name | Never read |
+
+The latitude/longitude pair is the one most people do not expect. It is
+city-level, not GPS, but it is precise enough to matter and it is present on
+every request to every Cloudflare Worker on the internet.
+
+### Letting users verify this themselves, on someone else's site
+
+The disclosure must be demonstrable without asking anyone to trust us. Cloudflare
+exposes a `/cdn-cgi/trace` endpoint on its **own** domain:
+
+```
+https://www.cloudflare.com/cdn-cgi/trace
+```
+
+Opening it in a browser returns something like:
+
+```
+fl=113f99
+h=www.cloudflare.com
+ip=<the visitor's IP>
+ts=1786...
+visit_scheme=https
+uag=Mozilla/5.0 ...
+colo=CPT          ← nearest Cloudflare datacenter
+loc=ZA            ← country, derived at the edge
+tls=TLSv1.3
+warp=off
+```
+
+This is Cloudflare's own site, unaffiliated with this project, so it proves the
+behaviour belongs to the network rather than to us. The same endpoint exists on
+essentially every Cloudflare-fronted site, so users can try it on unrelated
+domains and see identical output — which makes the wider point that this is
+ordinary web infrastructure, not something this integration introduced.
+
+The README will link this and say: *this is what any website behind Cloudflare
+already knows about you, including this one, whether or not you enable telemetry.
+What we choose to store is the narrow question — and the answer is in the schema
+above.*
 
 ## Opt-in UX
 
@@ -321,6 +389,11 @@ Per repo convention, standalone runners in the `ha-test` container, wired into
   `^\d{4}-\d{2}-\d{2}$` and that no column holds a timestamp
 - **client cannot forge history** — a payload carrying its own `day`/`ts` is
   ignored in favour of the worker clock
+- **no geo field other than `country` is ever read** — the mock `cf` object
+  carries `city`, `region`, `postalCode`, `latitude`, `longitude`, `timezone`,
+  `colo`, `asn` and `asOrganization`, and the test asserts none of them reaches
+  any statement or response. This is the regression guard for the transparency
+  claim: the disclosure says we read exactly one field, so a test must enforce it
 - `/stats` rejects requests without a valid token
 - `/ping` returns 204 and no body
 
