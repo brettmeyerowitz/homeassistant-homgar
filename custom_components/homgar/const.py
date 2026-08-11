@@ -9,6 +9,17 @@ CONF_APP_TYPE = "app_type"  # "homgar" or "rainpoint"
 CONF_GROUP_MULTI_ZONE_DEVICES = "group_multi_zone_devices"
 CONF_VALVE_DURATION_UNIT = "valve_duration_unit"
 
+# --- Opt-in telemetry (v3.0.44) -------------------------------------------
+# Master switch plus two independent sub-toggles, all default OFF. Stored in
+# config entry OPTIONS (user-editable via the options flow).
+CONF_TELEMETRY_CHOICE = "telemetry_choice"
+CONF_TELEMETRY_COUNTRY = "telemetry_share_country"
+CONF_TELEMETRY_MODELS = "telemetry_share_models"
+
+# Stored in config entry DATA (must survive restarts, not user-editable).
+CONF_ANON_ID = "anon_id"
+CONF_LAST_PING_AT = "last_ping_at"
+
 VALVE_DURATION_UNIT_MINUTES = "minutes"
 VALVE_DURATION_UNIT_SECONDS = "seconds"
 DEFAULT_VALVE_DURATION_UNIT = VALVE_DURATION_UNIT_MINUTES
