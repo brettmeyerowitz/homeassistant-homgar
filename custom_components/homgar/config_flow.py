@@ -37,6 +37,23 @@ from .api import HomGarClient, HomGarApiError
 
 _LOGGER = logging.getLogger(__name__)
 
+# `section` groups fields into a collapsible sub-form in the options flow UI
+# and was added in HA 2024.6. hacs.json declares a floor of 2024.5.0, so an
+# unconditional import would break setup outright on that floor — the same
+# class of problem as UnitOfRatio (see sensor_defs.py and issue #84). Import
+# it where it exists and fall back to a flat schema (no section, no `└`
+# fake-indentation either — see _build_options_schema) where it doesn't.
+try:  # HA >= 2024.6
+    from homeassistant.data_entry_flow import section
+except ImportError:  # pragma: no cover - exercised on HA < 2024.6
+    section = None
+
+# Key the telemetry sub-toggles are nested under when `section` is in use.
+# The frontend nests submitted values under this key; _flatten_telemetry_section
+# below undoes that so stored options always end up flat, regardless of core
+# version, so existing (flat) options entries keep working unchanged.
+_TELEMETRY_SECTION_KEY = "telemetry_details"
+
 
 def _normalize_email(email: str) -> str:
     """Normalize email for config-entry identity comparisons."""
@@ -345,6 +362,77 @@ class HomGarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
+def _flatten_telemetry_section(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Flatten the telemetry sub-toggles back out of their UI section.
+
+    When `section` is available, the frontend nests CONF_TELEMETRY_COUNTRY
+    and CONF_TELEMETRY_MODELS under `_TELEMETRY_SECTION_KEY` in the submitted
+    data. Options must always be stored flat — so existing entries (written
+    before `section` existed, or by a core below 2024.6 that never had it)
+    keep working unchanged. A no-op when the section key isn't present.
+    """
+    data = dict(user_input)
+    nested = data.pop(_TELEMETRY_SECTION_KEY, None)
+    if isinstance(nested, dict):
+        data.update(nested)
+    return data
+
+
+def _build_options_schema(
+    defaults: dict[str, Any],
+    section_impl: Any = section,
+) -> vol.Schema:
+    """Build the options-flow schema.
+
+    Split out from async_step_init so it can be built and inspected without
+    a running HomeAssistant instance. `section_impl` defaults to the guarded
+    module-level import (so production always reflects what this core
+    actually supports); tests pass it explicitly to exercise both the
+    HA >= 2024.6 and HA < 2024.6 paths deterministically, independent of
+    which core the test container happens to run.
+    """
+    schema_dict: dict[Any, Any] = {
+        vol.Optional(
+            CONF_GROUP_MULTI_ZONE_DEVICES,
+            default=defaults.get(CONF_GROUP_MULTI_ZONE_DEVICES, False),
+        ): bool,
+        vol.Optional(
+            CONF_VALVE_DURATION_UNIT,
+            default=defaults.get(CONF_VALVE_DURATION_UNIT, DEFAULT_VALVE_DURATION_UNIT),
+        ): vol.In({
+            VALVE_DURATION_UNIT_MINUTES: "Minutes",
+            VALVE_DURATION_UNIT_SECONDS: "Seconds",
+        }),
+        vol.Optional(
+            CONF_TELEMETRY_CHOICE,
+            default=defaults.get(CONF_TELEMETRY_CHOICE, False),
+        ): bool,
+    }
+
+    sub_toggles = {
+        vol.Optional(
+            CONF_TELEMETRY_COUNTRY,
+            default=defaults.get(CONF_TELEMETRY_COUNTRY, False),
+        ): bool,
+        vol.Optional(
+            CONF_TELEMETRY_MODELS,
+            default=defaults.get(CONF_TELEMETRY_MODELS, False),
+        ): bool,
+    }
+
+    if section_impl is not None:
+        # Collapsible sub-section grouping the two toggles that are inert
+        # without the master switch above — see translations/en.json
+        # options.step.init.sections for the section's own label/description.
+        schema_dict[vol.Optional(_TELEMETRY_SECTION_KEY)] = section_impl(
+            vol.Schema(sub_toggles), {"collapsed": False}
+        )
+    else:
+        schema_dict.update(sub_toggles)
+
+    return vol.Schema(schema_dict)
+
+
 class HomGarOptionsFlow(config_entries.OptionsFlow):
     """Handle HomGar options."""
 
@@ -362,38 +450,11 @@ class HomGarOptionsFlow(config_entries.OptionsFlow):
                 self.hass, TELEMETRY_NOTIFICATION_ID
             )
 
-            return self.async_create_entry(title="", data=user_input)
+            return self.async_create_entry(
+                title="", data=_flatten_telemetry_section(user_input)
+            )
 
-        data_schema = vol.Schema(
-            {
-                vol.Optional(
-                    CONF_GROUP_MULTI_ZONE_DEVICES,
-                    default=self._config_entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False),
-                ): bool,
-                vol.Optional(
-                    CONF_VALVE_DURATION_UNIT,
-                    default=self._config_entry.options.get(
-                        CONF_VALVE_DURATION_UNIT,
-                        DEFAULT_VALVE_DURATION_UNIT,
-                    ),
-                ): vol.In({
-                    VALVE_DURATION_UNIT_MINUTES: "Minutes",
-                    VALVE_DURATION_UNIT_SECONDS: "Seconds",
-                }),
-                vol.Optional(
-                    CONF_TELEMETRY_CHOICE,
-                    default=self._config_entry.options.get(CONF_TELEMETRY_CHOICE, False),
-                ): bool,
-                vol.Optional(
-                    CONF_TELEMETRY_COUNTRY,
-                    default=self._config_entry.options.get(CONF_TELEMETRY_COUNTRY, False),
-                ): bool,
-                vol.Optional(
-                    CONF_TELEMETRY_MODELS,
-                    default=self._config_entry.options.get(CONF_TELEMETRY_MODELS, False),
-                ): bool,
-            }
-        )
+        data_schema = _build_options_schema(dict(self._config_entry.options))
 
         return self.async_show_form(
             step_id="init",

@@ -81,6 +81,19 @@ check("model list is deduplicated and sorted",
 check("None models are dropped", None not in models)
 check("empty data yields an empty list", models_from_coordinator_data({}) == [])
 
+# Hub-model "Unknown" filtering must be symmetric with sub-device models: a
+# hub row missing a real model gets the literal string "Unknown" from the
+# coordinator (see coordinator.py hub_copy["model"]), and that placeholder
+# must never leak into the payload as if it were a real device someone owns —
+# for hubs AND for sub-devices identically.
+UNKNOWN_DATA = {"hubs": [
+    {"model": "Unknown", "subDevices": [{"model": "Unknown"}, {"model": "HTV245FRF"}]},
+]}
+unknown_models = models_from_coordinator_data(UNKNOWN_DATA)
+check("hub model 'Unknown' is filtered", "Unknown" not in unknown_models)
+check("sub-device model 'Unknown' is filtered symmetrically with hub models",
+      unknown_models == ["HTV245FRF"], f"got {unknown_models}")
+
 # --- daily guard -----------------------------------------------------------
 now = datetime(2026, 8, 11, 12, 0, tzinfo=timezone.utc)
 check("pings when never pinged before", should_ping(None, now, PING_INTERVAL_HOURS) is True)
@@ -92,8 +105,13 @@ check("pings at 24h01m",
       should_ping(now - timedelta(hours=24, minutes=1), now, PING_INTERVAL_HOURS) is True)
 check("a corrupt last_ping_at does not crash and allows a ping",
       should_ping("not-a-timestamp", now, PING_INTERVAL_HOURS) is True)
-check("a future last_ping_at (clock skew) does not ping forever",
-      should_ping(now + timedelta(days=400), now, PING_INTERVAL_HOURS) is False)
+check("a modest future last_ping_at (clock skew within one interval) blocks rather than double-pinging",
+      should_ping(now + timedelta(hours=2), now, PING_INTERVAL_HOURS) is False)
+check("a future last_ping_at right at the interval boundary still blocks",
+      should_ping(now + timedelta(hours=PING_INTERVAL_HOURS), now, PING_INTERVAL_HOURS) is False)
+check("a future last_ping_at beyond one full interval is treated as corrupt and pings "
+      "(previously this wedged telemetry off indefinitely)",
+      should_ping(now + timedelta(days=400), now, PING_INTERVAL_HOURS) is True)
 
 # --- enablement ------------------------------------------------------------
 check("disabled when nothing is set", is_telemetry_enabled({}) is False)

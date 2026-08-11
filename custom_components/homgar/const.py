@@ -16,7 +16,13 @@ CONF_TELEMETRY_CHOICE = "telemetry_choice"
 CONF_TELEMETRY_COUNTRY = "telemetry_share_country"
 CONF_TELEMETRY_MODELS = "telemetry_share_models"
 
-# Stored in config entry DATA (must survive restarts, not user-editable).
+# These two are field NAMES inside the dedicated telemetry Store (see
+# telemetry.py TELEMETRY_STORE_KEY), NOT config entry data keys. They must
+# survive restarts but must NEVER live in entry.data/options: HA fires
+# update listeners on ANY entry.data change, and this integration's listener
+# does a full reload -- unacceptable for state that changes on every daily
+# ping. Kept as constants so the field names aren't duplicated as raw
+# strings across telemetry.py and its tests.
 CONF_ANON_ID = "anon_id"
 CONF_LAST_PING_AT = "last_ping_at"
 

@@ -370,7 +370,7 @@ else
 fi
 
 # ── Test: opt-in telemetry (v3.0.44) ──────────────────────────────────────
-for suite in run_telemetry_payload_tests run_telemetry_send_tests run_telemetry_optin_tests; do
+for suite in run_telemetry_payload_tests run_telemetry_send_tests run_telemetry_optin_tests run_telemetry_options_flow_tests run_coordinator_telemetry_tests; do
     echo "🧪 Running ${suite}..."
     docker cp "tests/${suite}.py" "ha-test:/tmp/tests/${suite}.py" > /dev/null
     if docker exec ha-test python3 "/tmp/tests/${suite}.py"; then

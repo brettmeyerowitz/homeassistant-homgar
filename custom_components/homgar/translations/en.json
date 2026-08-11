@@ -67,15 +67,21 @@
                     "group_multi_zone_devices": "Create a separate Home Assistant device for each controller zone",
                     "valve_duration_unit": "Valve duration control unit",
                     "telemetry_choice": "Share anonymous usage data (off by default)",
-                    "telemetry_share_country": "  └ Include my country",
-                    "telemetry_share_models": "  └ Include my device models"
+                    "telemetry_share_country": "Include my country",
+                    "telemetry_share_models": "Include my device models"
                 },
                 "data_description": {
                     "group_multi_zone_devices": "When enabled, per-zone valves, durations, and per-port sensors are grouped under child devices. Shared diagnostics stay on the parent controller device.",
                     "valve_duration_unit": "Choose whether valve duration number entities are shown in minutes or seconds. Existing installs default to minutes.",
-                    "telemetry_choice": "Off by default. When on, sends an anonymous random ID plus your Home Assistant and integration version numbers to help gauge usage. Nothing else is sent unless you enable the options below, and your IP address is never stored.",
-                    "telemetry_share_country": "Adds your country, derived at the edge from your request and stored only as a monthly count that cannot be traced back to your install.",
-                    "telemetry_share_models": "Adds which RainPoint/HomGar device models you own. Model names only, stored as monthly counts."
+                    "telemetry_choice": "Off by default. When on, sends an anonymous random ID plus your Home Assistant and integration version numbers to help gauge usage. The two toggles below only take effect once this is on, and your IP address is never stored by the worker.",
+                    "telemetry_share_country": "Adds your country, derived at the edge from your request and stored only as a monthly count that cannot be traced back to your install. Has no effect unless the switch above is also on.",
+                    "telemetry_share_models": "Adds which RainPoint/HomGar device models you own. Model names only, stored as monthly counts. Has no effect unless the switch above is also on."
+                },
+                "sections": {
+                    "telemetry_details": {
+                        "name": "Anonymous usage data",
+                        "description": "These only take effect when \"Share anonymous usage data\" above is switched on."
+                    }
                 }
             }
         }

@@ -14,6 +14,14 @@ Design notes that matter:
     any device identifier.
   * No User-Agent override. The HomGar cloud blocks HA's default UA (issue
     #76) but the telemetry worker does not — verified by spike.
+  * Bookkeeping state (anon_id, last_ping_at, whether the opt-in prompt has
+    been shown) lives in its own HA Store, NEVER in the config entry. HA
+    fires update listeners on any entry.data/options change, and this
+    integration's listener does a full `async_reload()` — platform
+    teardown/rebuild, MQTT disconnect/reconnect, every entity briefly
+    Unavailable, a recorder gap. That is the right reaction to the three
+    user-facing OPTIONS toggles actually changing, but it must never happen
+    just because a daily ping bumped a timestamp. See TELEMETRY_STORE_KEY.
 
 See docs/superpowers/specs/2026-08-11-optin-telemetry-design.md
 """
@@ -28,6 +36,13 @@ _LOGGER = logging.getLogger(__name__)
 TELEMETRY_URL = "https://homgar-telemetry-worker.funkypeople.workers.dev/ping"
 PING_INTERVAL_HOURS = 24
 PING_TIMEOUT_SECONDS = 10
+
+# Dedicated Store for telemetry bookkeeping, keyed by config entry id inside
+# a single file: {entry_id: {"anon_id": ..., "last_ping_at": ..., "prompted":
+# True}}. Deliberately NOT config entry data/options — see the module
+# docstring.
+TELEMETRY_STORE_KEY = "homgar_telemetry"
+TELEMETRY_STORE_VERSION = 1
 
 
 def is_telemetry_enabled(options: dict) -> bool:
@@ -68,6 +83,9 @@ def models_from_coordinator_data(data: dict | None) -> list[str]:
     """Extract the distinct device model names from a coordinator payload.
 
     Model names only — never serial numbers, addresses, names or home IDs.
+    "Unknown" is filtered symmetrically for hubs and sub-devices; it is a
+    placeholder the coordinator fills in when the cloud didn't return a real
+    model, not a device model any user actually owns.
     """
     if not data:
         return []
@@ -78,7 +96,7 @@ def models_from_coordinator_data(data: dict | None) -> list[str]:
             found.add(str(model))
         for sub in hub.get("subDevices") or []:
             sub_model = sub.get("model")
-            if sub_model:
+            if sub_model and sub_model != "Unknown":
                 found.add(str(sub_model))
     return sorted(found)
 
@@ -89,9 +107,11 @@ def should_ping(
     """Whether enough time has passed since the last successful ping.
 
     Tolerates a missing, malformed or future timestamp: a corrupt value must
-    never wedge telemetry permanently on or permanently off. A future value
-    (clock skew, restored backup) blocks until it passes rather than pinging
-    every cycle.
+    never wedge telemetry permanently on or permanently off. A modest future
+    value (clock skew, DST edge) blocks until it passes. A future value more
+    than a full interval out cannot be ordinary clock drift — treat it as
+    corrupt data and let the ping through rather than wedging telemetry off
+    indefinitely.
     """
     if last_ping_at is None:
         return True
@@ -105,8 +125,78 @@ def should_ping(
     if last_ping_at.tzinfo is None:
         last_ping_at = last_ping_at.replace(tzinfo=timezone.utc)
     if last_ping_at > now:
-        return False
+        return (last_ping_at - now) > timedelta(hours=interval_hours)
     return now - last_ping_at >= timedelta(hours=interval_hours)
+
+
+def _get_store(hass):
+    """Return the cached telemetry Store, creating it on first use.
+
+    Cached on hass.data so repeated calls (once per poll, at minimum daily)
+    reuse the same Store object instead of constructing a new one each time.
+    """
+    from homeassistant.helpers.storage import Store
+
+    from .const import DOMAIN
+
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    store = domain_data.get("_telemetry_store")
+    if store is None:
+        store = Store(hass, TELEMETRY_STORE_VERSION, TELEMETRY_STORE_KEY)
+        domain_data["_telemetry_store"] = store
+    return store
+
+
+async def _async_store_load(hass) -> dict:
+    """Load the store from disk.
+
+    Indirection (matching `_async_create_notification` below) so tests can
+    substitute an in-memory fake instead of exercising real HA storage I/O.
+    """
+    return await _get_store(hass).async_load() or {}
+
+
+async def _async_store_save(hass, data: dict) -> None:
+    """Persist the store to disk. See `_async_store_load`."""
+    await _get_store(hass).async_save(data)
+
+
+async def _async_load_all(hass) -> dict:
+    """Load the full telemetry store, cached on hass.data after first read.
+
+    This is the "lazily created and cached" requirement: without this cache
+    every poll (and the opt-in prompt on every setup) would re-read the
+    store file from disk.
+    """
+    from .const import DOMAIN
+
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    if "_telemetry_store_data" not in domain_data:
+        domain_data["_telemetry_store_data"] = await _async_store_load(hass)
+    return domain_data["_telemetry_store_data"]
+
+
+async def _async_save_all(hass, data: dict) -> None:
+    """Persist the full telemetry store and refresh the in-memory cache."""
+    from .const import DOMAIN
+
+    hass.data.setdefault(DOMAIN, {})["_telemetry_store_data"] = data
+    await _async_store_save(hass, data)
+
+
+async def _async_get_entry_state(hass, entry_id: str) -> dict:
+    """Return a copy of this config entry's telemetry bookkeeping state."""
+    all_data = await _async_load_all(hass)
+    return dict(all_data.get(entry_id) or {})
+
+
+async def _async_patch_entry_state(hass, entry_id: str, patch: dict) -> None:
+    """Merge `patch` into this config entry's telemetry state and persist."""
+    all_data = dict(await _async_load_all(hass))
+    entry_state = dict(all_data.get(entry_id) or {})
+    entry_state.update(patch)
+    all_data[entry_id] = entry_state
+    await _async_save_all(hass, all_data)
 
 
 async def async_maybe_ping(hass, entry, coordinator_data, session) -> bool:
@@ -115,33 +205,29 @@ async def async_maybe_ping(hass, entry, coordinator_data, session) -> bool:
     This function must NEVER raise. It runs inside the coordinator's poll
     cycle, and a user's irrigation must not depend on a stats endpoint being
     reachable. Every failure path is swallowed at debug level.
+
+    Bookkeeping (anon_id, last_ping_at) is read from and written to the
+    telemetry Store, never `entry.data` — see the module docstring for why.
     """
     from uuid import uuid4
 
-    from .const import (
-        CONF_ANON_ID,
-        CONF_LAST_PING_AT,
-        CONF_TELEMETRY_COUNTRY,
-        CONF_TELEMETRY_MODELS,
-    )
+    from .const import CONF_ANON_ID, CONF_LAST_PING_AT, CONF_TELEMETRY_COUNTRY, CONF_TELEMETRY_MODELS
 
     try:
         options = dict(getattr(entry, "options", {}) or {})
         if not is_telemetry_enabled(options):
             return False
 
-        data = dict(getattr(entry, "data", {}) or {})
+        entry_id = entry.entry_id
+        state = await _async_get_entry_state(hass, entry_id)
         now = datetime.now(timezone.utc)
-        if not should_ping(data.get(CONF_LAST_PING_AT), now):
+        if not should_ping(state.get(CONF_LAST_PING_AT), now):
             return False
 
-        anon_id = data.get(CONF_ANON_ID)
+        anon_id = state.get(CONF_ANON_ID)
         if not anon_id:
             anon_id = str(uuid4())
-            hass.config_entries.async_update_entry(
-                entry, data={**data, CONF_ANON_ID: anon_id}
-            )
-            data = {**data, CONF_ANON_ID: anon_id}
+            await _async_patch_entry_state(hass, entry_id, {CONF_ANON_ID: anon_id})
 
         share_country = options.get(CONF_TELEMETRY_COUNTRY) is True
         share_models = options.get(CONF_TELEMETRY_MODELS) is True
@@ -168,9 +254,7 @@ async def async_maybe_ping(hass, entry, coordinator_data, session) -> bool:
 
         # Only stamp on success, so a failed ping retries on the next cycle
         # rather than being silently skipped for a day.
-        hass.config_entries.async_update_entry(
-            entry, data={**data, CONF_LAST_PING_AT: now.isoformat()}
-        )
+        await _async_patch_entry_state(hass, entry_id, {CONF_LAST_PING_AT: now.isoformat()})
         _LOGGER.debug("Telemetry ping sent")
         return True
     except Exception as err:  # noqa: BLE001 - telemetry must never break setup
@@ -199,7 +283,7 @@ _OPTIN_MESSAGE = (
     "No account details, no location beyond an optional country, and your IP is "
     "never stored.\n\n"
     "[Open settings](/config/integrations/integration/homgar) — or ignore this; "
-    "it will not ask again."
+    "you can change this any time in Options."
 )
 
 
@@ -207,8 +291,13 @@ async def async_prompt_for_telemetry_once(hass, entry) -> bool:
     """Show the opt-in prompt if the user has never answered. Returns True if
     shown.
 
-    Fires only when no choice exists. Recording any answer — including "no" —
-    stops it permanently.
+    Fires only when no choice exists AND the prompt has never been shown
+    before. Recording any answer — including "no" — stops it permanently,
+    and so does merely showing it: checking only for a recorded *choice*
+    meant a user who dismissed the notification without opening Options got
+    renagged on every restart/reload forever, contradicting the message's
+    promise. The "shown" flag is persisted in the telemetry Store (see
+    module docstring) so it survives restarts without touching entry.data.
     """
     from .const import CONF_TELEMETRY_CHOICE
 
@@ -216,12 +305,19 @@ async def async_prompt_for_telemetry_once(hass, entry) -> bool:
         options = dict(getattr(entry, "options", {}) or {})
         if CONF_TELEMETRY_CHOICE in options:
             return False
+
+        entry_id = entry.entry_id
+        state = await _async_get_entry_state(hass, entry_id)
+        if state.get("prompted"):
+            return False
+
         _async_create_notification(
             hass,
             _OPTIN_MESSAGE,
             title="HomGar/RainPoint: optional anonymous usage data",
             notification_id=TELEMETRY_NOTIFICATION_ID,
         )
+        await _async_patch_entry_state(hass, entry_id, {"prompted": True})
         return True
     except Exception as err:  # noqa: BLE001
         _LOGGER.debug("Telemetry opt-in prompt failed (ignored): %s", err)
