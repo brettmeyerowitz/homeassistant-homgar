@@ -255,6 +255,21 @@ README and linked from the opt-in notification.
 
 ### What is available to any Cloudflare Worker
 
+> **Must be verified on the deployed Worker before the README ships.** This table
+> is from Cloudflare's documentation, which lists these under "All plans have
+> access to" (geolocation became free for all Workers developers in April 2021;
+> earlier, only `asn` and `colo` were available on the free plan). However,
+> `request.cf` is **not populated in `wrangler dev` local mode**, nor in the
+> dashboard editor or Playground preview — the fields are computed on the edge.
+> Local testing therefore shows only `CF-IPCountry`, which is easily mistaken for
+> a plan limitation.
+>
+> **Verification step (first task of the Worker build):** deploy a temporary
+> route returning `Object.keys(request.cf)` and the geo values, call it from a
+> real client, and correct this table to match observed reality. Publishing a
+> claim that overstates what Cloudflare exposes would undermine the very section
+> it appears in.
+
 `request.cf` carries, among other fields:
 
 | Field | Example | Note |
@@ -402,6 +417,11 @@ Per repo convention, standalone runners in the `ha-test` container, wired into
 Two deliverables in two repos. They are separable and should be built in this
 order, since the second is untestable end to end without the first:
 
+0. **Verify what `request.cf` actually exposes on the deployed edge** (see
+   *Transparency*). Everything the README claims about Cloudflare's geolocation
+   rests on this, and it cannot be established from local dev, where `request.cf`
+   is unpopulated. Correct the field table to observed reality before writing any
+   user-facing disclosure.
 1. **Worker** (`homgar-telemetry-worker`) — schema, `/ping`, `/stats`, `/health`,
    privacy rules, vitest suite, deployed. Verifiable standalone with `curl`.
 2. **Integration** (`v3.0.44`) — `telemetry.py`, opt-in UX, one-time
