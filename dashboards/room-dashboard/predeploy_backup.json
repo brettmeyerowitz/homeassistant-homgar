@@ -1,0 +1,20 @@
+{
+  "views": [
+    {
+      "title": "Home",
+      "sections": [
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "type": "heading",
+              "heading": "Climate and Temperature",
+              "heading_style": "title",
+              "badges": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

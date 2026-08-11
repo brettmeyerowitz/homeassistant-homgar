@@ -116,6 +116,34 @@ def _status_on_fetch_failure(
     return {"subDeviceStatus": []}
 
 
+def _home_names_on_fetch_failure(cached: dict[int, str] | None) -> dict[int, str]:
+    """Choose the hid -> homeName map to use when list_homes failed this poll.
+
+    The map was previously rebuilt from scratch each cycle and left empty on
+    failure. That is not harmless: ``hub_copy["homeName"]`` falls back to ``""``
+    and areas.py skips area seeding entirely for a blank name, so a passing
+    cloud blip could quietly suppress it. Retain the last-good map instead.
+
+    Unlike hub status, this needs no staleness cap — a home's name is
+    effectively static, so a stale one carries no risk of masking an outage the
+    way a stuck "watering" state would. Returns a copy so a later cycle cannot
+    mutate the retained map. See issue #82.
+    """
+    return dict(cached) if cached else {}
+
+
+def _should_warn_home_name_failure(cached: dict[int, str] | None) -> bool:
+    """Whether a failed list_homes fetch deserves a WARNING.
+
+    The client already logs one warning when its retries are exhausted, so
+    logging again here made a single blip produce two WARNING entries for the
+    same event (reported on issue #82). When a cached map covers the failure
+    nothing user-visible degraded, so this drops to debug; a warning is kept
+    only when there is genuinely no map to fall back on.
+    """
+    return not cached
+
+
 def _hub_identity_keys(hub: dict) -> set[tuple[str, str]]:
     """Return stable cloud identity keys that can reveal duplicate hub rows."""
     keys: set[tuple[str, str]] = set()
@@ -142,6 +170,9 @@ class HomGarCoordinator(DataUpdateCoordinator):
         self._notified_unknown_models: set[str] = set()
         self._mqtt_diagnostics: dict[str, dict] = {}
         self._last_good_data: dict[str, dict] = {}
+        # Last successful hid -> homeName map, reused when list_homes fails so a
+        # blip does not blank home names. See _home_names_on_fetch_failure.
+        self._last_good_home_names: dict[int, str] = {}
         # Consecutive failed status fetches per hub mid, used to cap how long a
         # hub may coast on retained last-good status. See _status_on_fetch_failure.
         self._status_miss_count: dict[int, int] = {}
@@ -167,8 +198,22 @@ class HomGarCoordinator(DataUpdateCoordinator):
                     name_val = h.get("homeName") or h.get("name") or ""
                     if hid_val:
                         home_name_by_hid[int(hid_val)] = name_val
+                if home_name_by_hid:
+                    self._last_good_home_names = dict(home_name_by_hid)
             except Exception as ex:  # noqa: BLE001
-                _LOGGER.warning("HomGar: could not fetch home names: %s", ex)
+                # Retain the last-good map rather than blanking home names for
+                # the cycle, and stay quiet when it covers the blip — the client
+                # has already logged its exhausted retries. See issue #82.
+                home_name_by_hid = _home_names_on_fetch_failure(
+                    self._last_good_home_names
+                )
+                if _should_warn_home_name_failure(self._last_good_home_names):
+                    _LOGGER.warning("HomGar: could not fetch home names: %s", ex)
+                else:
+                    _LOGGER.debug(
+                        "HomGar: could not fetch home names (%s); retaining %d cached name(s)",
+                        ex, len(home_name_by_hid),
+                    )
 
             for hid in homes:
                 devices = await self._client.get_devices_by_hid(hid)
