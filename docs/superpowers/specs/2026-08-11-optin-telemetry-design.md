@@ -107,14 +107,23 @@ purges, and aggregates computed on read so nothing can drift. The workload —
 
 ## Data model
 
+Normalised: `installs` is the identifier dimension, `pings` is the event fact
+table, and country/models remain aggregate-only.
+
 ```sql
 CREATE TABLE installs (
-  anon_id             TEXT PRIMARY KEY,  -- random UUID4, no link to any account
+  anon_id            TEXT PRIMARY KEY,  -- random UUID4, no link to any account
+  first_seen         TEXT NOT NULL,     -- "2026-08-11"
+  last_seen          TEXT NOT NULL,
+  last_counted_month TEXT               -- "2026-08", gates monthly aggregation
+);
+
+CREATE TABLE pings (
+  anon_id             TEXT NOT NULL,
+  day                 TEXT NOT NULL,    -- "2026-08-11", DATE ONLY (see below)
   integration_version TEXT NOT NULL,
   hass_version        TEXT NOT NULL,
-  first_seen          INTEGER NOT NULL,
-  last_seen           INTEGER NOT NULL,
-  last_counted_month  TEXT               -- "2026-08", gates monthly aggregation
+  PRIMARY KEY (anon_id, day)            -- at most one row per install per day
 );
 
 CREATE TABLE country_counts (
@@ -128,10 +137,27 @@ CREATE TABLE model_counts (
 );
 ```
 
-Country and device models are both **aggregate-only**. No foreign key and no
-query path joins either back to an `anon_id`, so "we never store your location
-against your install" is true by construction rather than by policy. Models get
-the same treatment because it costs nothing.
+### Why the ping log stores a day, not a timestamp
+
+A per-install event log is the most linkable structure in this design, and it
+would otherwise sit awkwardly beside the aggregate-only choice made for country
+and models. Four constraints keep it defensible while preserving what it is for:
+
+1. **`day` is a date, never a timestamp.** Cohort and retention analysis is
+   unaffected; time-of-day and uptime patterns are not recorded at all. The log
+   says "this anonymous install was active on these days" and nothing finer.
+2. **`PRIMARY KEY (anon_id, day)`** makes writes idempotent, bounds growth, and
+   removes any intra-day signal — a box that restarts twenty times looks
+   identical to one that restarts once.
+3. **Versions live on the ping row**, which is the main thing the log buys:
+   version migration over time becomes a plain `GROUP BY` rather than a snapshot.
+4. **13-month retention** on `pings`, keeping year-on-year comparison. Steady
+   state ≈ 60k rows (150 installs × 365 days), trivial for D1's 5GB.
+
+Country and device models stay **aggregate-only** — no foreign key and no query
+path joins either back to an `anon_id`. "We never store your location against
+your install" remains true by construction. They are deliberately *not* moved
+onto the ping row.
 
 `last_counted_month` gates both aggregates. **Known edge case, documented rather
 than engineered around:** enabling country partway through a month means being
@@ -139,10 +165,14 @@ counted from the following month.
 
 Derived figures:
 
-- **Active installs** — `COUNT(*) FROM installs WHERE last_seen > now-30d`
-- **Version adoption** — `GROUP BY integration_version` / `hass_version`
+- **Active installs, any window, retrospectively** —
+  `SELECT COUNT(DISTINCT anon_id) FROM pings WHERE day BETWEEN ? AND ?`
+- **Growth curve** — `SELECT day, COUNT(DISTINCT anon_id) FROM pings GROUP BY day`
+- **Version migration over time** —
+  `SELECT day, integration_version, COUNT(*) FROM pings GROUP BY day, integration_version`
+- **Retention/churn cohorts** — first_seen cohort joined to subsequent ping days
 - **Geography** — `country_counts` for the month
-- **Retention** — rows unseen for 90 days are purged
+- **Purge** — `pings` older than 13 months; `installs` unseen for 90 days
 
 ## Data flow
 
@@ -160,10 +190,20 @@ POST /ping
 }
 ```
 
-`models` is **omitted entirely** when not opted in — not sent and ignored. The
-worker upserts `installs`, then if `last_counted_month` differs from the current
-month, increments `country_counts` (only when `share_country`) and `model_counts`
-(only when `share_models`), and stamps the month. Returns `204` with no body.
+`models` is **omitted entirely** when not opted in — not sent and ignored.
+
+The worker derives `day` and `month` from its own clock (never from the client),
+then in one transaction:
+
+1. Upserts `installs` — inserting `first_seen` on conflict-do-nothing, updating
+   `last_seen`.
+2. Inserts into `pings` with `ON CONFLICT (anon_id, day) DO UPDATE` on the two
+   version columns, so repeated pings the same day are idempotent.
+3. If `last_counted_month` differs from the current month, increments
+   `country_counts` (only when `share_country`) and `model_counts` (only when
+   `share_models`), then stamps the month.
+
+Returns `204` with no body.
 
 ### Endpoints
 
@@ -192,8 +232,12 @@ and verifiable because the Worker is open source. Six rules:
 6. The Worker README states the schema verbatim and says plainly: *Cloudflare
    terminates the connection and therefore sees your IP address, as any web
    server does — we never read, log, or store it.* The same disclosure appears in
-   the opt-in notification text, including that the HA and integration versions
-   are part of the base payload.
+   the opt-in notification text, and covers the two things a reader would not
+   otherwise guess: that the HA and integration versions are part of the base
+   payload, and that **the dates on which an install was active are retained for
+   13 months** (dates only, never times).
+7. `day` is derived from the **worker's** clock, never from client input, so a
+   malformed or hostile payload cannot write arbitrary history.
 
 ## Opt-in UX
 
@@ -271,6 +315,12 @@ Per repo convention, standalone runners in the `ha-test` container, wired into
 - `cf.colo`, `cf.city`, `cf.timezone` are never read — asserted against a mock
   `cf` object carrying all of them
 - monthly dedupe: a second ping in the same month does not double-count
+- **ping idempotence:** twenty pings on the same day yield exactly one `pings`
+  row, with versions reflecting the latest
+- **no time component is ever persisted** — assert `day` matches
+  `^\d{4}-\d{2}-\d{2}$` and that no column holds a timestamp
+- **client cannot forge history** — a payload carrying its own `day`/`ts` is
+  ignored in favour of the worker clock
 - `/stats` rejects requests without a valid token
 - `/ping` returns 204 and no body
 
@@ -303,3 +353,11 @@ accounts counts as two installs. Rare enough to document rather than solve.
   in, which skews toward engaged, privacy-tolerant users. Treat outputs as
   directional, never as a census.
 - **The month-boundary edge case** in `last_counted_month` (above).
+- **The ping log is the design's most linkable structure.** Date-only rows, a
+  one-row-per-day primary key and 13-month retention keep it to "this anonymous
+  install was active on these days", which is materially less than a timestamped
+  uptime trace — but it is still per-install history, unlike country and models.
+  This was a deliberate trade for retrospective growth and retention analysis,
+  which current-state-only storage cannot provide. It must be disclosed plainly
+  rather than buried, and it is the first thing to revisit if the privacy posture
+  is ever questioned.
