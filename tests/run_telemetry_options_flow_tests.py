@@ -107,5 +107,40 @@ if real_section is not None:
     check("the master switch stays outside the section either way",
           CONF_TELEMETRY_CHOICE in section_keys, str(section_keys))
 
+# --- translations must cover BOTH render paths ------------------------------
+# A field nested inside a `section` takes its label from
+# options.step.init.sections.<key>.data.<field> — NOT the top-level data block.
+# Getting this wrong renders raw key names in the UI and is invisible to every
+# other test, because the schema is still valid. It shipped once; hence this.
+import json  # noqa: E402
+
+with open("/config/custom_components/homgar/translations/en.json") as fh:
+    _tr = json.load(fh)
+
+_init = _tr["options"]["step"]["init"]
+_flat = _init.get("data", {})
+_flat_desc = _init.get("data_description", {})
+_section = _init.get("sections", {}).get(_TELEMETRY_SECTION_KEY, {})
+_sec_data = _section.get("data", {})
+_sec_desc = _section.get("data_description", {})
+
+check("section carries a name and description",
+      bool(_section.get("name")) and bool(_section.get("description")))
+
+for _field in (CONF_TELEMETRY_COUNTRY, CONF_TELEMETRY_MODELS):
+    check(f"'{_field}' has a label for the SECTION path",
+          bool(_sec_data.get(_field)), f"missing sections.{_TELEMETRY_SECTION_KEY}.data.{_field}")
+    check(f"'{_field}' has a description for the SECTION path",
+          bool(_sec_desc.get(_field)))
+    # The flat fallback (HA < 2024.6, where `section` is unavailable) renders
+    # these as ordinary top-level fields, so both places must be populated.
+    check(f"'{_field}' also has a label for the FLAT fallback path",
+          bool(_flat.get(_field)), f"missing data.{_field}")
+
+check("master switch has a label and description",
+      bool(_flat.get(CONF_TELEMETRY_CHOICE)) and bool(_flat_desc.get(CONF_TELEMETRY_CHOICE)))
+check("no leftover box-drawing characters in any telemetry label",
+      not any("└" in str(v) for v in list(_flat.values()) + list(_sec_data.values())))
+
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
