@@ -2,7 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.0.44] - 2026-08-11
+## [3.0.44-beta.1] - 2026-08-12
+
+> **Beta release.** Opt-in telemetry is new and touches the config entry, the
+> options flow and the coordinator's poll cycle, so it is going out as a
+> pre-release for field testing before a general release. It is visible only to
+> users who have explicitly enabled beta versions for this repository in HACS.
+> Telemetry itself remains **off by default** even in this build.
 
 ### ✨ Features
 - **Optional, anonymous usage telemetry — off by default** — custom HACS integrations never report to Home Assistant's own analytics, and HACS itself publishes no install counts, so there has been no way to know how many people actually run this integration or which Home Assistant versions matter for support. This release adds a telemetry ping to answer that, gated behind three independent toggles under **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options** (the two sub-toggles live in a collapsible "Anonymous usage data" section on cores that support it, HA 2024.6+; older cores get an equivalent flat layout), all of them **off** unless you turn them on: a master switch, plus separate switches for sharing your country and your device models. With the master switch off, no request is ever made — the code path that builds and sends the payload is skipped entirely, not merely told to omit fields. Existing installs get a **one-time** persistent notification explaining the choice; answering it any way, including declining, or simply dismissing the notification without answering, stops it from reappearing — there is no re-prompt loop. You can still revisit the choice any time under Options.
