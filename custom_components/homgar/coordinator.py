@@ -4,6 +4,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.components.persistent_notification import async_create
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
@@ -23,6 +24,7 @@ from .const import (
 )
 from .api import HomGarClient, HomGarApiError
 from .decoder import decode_payload, get_switch_ports, get_valve_ports
+from .telemetry import async_maybe_ping
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -181,6 +183,29 @@ class HomGarCoordinator(DataUpdateCoordinator):
         """Handle MQTT message for real-time valve updates."""
         from .coordinator_mqtt import handle_mqtt_update
         await handle_mqtt_update(self, data)
+
+    def _fire_telemetry_ping(self, hubs: list[dict]) -> None:
+        """Fire the opt-in telemetry ping as a background task.
+
+        `async_maybe_ping` already swallows every failure internally and
+        must never raise, but everything needed to *schedule* it (resolving
+        the shared session, constructing the coroutine, creating the
+        background task) happens here too. This is defense in depth: it
+        keeps any of that scheduling machinery — not just the ping itself —
+        from ever reaching `_async_update_data`'s outer `except Exception`
+        and turning a stats hiccup into every entity going Unavailable.
+        """
+        try:
+            result_for_telemetry = {"hubs": hubs}
+            self.hass.async_create_background_task(
+                async_maybe_ping(
+                    self.hass, self._entry, result_for_telemetry,
+                    async_get_clientsession(self.hass),
+                ),
+                name="homgar_telemetry_ping",
+            )
+        except Exception as err:  # noqa: BLE001 - telemetry must never break the poll
+            _LOGGER.debug("Telemetry scheduling failed (ignored): %s", err)
 
     async def _async_update_data(self):
         """Fetch and decode data from HomGar/RainPoint."""
@@ -470,7 +495,14 @@ class HomGarCoordinator(DataUpdateCoordinator):
             
             # Update MQTT diagnostics
             self._update_mqtt_diagnostics(hubs)
-            
+
+            # Opt-in telemetry. Off by default; fired in the background (not
+            # awaited) so a slow or blackholed telemetry endpoint can never
+            # add latency to this poll, and wrapped in its own try/except so
+            # nothing telemetry-related can reach the outer `except Exception`
+            # below and turn into an UpdateFailed (every entity Unavailable).
+            self._fire_telemetry_ping(hubs)
+
             return {
                 "hubs": hubs,
                 "status": status_by_mid,

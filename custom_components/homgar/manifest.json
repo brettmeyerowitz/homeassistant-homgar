@@ -12,6 +12,8 @@
     "loggers": [
         "custom_components.homgar"
     ],
-    "requirements": ["paho-mqtt>=1.6.0"],
-    "version": "3.0.43"
+    "requirements": [
+        "paho-mqtt>=1.6.0"
+    ],
+    "version": "3.0.44"
 }

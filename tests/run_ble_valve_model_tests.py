@@ -61,8 +61,23 @@ def _install_aiohttp_stub() -> None:
     sys.modules["aiohttp"] = aiohttp
 
 
+def _install_ha_exceptions_stub() -> None:
+    """client.py imports HomeAssistantError (issue #82: only HomeAssistantError
+    subclasses can be swallowed by an automation's continue_on_error). The real
+    homeassistant.exceptions imports ClientResponse from aiohttp, which is
+    stubbed above, so register a faithful stub of just that class instead."""
+    if "homeassistant.exceptions" in sys.modules:
+        return
+    ha_pkg = sys.modules.setdefault("homeassistant", types.ModuleType("homeassistant"))
+    exc = types.ModuleType("homeassistant.exceptions")
+    exc.HomeAssistantError = type("HomeAssistantError", (Exception,), {})
+    ha_pkg.exceptions = exc
+    sys.modules["homeassistant.exceptions"] = exc
+
+
 def _load_client():
     _install_aiohttp_stub()
+    _install_ha_exceptions_stub()
     path = ROOT / "custom_components" / "homgar" / "api" / "client.py"
     spec = importlib.util.spec_from_file_location("homgar_api_client", path)
     if spec is None or spec.loader is None:

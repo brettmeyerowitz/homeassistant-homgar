@@ -52,6 +52,17 @@ _aiohttp_stub.ClientSession = type("ClientSession", (), {})
 _aiohttp_stub.ClientError = type("ClientError", (Exception,), {})
 sys.modules["aiohttp"] = _aiohttp_stub
 
+# client.py now imports HomeAssistantError (issue #82: only HomeAssistantError
+# subclasses can be swallowed by an automation's continue_on_error). The real
+# homeassistant.exceptions imports ClientResponse from aiohttp, which is stubbed
+# above, so register a faithful stub of just that class instead.
+if "homeassistant.exceptions" not in sys.modules:
+    _ha_pkg = sys.modules.setdefault("homeassistant", types.ModuleType("homeassistant"))
+    _ha_exc_stub = types.ModuleType("homeassistant.exceptions")
+    _ha_exc_stub.HomeAssistantError = type("HomeAssistantError", (Exception,), {})
+    _ha_pkg.exceptions = _ha_exc_stub
+    sys.modules["homeassistant.exceptions"] = _ha_exc_stub
+
 sys.modules.setdefault("custom_components", types.ModuleType("custom_components"))
 sys.modules.setdefault("custom_components.homgar", types.ModuleType("custom_components.homgar"))
 sys.modules.setdefault("custom_components.homgar.api", types.ModuleType("custom_components.homgar.api"))

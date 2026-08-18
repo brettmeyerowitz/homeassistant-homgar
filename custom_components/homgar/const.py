@@ -9,6 +9,23 @@ CONF_APP_TYPE = "app_type"  # "homgar" or "rainpoint"
 CONF_GROUP_MULTI_ZONE_DEVICES = "group_multi_zone_devices"
 CONF_VALVE_DURATION_UNIT = "valve_duration_unit"
 
+# --- Opt-in telemetry (v3.0.44) -------------------------------------------
+# Master switch plus two independent sub-toggles, all default OFF. Stored in
+# config entry OPTIONS (user-editable via the options flow).
+CONF_TELEMETRY_CHOICE = "telemetry_choice"
+CONF_TELEMETRY_COUNTRY = "telemetry_share_country"
+CONF_TELEMETRY_MODELS = "telemetry_share_models"
+
+# These two are field NAMES inside the dedicated telemetry Store (see
+# telemetry.py TELEMETRY_STORE_KEY), NOT config entry data keys. They must
+# survive restarts but must NEVER live in entry.data/options: HA fires
+# update listeners on ANY entry.data change, and this integration's listener
+# does a full reload -- unacceptable for state that changes on every daily
+# ping. Kept as constants so the field names aren't duplicated as raw
+# strings across telemetry.py and its tests.
+CONF_ANON_ID = "anon_id"
+CONF_LAST_PING_AT = "last_ping_at"
+
 VALVE_DURATION_UNIT_MINUTES = "minutes"
 VALVE_DURATION_UNIT_SECONDS = "seconds"
 DEFAULT_VALVE_DURATION_UNIT = VALVE_DURATION_UNIT_MINUTES

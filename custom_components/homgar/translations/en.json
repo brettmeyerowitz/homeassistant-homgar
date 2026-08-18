@@ -1,77 +1,97 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "HomGar/RainPoint Cloud",
-                "description": "Log in with your HomGar/RainPoint account.",
-                "data": {
-                    "area_code": "Country code",
-                    "email": "Email",
-                    "password": "Password",
-                    "app_type": "Mobile App Type"
-                },
-                "data_description": {
-                    "app_type": "Choose which mobile app you use with your devices."
-                }
-            },
-            "select_homes": {
-                "title": "Select Homes",
-                "description": "Choose which homes to add to Home Assistant. You can select multiple.",
-                "data": {
-                    "hids": "Homes"
-                }
-            },
-            "reconfigure": {
-                "title": "Reconfigure HomGar/RainPoint",
-                "description": "Update your HomGar/RainPoint credentials.",
-                "data": {
-                    "area_code": "Country code",
-                    "email": "Email",
-                    "password": "Password",
-                    "app_type": "Mobile App Type"
-                },
-                "data_description": {
-                    "app_type": "Choose which mobile app you use with your devices."
-                }
-            },
-            "select_homes_reconfigure": {
-                "title": "Select Homes",
-                "description": "Choose which homes to use with this integration. You can select multiple.",
-                "data": {
-                    "hids": "Homes",
-                    "clean_registry": "Remove all existing devices and entities before reloading"
-                },
-                "data_description": {
-                    "clean_registry": "Use this when upgrading from v2.x or if you have duplicate/orphaned devices. All sensor history will be lost."
-                }
-            }
+  "config": {
+    "step": {
+      "user": {
+        "title": "HomGar/RainPoint Cloud",
+        "description": "Log in with your HomGar/RainPoint account.",
+        "data": {
+          "area_code": "Country code",
+          "email": "Email",
+          "password": "Password",
+          "app_type": "Mobile App Type"
         },
-        "error": {
-            "auth_failed": "Authentication failed. Please check your credentials.",
-            "cannot_connect": "Unable to connect to HomGar/RainPoint. Please try again.",
-            "no_homes": "No homes were found for this account.",
-            "select_at_least_one": "Please select a home.",
-            "invalid_app_type": "Invalid app type selected"
-        },
-        "abort": {
-            "already_configured": "This account is already configured.",
-            "reconfigure_successful": "HomGar/RainPoint integration has been successfully reconfigured."
+        "data_description": {
+          "app_type": "Choose which mobile app you use with your devices."
         }
+      },
+      "select_homes": {
+        "title": "Select Homes",
+        "description": "Choose which homes to add to Home Assistant. You can select multiple.",
+        "data": {
+          "hids": "Homes"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure HomGar/RainPoint",
+        "description": "Update your HomGar/RainPoint credentials.",
+        "data": {
+          "area_code": "Country code",
+          "email": "Email",
+          "password": "Password",
+          "app_type": "Mobile App Type"
+        },
+        "data_description": {
+          "app_type": "Choose which mobile app you use with your devices."
+        }
+      },
+      "select_homes_reconfigure": {
+        "title": "Select Homes",
+        "description": "Choose which homes to use with this integration. You can select multiple.",
+        "data": {
+          "hids": "Homes",
+          "clean_registry": "Remove all existing devices and entities before reloading"
+        },
+        "data_description": {
+          "clean_registry": "Use this when upgrading from v2.x or if you have duplicate/orphaned devices. All sensor history will be lost."
+        }
+      }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "HomGar/RainPoint Options",
-                "description": "Adjust how HomGar/RainPoint devices are presented in Home Assistant.",
-                "data": {
-                    "group_multi_zone_devices": "Create a separate Home Assistant device for each controller zone",
-                    "valve_duration_unit": "Valve duration control unit"
-                },
-                "data_description": {
-                    "group_multi_zone_devices": "When enabled, per-zone valves, durations, and per-port sensors are grouped under child devices. Shared diagnostics stay on the parent controller device.",
-                    "valve_duration_unit": "Choose whether valve duration number entities are shown in minutes or seconds. Existing installs default to minutes."
-                }
-            }
-        }
+    "error": {
+      "auth_failed": "Authentication failed. Please check your credentials.",
+      "cannot_connect": "Unable to connect to HomGar/RainPoint. Please try again.",
+      "no_homes": "No homes were found for this account.",
+      "select_at_least_one": "Please select a home.",
+      "invalid_app_type": "Invalid app type selected"
+    },
+    "abort": {
+      "already_configured": "This account is already configured.",
+      "reconfigure_successful": "HomGar/RainPoint integration has been successfully reconfigured."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "HomGar/RainPoint Options",
+        "description": "Adjust how HomGar/RainPoint devices are presented in Home Assistant.",
+        "data": {
+          "group_multi_zone_devices": "Create a separate Home Assistant device for each controller zone",
+          "valve_duration_unit": "Valve duration control unit",
+          "telemetry_choice": "Share anonymous usage data (off by default)",
+          "telemetry_share_country": "Include my country",
+          "telemetry_share_models": "Include my device models"
+        },
+        "data_description": {
+          "group_multi_zone_devices": "When enabled, per-zone valves, durations, and per-port sensors are grouped under child devices. Shared diagnostics stay on the parent controller device.",
+          "valve_duration_unit": "Choose whether valve duration number entities are shown in minutes or seconds. Existing installs default to minutes.",
+          "telemetry_choice": "Sends an anonymous random ID with your Home Assistant and integration version numbers, at most once a day. It tells me how many people use this and which versions to support. Your IP address is never stored.",
+          "telemetry_share_country": "Adds your country and nothing more precise. It is worked out from your connection, and kept only as a monthly count that cannot be traced back to you.",
+          "telemetry_share_models": "Adds which RainPoint/HomGar devices you own, by model name only, kept as monthly counts."
+        },
+        "sections": {
+          "telemetry_details": {
+            "name": "Anonymous usage data",
+            "description": "These only take effect when \"Share anonymous usage data\" above is switched on.",
+            "data": {
+              "telemetry_share_country": "Include my country",
+              "telemetry_share_models": "Include my device models"
+            },
+            "data_description": {
+              "telemetry_share_country": "Adds your country and nothing more precise. It is worked out from your connection, and kept only as a monthly count that cannot be traced back to you.",
+              "telemetry_share_models": "Adds which RainPoint/HomGar devices you own, by model name only, kept as monthly counts."
+            }
+          }
+        }
+      }
+    }
+  }
 }
