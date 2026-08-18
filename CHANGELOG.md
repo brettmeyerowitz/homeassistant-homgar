@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.44-beta.2] - 2026-08-18
+
+> **Beta release.** Same opt-in telemetry work as beta.1 (unchanged and still
+> off by default), plus the fix below. Visible only to users who have enabled
+> beta versions for this repository in HACS.
+
+### 🐛 Bug Fixes
+- **A failed valve command no longer kills the whole automation — `continue_on_error` now works** — follow-up to [#82](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82). On 2026-08-18 the v3.0.43 pre-send write retry fired against the real cloud for the first time: an irrigation run opened its master valve, then a `controlWorkMode` for the next zone hit a connect timeout, was safely resent once, and failed again (`controlWorkMode failed after 2 attempts`). That much is the policy working as designed — a longer outage can outlive both safe attempts. What should not have happened is what came next: the error aborted the entire automation as an **"Unexpected error for call_service"** even though the action was explicitly configured with `continue_on_error: true`, so the reporter's own safety branch — the one that would have closed the already-open master valve — never ran. Only the device-side 10-minute master duration prevented an over-run.
+  - **Cause**: Home Assistant's script engine only lets `continue_on_error` swallow exceptions derived from `HomeAssistantError` (`Script._handle_exception` in `homeassistant/helpers/script.py`: *"Only Home Assistant errors can be ignored"*); everything else is re-raised and stops the script. `HomGarApiError` derived from plain `Exception`, so **every** failed cloud command from this integration — valve, switch, any control call, transient or not — was uncatchable by an automation. The transient case is simply the one that shows up in the field.
+  - **Fix**: `HomGarApiError` (and with it `HomGarTransientError`) now derives from `HomeAssistantError`. Automations can once again use `continue_on_error: true` and run their own fallback/safety logic after a failed command, which for irrigation is the difference between a missed zone and a master valve left open. Nothing else changes: the retry policy is untouched (writes still get exactly one resend, and only for provably pre-send failures), the exception types stay distinguishable so the coordinator still converts a blip into a single `UpdateFailed` with last-good state retained, and the log wording is unchanged.
+  - Thanks to [@thomasgraf99](https://github.com/thomasgraf99) for the trace-level report that separated the two questions cleanly.
+
+### 🧪 Tests
+- `tests/run_service_error_surface_tests.py` (13 checks) — pins the exception hierarchy the guarantee rests on (`HomGarApiError` **is** a `HomeAssistantError`, `HomGarTransientError` still **is** a `HomGarApiError` so the coordinator and config flow keep catching it), mirrors Home Assistant's own `continue_on_error` rule against a transient failure, a genuine API error, and an unrelated `ValueError` control, and then drives the real write path end to end: an exhausted valve open must raise something an automation can catch, must still be identifiable as transient, and must still have made exactly two attempts — the no-double-actuation guarantee stays intact. Where Home Assistant is importable (the ha-test container) the suite asserts against the **real** `HomeAssistantError`, not a stub.
+- The six existing suites that load `api/client.py` with a stubbed `aiohttp` now register a matching `homeassistant.exceptions` stub, since the real module imports from `aiohttp`. All still pass unchanged (8 + 15 + 27 + 23 + 11 + 22 checks).
+- The new suite is wired into the pre-commit Docker gate.
+
+---
+
 ## [3.0.44-beta.1] - 2026-08-12
 
 > **Beta release.** Opt-in telemetry is new and touches the config entry, the

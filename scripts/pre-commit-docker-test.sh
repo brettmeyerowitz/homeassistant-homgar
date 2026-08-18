@@ -369,6 +369,16 @@ else
     exit 1
 fi
 
+# ── Test: service error surface (issue #82 follow-up) ─────────────────────
+echo "🧪 Running service-error surface tests..."
+docker cp tests/run_service_error_surface_tests.py ha-test:/tmp/tests/run_service_error_surface_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_service_error_surface_tests.py; then
+    echo "✅ Service-error surface tests passed"
+else
+    echo "❌ ERROR: Service-error surface tests failed"
+    exit 1
+fi
+
 # ── Test: opt-in telemetry (v3.0.44) ──────────────────────────────────────
 for suite in run_telemetry_payload_tests run_telemetry_send_tests run_telemetry_optin_tests run_telemetry_options_flow_tests run_coordinator_telemetry_tests; do
     echo "🧪 Running ${suite}..."

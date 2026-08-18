@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
+from homeassistant.exceptions import HomeAssistantError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,8 +81,18 @@ def _is_pre_send_error(err: BaseException) -> bool:
     return isinstance(err, _PRE_SEND_ERRORS)
 
 
-class HomGarApiError(Exception):
-    pass
+class HomGarApiError(HomeAssistantError):
+    """Any failure talking to the HomGar cloud.
+
+    The ``HomeAssistantError`` base is load-bearing, not cosmetic. Home
+    Assistant's script engine only allows ``continue_on_error: true`` to swallow
+    exceptions derived from it (``Script._handle_exception``: "Only Home
+    Assistant errors can be ignored"); anything else aborts the whole automation
+    as an unexpected error. Deriving from plain ``Exception`` meant a failed
+    valve command killed the automation mid-run, so a user's own safety branch —
+    e.g. closing an already-open master valve — never got to execute. See
+    issue #82.
+    """
 
 
 class HomGarTransientError(HomGarApiError):
