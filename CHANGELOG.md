@@ -2,7 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.0.45] - 2026-08-22
+## [3.0.45-beta.1] - 2026-08-22
+
+> **Pre-release.** The fix below changes how long a *failing* control command
+> blocks the calling service call: worst case rises from ~11s to ~72s (three
+> attempts, with the wall-clock deadline stopping the fourth). The healthy path
+> is unchanged at ~0.5s, and this only happens while the vendor cloud is
+> actually unreachable — but a watering automation running zones in sequence
+> stacks it, and a `mode: single` automation could overlap its next trigger.
+> That profile has been reasoned about and tested, not yet *observed* in the
+> field, which is why this is a beta.
 
 ### 🐛 Bug Fixes
 - **Valve commands now survive a multi-minute cloud brownout instead of one second of it** — follow-up to [#82](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82). A reporter ran an independent per-minute `curl` probe from a *separate machine* on the same LAN as Home Assistant, against `region3.homgarus.com`, and caught a failure window alongside a real `controlWorkMode` timeout at 07:02 CEST:
