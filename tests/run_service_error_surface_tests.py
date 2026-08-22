@@ -286,8 +286,15 @@ async def _test_open_valve_raises_ha_error():
           isinstance(raised, client_mod.HomGarTransientError), f"got {type(raised).__name__}")
     check("the cloud host and endpoint stay in the message",
           "controlWorkMode" in str(raised), str(raised))
-    check("the no-double-actuation policy is untouched (2 attempts, not more)",
-          sum(1 for _m, url in session.calls if url.endswith(_CTL)) == 2,
+    # The attempt count itself is not the guarantee — the classifier is. This
+    # failure is a connect timeout, which is provably pre-send, so every attempt
+    # in the envelope is safe. What must never change is that the count is
+    # bounded and derived from the declared envelope rather than unbounded.
+    # (The envelope widened in issue #82's second field report; its shape is
+    # owned by run_write_retry_envelope_tests.py.)
+    expected = len(client_mod._WRITE_PRE_SEND_RETRY_BACKOFF) + 1
+    check(f"the write envelope stays bounded ({expected} attempts, not more)",
+          sum(1 for _m, url in session.calls if url.endswith(_CTL)) == expected,
           str(session.calls))
 
 

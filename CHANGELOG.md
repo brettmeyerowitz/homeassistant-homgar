@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.45-beta.1] - 2026-08-22
+
+> **Pre-release.** The fix below changes how long a *failing* control command
+> blocks the calling service call: worst case rises from ~11s to ~72s (three
+> attempts, with the wall-clock deadline stopping the fourth). The healthy path
+> is unchanged at ~0.5s, and this only happens while the vendor cloud is
+> actually unreachable — but a watering automation running zones in sequence
+> stacks it, and a `mode: single` automation could overlap its next trigger.
+> That profile has been reasoned about and tested, not yet *observed* in the
+> field, which is why this is a beta.
+
+### 🐛 Bug Fixes
+- **Valve commands now survive a multi-minute cloud brownout instead of one second of it** — follow-up to [#82](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82). A reporter ran an independent per-minute `curl` probe from a *separate machine* on the same LAN as Home Assistant, against `region3.homgarus.com`, and caught a failure window alongside a real `controlWorkMode` timeout at 07:02 CEST:
+
+  ```text
+  07:00:20  OK      tcp=0.173s  tls=1.236s  code=200
+  07:01:21  FAILED  SSL connection timeout
+  07:02:36  OK      tcp=0.175s  tls=3.657s  code=200
+  07:03:40  FAILED  SSL connection timeout
+  07:04:55  OK      tcp=0.178s  tls=4.536s  code=200
+  07:06:00  FAILED  SSL connection timeout
+  07:07:15  OK      tcp=0.168s  tls=2.032s  code=200
+  ```
+
+  Two findings came out of it. **The brownouts last minutes, not milliseconds** — so the single 1-second resend introduced in 3.0.43 almost always landed inside the same degraded window and rarely helped. And **only the TLS handshake degraded**: TCP connect stayed flat at 0.167–0.187s throughout, with no SYN-retransmit outliers (a lost SYN would show as ~1.17s), which points at the far end rather than the path — the kernel completes the TCP handshake without the server application doing any work, while the handshake is the first step that requires it.
+  - **The retry envelope was backwards.** A failed *read* self-heals on the next 120-second poll, yet it had three retries; a failed *write* has no next poll — the garden simply does not get watered — yet it had one. Writes now retry across a much wider window. This is safe by construction and the no-double-actuation guarantee is untouched: every delay applies **only** to provably pre-send failures, where not one request byte was transmitted, so a resend cannot re-actuate irrigation. Ambiguous failures (read timeout, mid-flight disconnect, 5xx) still fail fast on the first attempt, exactly as before.
+  - **Retries are jittered.** `region3.homgarus.com` resolves to a single Alibaba host with no CDN, anycast, or failover in front of it. Installations retrying on an identical schedule would arrive in lockstep and add to whatever pile-up caused the brownout, so each delay is spread by ±25%.
+  - **A wall-clock deadline bounds the whole thing.** The request is awaited straight from the service call, so every second spent retrying blocks the calling script step — and a watering automation opening valves in sequence would multiply it. A hard 75-second ceiling stops a stuck command from wedging an automation.
+  - **The TLS handshake budget was raised from 10s to 20s.** The slowest *successful* handshake in the probe was 4.5s, leaving barely any headroom before a marginally worse minute turns a slow success into a hard failure. aiohttp's connect budget covers the handshake, not just the TCP connect. It is raised **within** the unchanged 30s total, so the worst case for a single attempt does not grow, and it costs nothing when the cloud is healthy (~0.5s there).
+  - Read/poll behaviour is deliberately **unchanged** at `(1, 2, 4)` seconds and unjittered, so a failing poll still finishes well inside the coordinator interval.
+  - Thanks again to [@thomasgraf99](https://github.com/thomasgraf99), whose probe — separate machine, independent client, phase-level timings — is what made it possible to rule things out instead of guessing.
+
+### ✨ Features
+- **A failed command is no longer silent** — the original complaint behind #82 was that a valve did not open and nothing said so. Two new **diagnostic** sensors on the Hub device expose it: **Failed commands** (a count since Home Assistant restarted) and **Last failed command** (a timestamp, with the endpoint and error text as attributes). A persistent notification also fires when a command gives up, using a stable per-entry `notification_id` so a multi-minute brownout that kills several commands in a row replaces one notification rather than stacking half a dozen.
+  - **Commands only, never polling.** A failed poll recovers by itself on the next cycle; notifying on it would be noise that trains people to ignore the notification entirely.
+  - The sensors exist alongside the notification rather than instead of it, so you can route alerting wherever you want — phone push, Telegram, a dashboard badge — instead of being limited to a banner you dismiss in the UI.
+
+### 🧪 Tests
+- `tests/run_write_retry_envelope_tests.py` (41 checks, new) — pins the envelope shape (wider than one step, non-decreasing, spans tens of seconds, still starts small), that reads keep exactly `(1, 2, 4)` and stay unjittered, and that the handshake budget rose while the 30s total did not. Drives the real write path end to end: a never-clearing pre-send failure exhausts the envelope and sleeps a jittered form of every base delay; a brownout that clears mid-envelope stops as soon as it succeeds; an ambiguous failure still makes exactly one attempt and sleeps zero times. Jitter is checked over 200 samples for spread, variance, centring, and never returning a negative delay. The deadline is exercised with a controlled monotonic clock to prove it truncates the envelope without disabling retries. Failure visibility is covered too: the counter and last-failure fields, that a failed **poll** is not counted as a write failure, that the callback fires exactly once with the failing endpoint, that a 4xx write is recorded as well as a timeout, and that a callback which raises cannot replace the original error with a more confusing traceback.
+- `tests/run_write_presend_retry_tests.py` (22 checks) — updated. The two assertions that pinned the old "at most one resend, ≤2s" policy now assert the envelope is *bounded* and deadline-capped instead; its shape is owned by the new suite. The classifier tests — the actual no-double-actuation guarantee — are unchanged and still pass.
+- `tests/run_service_error_surface_tests.py` (13 checks) — updated. Its attempt-count assertion now derives from the declared envelope rather than hard-coding 2; the guarantee it protects is the classifier, not the count.
+- `tests/run_command_failure_surface_tests.py` (22 checks, new) — covers the sensor and notification layer, which had no automated coverage: entry-scoped unique ids so two accounts don't collide, both entities DIAGNOSTIC and attached to the hub device, and the sensors reading **live** client state rather than a coordinator snapshot so a failure between polls is visible immediately. The notification wiring is exercised for real: it names the failing command, says the device did not change state, links the tracking issue, is titled with the account, and — the assertion that matters most — six consecutive failures produce **one** notification id rather than six, while a second config entry still alerts independently.
+- Full pre-commit gate green, including the 84-check decoder regression suite. Verified in the `ha-test` container against a real account: the integration sets up cleanly and both new entities register and are enabled.
+
 ## [3.0.44] - 2026-08-18
 
 > Supersedes the `3.0.44-beta.1` and `3.0.44-beta.2` pre-releases; this is
