@@ -379,6 +379,16 @@ else
     exit 1
 fi
 
+# ── Test: command-failure surface — sensors + notification (issue #82) ────
+echo "🧪 Running command-failure surface tests..."
+docker cp tests/run_command_failure_surface_tests.py ha-test:/tmp/tests/run_command_failure_surface_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_command_failure_surface_tests.py; then
+    echo "✅ Command-failure surface tests passed"
+else
+    echo "❌ ERROR: Command-failure surface tests failed"
+    exit 1
+fi
+
 # ── Test: service error surface (issue #82 follow-up) ─────────────────────
 echo "🧪 Running service-error surface tests..."
 docker cp tests/run_service_error_surface_tests.py ha-test:/tmp/tests/run_service_error_surface_tests.py > /dev/null
