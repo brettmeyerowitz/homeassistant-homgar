@@ -74,6 +74,43 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     return True
 
 
+
+def _wire_write_failure_notification(hass: HomeAssistant, client, entry) -> None:
+    """Surface a control command that gave up as a persistent notification.
+
+    Writes only. A failed poll recovers on the next coordinator cycle, so
+    notifying on it would train people to ignore the notification entirely — and
+    the whole point is that a *command* failure is the one with a real-world
+    consequence and no second chance.
+
+    The notification_id is stable per entry, so a multi-minute cloud brownout
+    that kills several commands in a row replaces one notification rather than
+    stacking half a dozen (the same pattern as homgar_unsupported_<model> in the
+    coordinator). Issue #82.
+    """
+    from homeassistant.components import persistent_notification
+
+    def _notify(what: str, detail: str) -> None:
+        persistent_notification.async_create(
+            hass,
+            (
+                f"A command to the HomGar/RainPoint cloud failed and was not "
+                f"applied, so the device did not change state.\n\n"
+                f"**Command:** `{what}`\n"
+                f"**Error:** {detail}\n\n"
+                f"This is almost always the vendor cloud being briefly "
+                f"unreachable rather than a problem with your network or Home "
+                f"Assistant. The command was retried before giving up. If it "
+                f"keeps happening, see "
+                f"https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82"
+            ),
+            title=f"HomGar: command failed ({entry.title})",
+            notification_id=f"homgar_write_failed_{entry.entry_id}",
+        )
+
+    client.on_write_failure = _notify
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up HomGar from a config entry."""
     session = async_get_clientsession(hass)
@@ -97,6 +134,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             raise ConfigEntryNotReady(f"HomGar [{entry.title}]: login failed: {err}") from err
 
     coordinator = HomGarCoordinator(hass, client, entry)
+    _wire_write_failure_notification(hass, client, entry)
 
     try:
         await coordinator.async_config_entry_first_refresh()

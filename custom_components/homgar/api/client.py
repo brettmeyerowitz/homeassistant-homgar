@@ -8,6 +8,8 @@ with the HomGar/RainPoint cloud API.
 import asyncio
 import hashlib
 import logging
+import random
+import time
 from datetime import datetime, timedelta, timezone
 
 import aiohttp
@@ -18,7 +20,15 @@ _LOGGER = logging.getLogger(__name__)
 # Explicit per-request timeout. Without this, requests inherit aiohttp's 300s
 # default total timeout, which lets a single stalled/poisoned connection wedge a
 # whole coordinator cycle for up to 5 minutes during upstream flakiness.
-_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10, sock_connect=10)
+# The connect budget covers the TLS handshake, not just the TCP connect:
+# aiohttp runs loop.create_connection inside ceil_timeout(sock_connect), and
+# anything timing out inside connector.connect() surfaces as
+# ConnectionTimeoutError. A field probe during a brownout (issue #82) measured a
+# 4.5s handshake on a *successful* request against the old 10s budget — barely
+# any headroom — while TCP connect stayed flat at ~0.17s. Raised to 20s, which
+# stays inside the unchanged 30s total, so the worst case for a single attempt
+# does not grow.
+_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=20, sock_connect=20)
 
 # HomGar's cloud (region3.homgarus.com, plain nginx) returns 403 Forbidden to any
 # request whose User-Agent contains "HomeAssistant". HA's shared aiohttp session
@@ -41,10 +51,39 @@ _TRANSIENT_RETRY_BACKOFF = (1, 2, 4)  # seconds between attempts (3 retries)
 # and server timeouts subclass asyncio.TimeoutError.
 _TRANSIENT_NETWORK_ERRORS = (aiohttp.ClientError, asyncio.TimeoutError)
 
-# Write commands get one short resend, and only for provably pre-send failures.
-# A user is waiting on a button press, so this stays deliberately small. See
-# _is_pre_send_error and issue #82.
-_WRITE_PRE_SEND_RETRY_BACKOFF = (1,)
+# Write commands resend only on provably pre-send failures (see
+# _is_pre_send_error), but the envelope is deliberately much wider than the
+# read one. An independent per-minute probe from a reporter's LAN (issue #82,
+# 2026-08-22) showed these cloud brownouts lasting *minutes*, with the handshake
+# degrading and recovering over a ~7 minute window. The previous single 1s
+# resend landed squarely inside the same bad window and rarely helped.
+#
+# The asymmetry with reads is intentional and the opposite way round from what
+# it looks like: a failed read self-heals on the next 120s poll, so it needs no
+# more than a few seconds of retrying. A failed valve command has no next poll —
+# the garden simply does not get watered — so it is the one that has to keep
+# trying. Widening it is safe by construction, because a pre-send failure means
+# no request byte was transmitted and a resend cannot double-actuate.
+_WRITE_PRE_SEND_RETRY_BACKOFF = (2, 8, 20)
+
+# region3.homgarus.com resolves to a single Alibaba host with no CDN in front of
+# it. If every installation retried on an identical schedule they would arrive
+# in lockstep and add to whatever pile-up caused the brownout, so each delay is
+# spread by +/- this fraction.
+_WRITE_PRE_SEND_JITTER = 0.25
+
+# Hard wall-clock ceiling on a single write. _request_json is awaited straight
+# from the service call, so every second spent retrying blocks the calling
+# script step; a watering automation opening valves in sequence would multiply
+# it. The nominal backoff sums to 30s, so this leaves room for jitter and slow
+# attempts while keeping a stuck command from wedging an automation.
+_WRITE_PRE_SEND_DEADLINE = 75.0
+
+
+def _jittered(delay: float) -> float:
+    """Spread a backoff delay by +/-_WRITE_PRE_SEND_JITTER, never below zero."""
+    spread = delay * _WRITE_PRE_SEND_JITTER
+    return max(0.0, random.uniform(delay - spread, delay + spread))
 
 # Failures that prove the request never left the client, so resending a
 # non-idempotent write cannot double-actuate:
@@ -120,6 +159,19 @@ class HomGarClient:
         self._token_expires_at: datetime | None = None
         self._mqtt_credentials: dict = {}
 
+        # Session-scoped write-failure telemetry (exposed via diagnostic sensors
+        # and a notification). A control command that fails has a real-world
+        # consequence and no next poll to recover on, so it must not be silent.
+        # Reads are deliberately excluded: they self-heal, and counting them
+        # here would bury the signal. See issue #82.
+        self._write_failure_count = 0
+        self._last_write_failure_at: datetime | None = None
+        self._last_write_failure_what: str | None = None
+        self._last_write_failure_error: str | None = None
+        # Set by the coordinator to surface a failed command to the user.
+        # Signature: (what: str, detail: str) -> None.
+        self.on_write_failure = None
+
         # Session-scoped token re-auth telemetry (exposed via diagnostic sensors).
         self._reauth_count = 0
         self._last_reauth_at: datetime | None = None
@@ -190,6 +242,7 @@ class HomGarClient:
         backoff = _TRANSIENT_RETRY_BACKOFF if retry else _WRITE_PRE_SEND_RETRY_BACKOFF
         attempts = len(backoff) + 1
         last_error: HomGarTransientError | None = None
+        started = time.monotonic()
         for attempt in range(attempts):
             pre_send = False
             try:
@@ -206,20 +259,82 @@ class HomGarClient:
                 # A 5xx means the request was delivered and answered, so it is
                 # never pre-send.
                 last_error = err
+            except HomGarApiError as err:
+                # A 4xx is final, but it is just as invisible to the user as a
+                # timeout was: the valve simply did not move. Record it before
+                # letting it propagate untouched.
+                if not retry:
+                    self._record_write_failure(what, err)
+                raise
             made = attempt + 1
             if not retry and not pre_send:
                 break
             if attempt + 1 < attempts:
                 delay = backoff[attempt]
+                if not retry:
+                    # Writes are jittered so installations do not retry in
+                    # lockstep against a single origin, and bounded by a
+                    # wall-clock deadline because this call is blocking a
+                    # service call. Reads keep an exact, predictable budget so a
+                    # failing poll stays inside the coordinator interval.
+                    delay = _jittered(delay)
+                    if time.monotonic() - started + delay > _WRITE_PRE_SEND_DEADLINE:
+                        _LOGGER.debug(
+                            "%s giving up after %.1fs: another %.1fs would exceed "
+                            "the %.0fs write deadline",
+                            what, time.monotonic() - started, delay,
+                            _WRITE_PRE_SEND_DEADLINE,
+                        )
+                        break
                 _LOGGER.debug(
-                    "%s transient failure (attempt %d/%d), retrying in %ss: %s",
+                    "%s transient failure (attempt %d/%d), retrying in %.1fs: %s",
                     what, attempt + 1, attempts, delay, last_error,
                 )
                 await asyncio.sleep(delay)
         # Report attempts actually made, not the ceiling — a write that failed
         # fast on an ambiguous error made one, not len(backoff) + 1.
         _LOGGER.warning("%s failed after %d attempts: %s", what, made, last_error)
+        if not retry:
+            self._record_write_failure(what, last_error)
         raise last_error
+
+    # --- write-failure telemetry ---
+
+    @property
+    def write_failure_count(self) -> int:
+        """Control commands that failed outright since HA (re)started."""
+        return self._write_failure_count
+
+    @property
+    def last_write_failure_at(self) -> datetime | None:
+        return self._last_write_failure_at
+
+    @property
+    def last_write_failure_what(self) -> str | None:
+        return self._last_write_failure_what
+
+    @property
+    def last_write_failure_error(self) -> str | None:
+        return self._last_write_failure_error
+
+    def _record_write_failure(self, what: str, error: BaseException) -> None:
+        """Record a control command that gave up, and tell the coordinator.
+
+        The callback is best-effort by design: notification plumbing must never
+        turn a cloud failure into a different, more confusing traceback for the
+        user, so anything it raises is swallowed here.
+        """
+        self._write_failure_count += 1
+        self._last_write_failure_at = datetime.now(timezone.utc)
+        self._last_write_failure_what = what
+        self._last_write_failure_error = str(error)
+        callback = self.on_write_failure
+        if callback is None:
+            return
+        try:
+            callback(what, str(error))
+        except Exception as err:  # noqa: BLE001 - see docstring
+            _LOGGER.debug("write-failure callback raised (ignored): %s", err)
 
     # --- token state helpers ---
 

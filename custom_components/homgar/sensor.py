@@ -35,6 +35,7 @@ from .diagnostic_sensors import (
     HomGarMqttFriendlySensor,
 )
 from .diagnostic_token_sensors import build_token_diagnostic_sensors
+from .diagnostic_command_sensors import build_command_diagnostic_sensors
 from .hub_entities import (
     HomGarHubDeviceIDSensor,
     HomGarHubFirmwareSensor,
@@ -116,6 +117,9 @@ async def async_setup_entry(
         first_hub_info = next(iter(hubs_dict.values()))
         entities.extend(
             build_token_diagnostic_sensors(coordinator, first_hub_info, entry.entry_id)
+        )
+        entities.extend(
+            build_command_diagnostic_sensors(coordinator, first_hub_info, entry.entry_id)
         )
 
     # Create sensor entities for sub-devices

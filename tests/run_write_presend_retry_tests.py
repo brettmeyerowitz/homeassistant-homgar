@@ -313,8 +313,8 @@ async def _test_write_does_not_retry_5xx():
     check("503 on a write raises", raised is not None)
 
 
-async def _test_write_gives_up_after_one_retry():
-    """Bounded: a user is waiting on a button press, so one resend only."""
+async def _test_write_gives_up_eventually():
+    """Bounded: the envelope is wide, but it is not infinite."""
     _SLEEPS.clear()
     err = aiohttp.ConnectionTimeoutError("Connection timeout to host https://x")
     script = {_CTL: [err] * 10}
@@ -324,8 +324,9 @@ async def _test_write_gives_up_after_one_retry():
         await _open_valve(client)
     except client_mod.HomGarApiError as e:
         raised = e
-    check("a persistent connect timeout stops after 2 attempts",
-          _count(session, _CTL) == 2, str(session.calls))
+    expected = len(client_mod._WRITE_PRE_SEND_RETRY_BACKOFF) + 1
+    check("a persistent connect timeout stops at the end of the envelope",
+          _count(session, _CTL) == expected, str(session.calls))
     check("it still raises HomGarTransientError",
           isinstance(raised, client_mod.HomGarTransientError), f"got {type(raised).__name__}")
 
@@ -333,8 +334,16 @@ async def _test_write_gives_up_after_one_retry():
 def _test_backoff_constant_sane():
     b = client_mod._WRITE_PRE_SEND_RETRY_BACKOFF
     check("write backoff is a non-empty tuple", isinstance(b, tuple) and len(b) >= 1, f"got {b!r}")
-    check("write retries at most once (a user is waiting)", len(b) == 1, f"got {b!r}")
-    check("write backoff is short (<=2s)", sum(b) <= 2, f"sum={sum(b)}")
+    # The original policy here was a single 1s resend, on the reasoning that a
+    # user is waiting on a button press. A field probe in issue #82 showed the
+    # cloud brownouts last minutes, so that resend almost always landed inside
+    # the same bad window. The envelope is now wide and bounded by a wall-clock
+    # deadline instead; run_write_retry_envelope_tests.py owns its shape. What
+    # matters *here* is only that it stays finite.
+    check("write backoff is bounded", len(b) <= 5, f"got {b!r}")
+    check("write backoff is bounded by a wall-clock deadline",
+          0 < client_mod._WRITE_PRE_SEND_DEADLINE <= 120,
+          f"got {client_mod._WRITE_PRE_SEND_DEADLINE!r}")
 
 
 def main() -> int:
@@ -349,7 +358,7 @@ def main() -> int:
         asyncio.run(_test_write_does_not_retry_read_timeout())
         asyncio.run(_test_write_does_not_retry_disconnect())
         asyncio.run(_test_write_does_not_retry_5xx())
-        asyncio.run(_test_write_gives_up_after_one_retry())
+        asyncio.run(_test_write_gives_up_eventually())
     finally:
         client_mod.asyncio.sleep = original_sleep
     print(f"\n{PASS} passed, {FAIL} failed")
