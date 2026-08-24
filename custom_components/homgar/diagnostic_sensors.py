@@ -147,7 +147,10 @@ class HomGarMqttRawPayloadSensor(HomGarDiagnosticSensorBase):
 
     @property
     def available(self) -> bool:
-        return self._sensor_key in self.coordinator._mqtt_diagnostics
+        # See HomGarHubMqttRawPayloadSensor: this device's diagnostics entry is
+        # not even created until its first frame, so keying availability off it
+        # meant an idle valve's entity could never become available. Issue #82.
+        return self.coordinator.mqtt_connected
 
     @property
     def native_value(self) -> str | None:
@@ -174,7 +177,10 @@ class HomGarMqttFriendlySensor(HomGarDiagnosticSensorBase):
 
     @property
     def available(self) -> bool:
-        return self._sensor_key in self.coordinator._mqtt_diagnostics
+        # See HomGarHubMqttRawPayloadSensor: this device's diagnostics entry is
+        # not even created until its first frame, so keying availability off it
+        # meant an idle valve's entity could never become available. Issue #82.
+        return self.coordinator.mqtt_connected
 
     @property
     def native_value(self) -> str | None:

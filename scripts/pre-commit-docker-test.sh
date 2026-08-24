@@ -379,6 +379,16 @@ else
     exit 1
 fi
 
+# ── Test: MQTT availability semantics (issue #82 follow-up) ───────────────
+echo "🧪 Running MQTT availability semantics tests..."
+docker cp tests/run_mqtt_availability_tests.py ha-test:/tmp/tests/run_mqtt_availability_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_mqtt_availability_tests.py; then
+    echo "✅ MQTT availability semantics tests passed"
+else
+    echo "❌ ERROR: MQTT availability semantics tests failed"
+    exit 1
+fi
+
 # ── Test: command-failure surface — sensors + notification (issue #82) ────
 echo "🧪 Running command-failure surface tests..."
 docker cp tests/run_command_failure_surface_tests.py ha-test:/tmp/tests/run_command_failure_surface_tests.py > /dev/null

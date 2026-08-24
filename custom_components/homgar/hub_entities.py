@@ -230,8 +230,11 @@ class HomGarHubMqttRawPayloadSensor(HomGarHubSensorBase):
 
     @property
     def available(self) -> bool:
-        diag = self.coordinator._mqtt_diagnostics.get(self._diag_key)
-        return bool(diag and diag.get("raw_payload"))
+        # Availability tracks the MQTT session, not whether this device has
+        # spoken yet: an idle device may emit nothing until it is commanded, and
+        # reporting that as unavailable made a preflight gate impossible to
+        # satisfy. No frame yet is `unknown` (native_value None). Issue #82.
+        return self.coordinator.mqtt_connected
 
     @property
     def _diag_key(self) -> str:
@@ -269,8 +272,11 @@ class HomGarHubMqttFriendlySensor(HomGarHubSensorBase):
 
     @property
     def available(self) -> bool:
-        diag = self.coordinator._mqtt_diagnostics.get(self._diag_key)
-        return bool(diag and diag.get("friendly_summary"))
+        # Availability tracks the MQTT session, not whether this device has
+        # spoken yet: an idle device may emit nothing until it is commanded, and
+        # reporting that as unavailable made a preflight gate impossible to
+        # satisfy. No frame yet is `unknown` (native_value None). Issue #82.
+        return self.coordinator.mqtt_connected
 
     @property
     def _diag_key(self) -> str:

@@ -514,6 +514,45 @@ class HomGarCoordinator(DataUpdateCoordinator):
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(f"Unexpected HomGar error: {err}") from err
 
+    @property
+    def mqtt_connected(self) -> bool:
+        """True when the MQTT session is up, regardless of whether any given
+        device has emitted a frame yet.
+
+        Read from the live MQTT client rather than the cached per-poll
+        diagnostics. The cache is not good enough here: ``async_setup_entry``
+        runs the coordinator's first refresh *before* it creates the MQTT
+        client, so immediately after a reload the cache is empty and would
+        report "not connected" for a full poll interval — which is exactly the
+        post-reload window where an automation is most likely to gate a command
+        on an idle device's diagnostic entity.
+
+        Entities use this to distinguish "MQTT is down, I cannot tell you"
+        (unavailable) from "connected, nothing heard yet" (unknown). Conflating
+        the two deadlocked such automations outright. See issue #82.
+        """
+        client = self._mqtt_client()
+        if client is None:
+            return False
+        connected = getattr(client, "connected", None)
+        if connected is None:  # older client object without the property
+            try:
+                connected = client.get_diagnostics().get("connected")
+            except Exception:  # noqa: BLE001 - availability must never raise
+                return False
+        return bool(connected)
+
+    def _mqtt_client(self):
+        """The entry's MQTT client, or None if it has not been created yet."""
+        try:
+            return (
+                self.hass.data.get(DOMAIN, {})
+                .get(self._entry.entry_id, {})
+                .get("mqtt_client")
+            )
+        except Exception:  # noqa: BLE001 - availability must never raise
+            return None
+
     def _update_mqtt_diagnostics(self, hubs: list) -> None:
         """Update MQTT diagnostics from MQTT client."""
         try:
