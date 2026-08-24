@@ -2,16 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.0.45-beta.1] - 2026-08-22
+## [3.0.45] - 2026-08-24
 
-> **Pre-release.** The fix below changes how long a *failing* control command
-> blocks the calling service call: worst case rises from ~11s to ~72s (three
-> attempts, with the wall-clock deadline stopping the fourth). The healthy path
-> is unchanged at ~0.5s, and this only happens while the vendor cloud is
-> actually unreachable — but a watering automation running zones in sequence
-> stacks it, and a `mode: single` automation could overlap its next trigger.
-> That profile has been reasoned about and tested, not yet *observed* in the
-> field, which is why this is a beta.
+> Supersedes the `3.0.45-beta.1` pre-release. The retry work below was validated
+> in the field over two days by [@thomasgraf99](https://github.com/thomasgraf99):
+> on 2026-08-23 two valve commands were issued *inside* an independently
+> observed TLS brownout and both succeeded (a CLOSE taking ~68s and an OPEN
+> ~32s, against the ~72s design ceiling), and on 2026-08-24 the same automations
+> ran outside the brownout window with command-to-confirmation times of 1–3s —
+> confirming no regression on the healthy path.
+>
+> A failing control command now blocks the calling service call for ~72s worst
+> case, against ~11s before. The healthy path is unchanged at ~0.5s, and this
+> only happens while the vendor cloud is genuinely unreachable.
+
+### 🐛 Bug Fixes (continued)
+- **"No MQTT message yet" no longer reports as `unavailable`** — reported on [#82](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82) while field-testing the beta. A user gated a valve OPEN on the device's MQTT diagnostic entity being available and deadlocked: after an integration reload the entity for an **idle** device stayed `unavailable` until that device emitted its first frame, and an idle valve emits nothing until it is commanded. The preflight check could never pass.
+  - **Cause**: four diagnostic entities (the hub's Last MQTT Payload/Summary and the per-device equivalents) keyed *availability* off a message having arrived. Home Assistant separates these deliberately — `unavailable` means the integration cannot determine the state, `unknown` means it can but there is no value yet — and a healthy MQTT session with a silent device is squarely the second. The per-device case was worse: that device's diagnostics entry is not created at all until its first frame.
+  - **Fix**: a new `HomGarCoordinator.mqtt_connected` property, derived from the `connected` flag the coordinator already refreshes from the MQTT client on **every** poll independent of message traffic. All four entities now report availability from the session state and leave `native_value` as `None` until a frame arrives. `unavailable` now means MQTT is genuinely down — which makes it worth gating on — and `unknown` means connected but not yet heard from.
+  - All four are disabled by default in the entity registry, so this only affects users who deliberately enabled them.
 
 ### 🐛 Bug Fixes
 - **Valve commands now survive a multi-minute cloud brownout instead of one second of it** — follow-up to [#82](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/82). A reporter ran an independent per-minute `curl` probe from a *separate machine* on the same LAN as Home Assistant, against `region3.homgarus.com`, and caught a failure window alongside a real `controlWorkMode` timeout at 07:02 CEST:
@@ -44,6 +53,7 @@ All notable changes to this project will be documented in this file.
 - `tests/run_write_presend_retry_tests.py` (22 checks) — updated. The two assertions that pinned the old "at most one resend, ≤2s" policy now assert the envelope is *bounded* and deadline-capped instead; its shape is owned by the new suite. The classifier tests — the actual no-double-actuation guarantee — are unchanged and still pass.
 - `tests/run_service_error_surface_tests.py` (13 checks) — updated. Its attempt-count assertion now derives from the declared envelope rather than hard-coding 2; the guarantee it protects is the classifier, not the count.
 - `tests/run_command_failure_surface_tests.py` (22 checks, new) — covers the sensor and notification layer, which had no automated coverage: entry-scoped unique ids so two accounts don't collide, both entities DIAGNOSTIC and attached to the hub device, and the sensors reading **live** client state rather than a coordinator snapshot so a failure between polls is visible immediately. The notification wiring is exercised for real: it names the failing command, says the device did not change state, links the tracking issue, is titled with the account, and — the assertion that matters most — six consecutive failures produce **one** notification id rather than six, while a second config entry still alerts independently.
+- `tests/run_mqtt_availability_tests.py` (30 checks, new) — pins the `unknown`/`unavailable` distinction for all four MQTT diagnostic entities: available with a value once a frame arrives, available but valueless for a device that has never spoken (the deadlock case, asserted for the sub-device whose diagnostics key does not yet exist), and still genuinely `unavailable` when the session is down or no diagnostics exist at all — otherwise the entity would be useless as a preflight gate. Also checks that a frame from the hub does not make a silent valve look like it reported.
 - Full pre-commit gate green, including the 84-check decoder regression suite. Verified in the `ha-test` container against a real account: the integration sets up cleanly and both new entities register and are enabled.
 
 ## [3.0.44] - 2026-08-18

@@ -514,6 +514,23 @@ class HomGarCoordinator(DataUpdateCoordinator):
         except Exception as err:  # noqa: BLE001
             raise UpdateFailed(f"Unexpected HomGar error: {err}") from err
 
+    @property
+    def mqtt_connected(self) -> bool:
+        """True when the MQTT session is up, regardless of whether any given
+        device has emitted a frame yet.
+
+        ``_update_mqtt_diagnostics`` refreshes the client's ``connected`` flag on
+        every poll, independent of message traffic, so this is knowable even for
+        a device that has never spoken. Entities use it to distinguish "MQTT is
+        down, I cannot tell you" (unavailable) from "connected, nothing heard
+        yet" (unknown) — conflating the two deadlocked automations that gated a
+        command on an idle device's diagnostic entity. See issue #82.
+        """
+        return any(
+            bool(diag.get("connected"))
+            for diag in self._mqtt_diagnostics.values()
+        )
+
     def _update_mqtt_diagnostics(self, hubs: list) -> None:
         """Update MQTT diagnostics from MQTT client."""
         try:
