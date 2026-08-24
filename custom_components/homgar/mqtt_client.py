@@ -422,6 +422,11 @@ class HomGarMQTTClient:
         except Exception as e:
             _LOGGER.error("HomGar MQTT message processing error: %s", e, exc_info=True)
 
+    @property
+    def connected(self) -> bool:
+        """Live session state, readable without building a diagnostics dict."""
+        return self._connected
+
     def get_diagnostics(self) -> dict:
         """Get MQTT diagnostic information."""
         uptime = time.time() - (self._last_connect_time or time.time())

@@ -178,11 +178,121 @@ def _sub_sensors(coord):
 # --- the coordinator's own signal -------------------------------------------
 
 
-def _test_coordinator_property_exists():
-    from custom_components.homgar import coordinator as _c  # noqa: F401
-    src = (ROOT / "custom_components" / "homgar" / "coordinator.py").read_text()
-    check("the coordinator exposes mqtt_connected", "def mqtt_connected" in src)
-    check("it is a property", "@property\n    def mqtt_connected" in src)
+def _load_real_coordinator():
+    """Load the real coordinator module so mqtt_connected is exercised for real.
+
+    The first version of this suite asserted the property existed by grepping
+    the source, and stubbed the property itself in the fake coordinator below.
+    That is how the post-reload bug got through: the entities were tested, the
+    thing they depend on never was.
+    """
+    core = types.ModuleType("homeassistant.core")
+    core.HomeAssistant = type("HomeAssistant", (), {})
+    pn = types.ModuleType("homeassistant.components.persistent_notification")
+    pn.async_create = lambda *a, **kw: None
+    aio = types.ModuleType("homeassistant.helpers.aiohttp_client")
+    aio.async_get_clientsession = lambda *a, **kw: None
+    sys.modules["homeassistant.core"] = core
+    sys.modules["homeassistant.components.persistent_notification"] = pn
+    sys.modules["homeassistant.helpers.aiohttp_client"] = aio
+    sys.modules["homeassistant.components"].persistent_notification = pn
+
+    api = types.ModuleType("custom_components.homgar.api")
+    api.HomGarClient = type("HomGarClient", (), {})
+    api.HomGarApiError = type("HomGarApiError", (Exception,), {})
+    dec = types.ModuleType("custom_components.homgar.decoder")
+    dec.decode_payload = lambda *a, **kw: {}
+    dec.get_switch_ports = lambda *a, **kw: []
+    dec.get_valve_ports = lambda *a, **kw: []
+    tel = types.ModuleType("custom_components.homgar.telemetry")
+    async def _noop(*a, **kw):
+        return None
+    tel.async_maybe_ping = _noop
+    for name, mod in [("custom_components.homgar.api", api),
+                      ("custom_components.homgar.decoder", dec),
+                      ("custom_components.homgar.telemetry", tel)]:
+        sys.modules[name] = mod
+
+    # The real const module — the coordinator imports many names from it.
+    del sys.modules["custom_components.homgar.const"]
+    _load("custom_components.homgar.const", "custom_components/homgar/const.py")
+    return _load("custom_components.homgar.coordinator",
+                 "custom_components/homgar/coordinator.py")
+
+
+class _FakeMqttClient:
+    def __init__(self, connected):
+        self.connected = connected
+
+
+class _LegacyMqttClient:
+    """No `connected` property — only get_diagnostics()."""
+
+    def __init__(self, connected, raises=False):
+        self._connected = connected
+        self._raises = raises
+
+    def get_diagnostics(self):
+        if self._raises:
+            raise RuntimeError("diagnostics exploded")
+        return {"connected": self._connected}
+
+
+class _Hass:
+    def __init__(self, data):
+        self.data = data
+
+
+class _Entry:
+    entry_id = "entry1"
+
+
+def _real_coord(mqtt_client=None, include_entry=True, include_domain=True,
+                diagnostics=None):
+    mod = _REAL_COORD
+    coord = mod.HomGarCoordinator.__new__(mod.HomGarCoordinator)
+    entry_data = {} if mqtt_client is None else {"mqtt_client": mqtt_client}
+    domain_data = {"entry1": entry_data} if include_entry else {}
+    coord.hass = _Hass({"homgar": domain_data} if include_domain else {})
+    coord._entry = _Entry()
+    coord._mqtt_diagnostics = diagnostics if diagnostics is not None else {}
+    return coord
+
+
+def _test_coordinator_mqtt_connected():
+    check("the coordinator exposes mqtt_connected as a property",
+          isinstance(getattr(_REAL_COORD.HomGarCoordinator, "mqtt_connected", None),
+                     property))
+
+    # THE REGRESSION. async_setup_entry runs the coordinator's first refresh
+    # before it creates the MQTT client, so right after a reload the per-poll
+    # diagnostics cache is empty. Reading the cache reported "not connected" for
+    # a whole poll interval — the exact window where an automation gates a
+    # command on an idle device.
+    coord = _real_coord(_FakeMqttClient(True), diagnostics={})
+    check("connected is reported from the live client even with an empty cache",
+          coord.mqtt_connected is True,
+          "post-reload window: this is the bug that shipped in the first attempt")
+
+    coord = _real_coord(_FakeMqttClient(False), diagnostics={})
+    check("a disconnected client reports not connected", coord.mqtt_connected is False)
+
+    check("no client yet means not connected",
+          _real_coord(None).mqtt_connected is False)
+    check("a missing entry means not connected",
+          _real_coord(_FakeMqttClient(True), include_entry=False).mqtt_connected is False)
+    check("a missing domain means not connected",
+          _real_coord(_FakeMqttClient(True), include_domain=False).mqtt_connected is False)
+
+    # A stale cache must not be able to override the live client either way.
+    stale = {"rainpoint_hub_777": {"connected": True}}
+    check("a stale cache saying connected cannot override a down client",
+          _real_coord(_FakeMqttClient(False), diagnostics=stale).mqtt_connected is False)
+
+    check("falls back to get_diagnostics for a client without the property",
+          _real_coord(_LegacyMqttClient(True)).mqtt_connected is True)
+    check("availability never raises, even if diagnostics does",
+          _real_coord(_LegacyMqttClient(True, raises=True)).mqtt_connected is False)
 
 
 # --- the deadlock itself ----------------------------------------------------
@@ -263,9 +373,12 @@ def _test_one_device_silent_does_not_hide_another():
           f"available={raw_sub.available} value={raw_sub.native_value!r}")
 
 
+_REAL_COORD = _load_real_coordinator()
+
+
 def main() -> int:
     print("MQTT availability semantics tests (issue #82 follow-up)")
-    _test_coordinator_property_exists()
+    _test_coordinator_mqtt_connected()
     _test_idle_device_is_unknown_not_unavailable()
     _test_unavailable_still_means_something()
     _test_values_appear_once_a_frame_arrives()
