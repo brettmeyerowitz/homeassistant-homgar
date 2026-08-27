@@ -632,8 +632,9 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
     # percentage; the app presents it as full.
     if model_str.upper() == "HCS012ARF":
         result["battery_level"] = 100
-        if rssi is not None:
-            result["signal_strength"] = rssi
+        signal = _valid_rssi(rssi)
+        if signal is not None:
+            result["signal_strength"] = signal
     elif not is_display_hub_v2:
         if bat_or_rssi is not None:
             if bat_or_rssi < 0:
@@ -648,8 +649,10 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
             result["battery_level"] = _LEGACY_SIMPLE_BATTERY_STATUS_TO_PCT[rssi]
             result["battery_status_code"] = rssi
             result["battery_status"] = "low" if rssi >= 2 else "normal"
-        if rssi is not None and "signal_strength" not in result:
-            result["signal_strength"] = rssi
+        if "signal_strength" not in result:
+            signal = _valid_rssi(rssi)
+            if signal is not None:
+                result["signal_strength"] = signal
 
     if port_number > 1 and len(port_sections) >= port_number:
         for p in range(1, port_number + 1):
@@ -749,13 +752,42 @@ def _find_entry(entries, dp_index, identity, dp_code_name, port=None):
 
 
 def _dec_rssi(entries, dp_index):
-    e = _find_entry(entries, dp_index, "STA_RSSI", "RSSI")
-    if e is None or len(e["type_value"]) < 2:
-        e = _find_by_identity(entries, dp_index, "STA_RSSI2")
+    # Try the primary slot, then STA_RSSI2. A slot that is present but holds a
+    # non-negative value is reporting "no reading" rather than a signal, so
+    # fall through to the next candidate instead of publishing it.
+    candidates = (
+        _find_entry(entries, dp_index, "STA_RSSI", "RSSI"),
+        _find_by_identity(entries, dp_index, "STA_RSSI2"),
+    )
+    for e in candidates:
         if e is None or len(e["type_value"]) < 2:
-            return None
-    raw = e["type_value"][1] & 0xFF
-    return raw - 256 if raw > 127 else raw
+            continue
+        raw = e["type_value"][1] & 0xFF
+        value = _valid_rssi(raw - 256 if raw > 127 else raw)
+        if value is not None:
+            return value
+    return None
+
+
+def _valid_rssi(value):
+    """Return ``value`` only when it can actually be an RSSI in dBm.
+
+    A received signal is always negative in dBm: 0 would be a milliwatt at the
+    antenna and positive is physically impossible for these radios. Every
+    genuine RSSI in the fixture corpus is negative, which makes the sign a
+    reliable way to tell a real reading from something that is not one.
+
+    Two different things produce non-negative values (issue #92):
+
+    * In TLV frames the device sends ``E1 00 00`` when it has no reading -
+      literal zero, which the HomGar app hides and we were rendering as
+      ``0 dBm``. A real frame looks like ``E1 AF 00`` (0xAF -> -81).
+    * In legacy frames the header slot we read carries a battery status flag
+      (1 = normal, 2 = low) on some models rather than a signal at all.
+    """
+    if value is None or value >= 0:
+        return None
+    return value
 
 
 _BAT_LEVEL_TO_PCT = {
@@ -950,6 +982,16 @@ def _dec_day_rain(entries, dp_index):
     return round(_le_int(e) / 10.0, 1)
 
 
+def _dec_week_rain(entries, dp_index):
+    # HCS012ARF sends STA_7DAY_RAIN alongside the hour/day totals and the
+    # HomGar app shows it, but the TLV path never decoded it - so the
+    # "Rain Last 7 Days" entity simply never appeared (issue #92).
+    e = _find_entry(entries, dp_index, "STA_7DAY_RAIN", "WEEK_RAIN")
+    if e is None or e["type_len"] <= 0:
+        return None
+    return round(_le_int(e) / 10.0, 1)
+
+
 def _dec_today_water(entries, dp_index, unit):
     e = _find_entry(entries, dp_index, "STA_TOTAL_TODAY", "TOTAL_TODAY")
     if e is None or e["type_len"] <= 0:
@@ -1064,6 +1106,10 @@ def _decode_port(entries: list[dict], dp_index: dict[int, dict],
     dr = _dec_day_rain(entries, dp_index)
     if dr is not None:
         result["precipitation_24h"] = dr
+
+    wr = _dec_week_rain(entries, dp_index)
+    if wr is not None:
+        result["precipitation_7d"] = wr
 
     rain_detected = _dec_rain_detected(entries, dp_index, model_str)
     if rain_detected is not None:

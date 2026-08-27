@@ -210,6 +210,16 @@ else
     exit 1
 fi
 
+# ── Test: no phantom Firmware Version entity (issue #92) ──────────────────
+echo "🧪 Running firmware sensor tests..."
+docker cp tests/run_firmware_sensor_tests.py ha-test:/tmp/tests/run_firmware_sensor_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_firmware_sensor_tests.py; then
+    echo "✅ Firmware sensor tests passed"
+else
+    echo "❌ ERROR: Firmware sensor tests failed"
+    exit 1
+fi
+
 # ── Test: area seeding regressions ────────────────────────────────────────
 echo "🧪 Running area seeding regression tests..."
 docker cp tests/run_area_seeding_tests.py ha-test:/tmp/tests/run_area_seeding_tests.py > /dev/null
