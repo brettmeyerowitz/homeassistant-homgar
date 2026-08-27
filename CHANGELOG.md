@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.46] - 2026-08-27
+
+### 🐛 Bug Fixes
+- **The rain gauge no longer invents readings it does not have** — reported in [#92](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/92). An HCS012ARF showed `Signal Strength 0 dBm` and `Firmware Version 0`, and never showed the 7-day rain total the HomGar app does show. Three symptoms, one mistake: treating a sentinel as a measurement.
+  - **Signal strength**: a real reading arrives as `E1 AF 00` (`0xAF` → `-81 dBm`); this device sends `E1 00 00`, meaning "no reading". On the legacy path the slot being read is a *battery status flag* (`1` = normal, `2` = low) on other models, which is why it produced `0` and `1` rather than anything signal-shaped. A received signal is always negative in dBm — `0` would be a milliwatt at the antenna — and every genuine RSSI in the test corpus is negative, so non-negative values are now rejected on both paths. `_dec_rssi()` additionally falls through to `STA_RSSI2` rather than publishing an empty primary slot, so models carrying both get a real reading where one exists.
+  - **7-day rain**: `STA_7DAY_RAIN` was present in the frame but the TLV path had no decoder for it, so **Rain Last 7 Days** never appeared. The legacy path had always produced it.
+  - **Firmware version**: the sensor was created for every sub-device regardless. RF accessories have no independently flashable firmware and the API reports `softVer` as zero — sometimes the integer, sometimes the string `"0"`, which a bare `or None` does not catch. The check is now type-agnostic, and the hub path's existing guard is unchanged.
+  - The guards test the **value**, not the model name. RainPoint's own product definition declares `STA_RSSI` for this gauge identically to models that do report it, so if a firmware update starts populating these fields the readings pass straight through and the entities return by themselves.
+
+### ⬆️ Upgrading
+- Installs that already have this hardware keep two now-orphaned entities, `Signal Strength` and `Firmware Version`. They report `unavailable` and can be deleted by hand. They are not removed automatically, because that would discard history you may have referenced.
+
 ## [3.0.45] - 2026-08-24
 
 > Supersedes the `3.0.45-beta.1` pre-release. The retry work below was validated

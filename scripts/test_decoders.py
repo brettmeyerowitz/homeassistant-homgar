@@ -226,7 +226,11 @@ r = decode_payload("HCS012ARF", "1,84,0,0;R=4870(10/20/430/2340)")
 check("no error",          "error" not in r)
 check("has rain fields",   any(k in r for k in ("precipitation_total", "precipitation_1h", "precipitation_24h")))
 check("battery present",   r.get("battery_level") is not None)
-check("signal present",    r.get("signal_strength") is not None)
+# Issue #92: the legacy header's third field is the battery status slot, not an
+# RSSI - every genuine legacy RSSI sits in the second field and is negative.
+# Reading it as dBm gave this gauge a phantom "0 dBm" sensor the HomGar app
+# does not show at all.
+check("no phantom signal", r.get("signal_strength") is None, str(r.get("signal_strength")))
 dean_rain = decode_payload("HCS012ARF", "1,0,1;R=100(0/70/100)")
 check("Dean sample total=10.0mm", dean_rain.get("precipitation_total") == 10.0, str(dean_rain.get("precipitation_total")))
 check("Dean sample 24h=7.0mm", dean_rain.get("precipitation_24h") == 7.0, str(dean_rain.get("precipitation_24h")))

@@ -29,6 +29,24 @@ from .telemetry import async_maybe_ping
 _LOGGER = logging.getLogger(__name__)
 
 
+def _clean_firmware(value: Any) -> str | None:
+    """Return a real firmware version, or None when the device reports none.
+
+    RF accessories such as the HCS012ARF rain gauge have no independently
+    flashable firmware, and the API reports ``softVer`` as zero for them -
+    sometimes the integer, sometimes the string ``"0"``. A bare ``or None``
+    only catches the integer, which is how "Firmware Version 0" survived
+    (issue #92). Real versions look like ``"1.1.1041"``, so anything that
+    reduces to zero or empty is absent, whatever its type.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text.lower() in {"0", "0.0", "none", "null"}:
+        return None
+    return text
+
+
 def _extract_state_rssi(raw_state: str | None) -> int | None:
     """Extract RSSI from hub state strings like ``0,-50``."""
     if not raw_state:
@@ -454,7 +472,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                             "sub_name": sub.get("name"),
                             "port_describe": sub.get("portDescribe"),
                             "model": sub.get("model"),
-                            "firmware_version": sub.get("softVer"),
+                            "firmware_version": _clean_firmware(sub.get("softVer")),
                             "raw_status": s,
                             "data": decoded,
                             "type_flag": sub.get("typeFlag", 0),
@@ -483,7 +501,7 @@ class HomGarCoordinator(DataUpdateCoordinator):
                                     "hub_name": hub.get("name", "Hub"),
                                     "sub_name": hub.get("name") or hub_model,
                                     "model": hub_model,
-                                    "firmware_version": hub.get("softVer"),
+                                    "firmware_version": _clean_firmware(hub.get("softVer")),
                                     "raw_status": hub_device_status,
                                     "data": decoded,
                                     "type_flag": 0,
