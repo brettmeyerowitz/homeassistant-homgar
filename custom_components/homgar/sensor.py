@@ -26,7 +26,7 @@ from .const import (
     format_port_entity_name,
     zone_device_identifier,
 )
-from .coordinator import HomGarCoordinator
+from .coordinator import HomGarCoordinator, _clean_firmware
 from .sensor_defs import FIELD_SENSOR_MAP, sensor_fields_for_data
 from .decoder import get_valve_ports
 from .diagnostic_sensors import (
@@ -154,8 +154,11 @@ async def async_setup_entry(
                 for field in sorted(fields):
                     entities.append(HomGarGenericSensor(coordinator, key, info, field))
 
-        # Diagnostic sensors for all sub-devices
-        entities.append(HomGarFirmwareVersionSensor(coordinator, key, info, base_slug))
+        # Only sub-devices that actually report a firmware version get the
+        # sensor. RF accessories such as the rain gauge report nothing, and an
+        # entity permanently reading "0" or "Unknown" is worse than no entity.
+        if _clean_firmware(info.get("firmware_version")):
+            entities.append(HomGarFirmwareVersionSensor(coordinator, key, info, base_slug))
 
         # Raw payload sensor (disabled by default)
         entities.append(HomGarRawPayloadSensor(coordinator, key, info, base_slug))
