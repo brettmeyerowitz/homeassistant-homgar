@@ -15,6 +15,29 @@ bash scripts/pre-commit-docker-test.sh
 6. Create and push tag `vX.Y.Z`
 7. Create the GitHub release with `gh` using a notes file
 
+## Release Title Rule
+
+**Do not begin the release title with the version number.**
+
+HACS renders the update dialog as `<tag> - <release name>`, so a title of
+`v3.0.47 — a null status no longer blocks setup` displays to users as:
+
+```
+v3.0.47 - v3.0.47 — a null status no longer blocks setup
+```
+
+Title the release with the change only:
+
+```bash
+gh release create v3.0.47 \
+  --title "A null status no longer blocks setup, plus diagnostics downloads" \
+  --notes-file notes.md
+```
+
+Releases up to and including v3.0.46 repeat the version and render doubled in
+HACS. They are left as-is rather than retitled, since editing a published
+release rewrites what existing users already saw.
+
 ## Notes File Rule
 
 When using `gh`, write multi-line release notes to a file first and pass:
