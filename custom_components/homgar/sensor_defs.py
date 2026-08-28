@@ -116,8 +116,21 @@ FIELD_SENSOR_MAP: dict[str, SensorDef | None] = {
     "last_water_volume": SensorDef(
         device_class=SensorDeviceClass.WATER,
         unit=UnitOfVolume.LITERS,
-        state_class=SensorStateClass.TOTAL,
+        # A per-session snapshot, NOT a meter. TOTAL made Home Assistant derive
+        # long-term statistics from the deltas between readings, so a 10 L
+        # session followed by a 2 L one recorded -8 L on the water dashboard.
+        # See issue #96.
+        state_class=SensorStateClass.MEASUREMENT,
         name="Last Session Volume",
+    ),
+    "water_total": SensorDef(
+        device_class=SensorDeviceClass.WATER,
+        unit=UnitOfVolume.LITERS,
+        # The meter the Energy dashboard actually wants. Derived by summing
+        # completed sessions, because these valves report no cumulative counter
+        # of their own. See water_total.py and issue #96.
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        name="Total Water Volume",
     ),
     "today_water_volume": SensorDef(
         device_class=SensorDeviceClass.WATER,

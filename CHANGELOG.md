@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.48] - 2026-08-28
+
+### 🐛 Bug Fixes
+- **Water volumes no longer produce negative readings on the Energy dashboard** — reported in [#96](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/96). **Last Session Volume** was declared as a cumulative meter (`state_class: total`), which makes Home Assistant derive long-term statistics from the difference between consecutive readings. It is not a meter — it is a snapshot of the most recent watering session, and it drops back down after every run. A 10 L session followed by a 2 L one was therefore recorded as **−8 L** of water use. It is now a `measurement`, so it reports its own value and contributes no bogus totals.
+  - Correcting the state class discards the `sum` statistics previously accumulated for these sensors. Those sums were the negative ones, so this is a cleanup rather than a loss, but Home Assistant may show a one-off statistics notice.
+
+### ✨ New
+- **Total Water Volume** — valves such as the HTV245FRF report only the last session's volume and carry no cumulative counter at all, so there was nothing to put on the Energy dashboard once the above was fixed. A running total is now derived per zone by summing completed sessions, exposed as `total_increasing` and restored across restarts.
+  - Sessions are counted using the device's own event timestamp rather than by watching the volume change. Two consecutive sessions using the same amount of water — the normal result of a fixed-duration schedule — are indistinguishable by value alone and would otherwise be silently counted once.
+  - Created only for valves that report no hardware total of their own. Devices that already expose a real cumulative counter keep using it and do not gain a second, competing meter.
+  - Sessions that complete while Home Assistant is stopped cannot be counted: the cloud only ever exposes the *most recent* session, so there is no history to catch up on.
+
 ## [3.0.47] - 2026-08-28
 
 ### 🐛 Bug Fixes
