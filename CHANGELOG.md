@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.47] - 2026-08-28
+
+### 🐛 Bug Fixes
+- **A device with no cloud status no longer blocks the whole integration from starting** — reported in [#97](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/97). An account containing an HCS048B failed setup entirely with `Unexpected HomGar error: 'NoneType' object has no attribute 'get'`, retrying every five seconds forever. The cloud answers `{"code": 0, "msg": "SUCCESS", "data": null}` for a device that has no status to report, and `data.get("data", {})` does not defend against that — a default only applies when the key is *absent*, and here it is present and explicitly null. The `None` was stored and detonated one poll later. Every response now passes through a single guard that substitutes the default for a null while leaving a genuinely empty answer (`{}`, `[]`, `0`) untouched, since "the server said empty" and "the server said nothing" are different facts. Applied to all six extraction points, not just the one that crashed.
+  - The affected device is a Bluetooth water flow meter. Its readings reach the cloud only when the phone app uploads them over BLE, so the cloud holds nothing of its own to serve. It will now appear without readings rather than preventing every other device on the account from loading — the honest outcome, since there is nothing for this integration to read.
+
+### ✨ New
+- **Download diagnostics** — the integration now supports Home Assistant's standard diagnostics download (**Settings → Devices & Services → HomGar/RainPoint → ⋮ → Download diagnostics**). Device-support reports previously depended on hand-pasted logs, which routinely omitted the one line that mattered; #97's report began immediately after it. The download captures the shipped catalogue version, any model the catalogue has never seen, the full cloud device rows, and the raw status envelopes exactly as received — so an explicit `"data": null` arrives as null rather than being normalised away. Account identifiers and device credentials (email, tokens, `iotId`, `productKey`, `deviceName`, `mac`, `hid`, and the entry title, which embeds the account email) are redacted; `mid`, `model`, `modelCode` and the raw payload frames are deliberately kept, because they are the diagnostic content itself.
+
 ## [3.0.46] - 2026-08-27
 
 ### 🐛 Bug Fixes

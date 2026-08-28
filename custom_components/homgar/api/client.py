@@ -39,6 +39,22 @@ _REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=20, sock_connect=20)
 # value works; this mirrors the RainPoint/HomGar phone app. See issue #76.
 _USER_AGENT = "okhttp/4.9.2"
 
+
+def _response_payload(data: dict, default):
+    """Return a response's ``data`` section, substituting *default* for null.
+
+    ``data.get("data", default)`` is not enough: the cloud answers
+    ``{"code": 0, "msg": "SUCCESS", "data": null}`` for a device that has no
+    status to report, and a dict default only applies when the key is *absent*.
+    The explicit null therefore leaked through as None and blew up one loop
+    later as ``'NoneType' object has no attribute 'get'``. See issue #97.
+
+    A present-but-empty payload (``{}`` / ``[]``) is passed through unchanged —
+    it is a real answer, not a missing one.
+    """
+    value = data.get("data")
+    return default if value is None else value
+
 # Transient upstream failures worth retrying within a single coordinator poll:
 # connection resets, DNS/connect timeouts, and 5xx from the cloud. The cloud
 # (region3.homgarus.com) intermittently returns these while the RainPoint app
@@ -590,7 +606,7 @@ class HomGarClient:
             data = await self._request_json("get", url, what="list_homes", headers=self._auth_headers())
         if data.get("code") != 0:
             raise HomGarApiError(f"list_homes failed: {data}")
-        return data.get("data", [])
+        return _response_payload(data, [])
 
     async def get_devices_by_hid(self, hid: int) -> list[dict]:
         """Get devices by home ID (HID)."""
@@ -610,7 +626,7 @@ class HomGarClient:
             )
         if data.get("code") != 0:
             raise HomGarApiError(f"getDeviceByHid failed: {data}")
-        return data.get("data", [])
+        return _response_payload(data, [])
 
     async def get_multiple_device_status(self, devices: list) -> list[dict]:
         """Get status for multiple devices in one call."""
@@ -642,7 +658,7 @@ class HomGarClient:
             raise HomGarApiError(f"Device status API error: {data.get('msg')}")
         
         # Convert response format - API returns "status" but coordinator expects "subDeviceStatus"
-        response_data = data.get("data", [])
+        response_data = _response_payload(data, [])
         converted_data = []
         for device in response_data:
             converted_device = device.copy()
@@ -672,7 +688,28 @@ class HomGarClient:
             )
         if data.get("code") != 0:
             raise HomGarApiError(f"getDeviceStatus failed: {data}")
-        return data.get("data", {})
+        return _response_payload(data, {})
+
+    async def raw_device_status(self, mid: int) -> dict:
+        """Return getDeviceStatus's full envelope, unnormalised, for diagnostics.
+
+        ``get_device_status`` deliberately substitutes ``{}`` for a null payload
+        so callers cannot crash on it (issue #97), which also makes "no status at
+        all" indistinguishable from "empty status" downstream. Diagnostics need
+        that distinction — a Bluetooth device with no cloud mirror answers
+        ``"data": null`` — so this returns ``code``/``msg``/``data``/``ts`` as
+        received. Read-only; no reauth retry, since a diagnostics download should
+        report a token problem rather than paper over it.
+        """
+        await self._ensure_auth()
+        url = f"{self._base_url}/app/device/getDeviceStatus"
+        return await self._request_json(
+            "get",
+            url,
+            what="getDeviceStatus(diagnostics)",
+            headers=self._auth_headers(),
+            params={"mid": mid},
+        )
 
     async def subscribe_status(
         self,
@@ -738,7 +775,7 @@ class HomGarClient:
             _LOGGER.debug("API response (after reauth): subscribe_status data=%s", data)
         if data.get("code") != 0:
             raise HomGarApiError(f"subscribeStatus failed: {data}")
-        return data.get("data", {})
+        return _response_payload(data, {})
 
     async def set_device_state(self, home_id: int, device_name: str, mid: int, product_key: str, state: dict) -> bool:
         """Set device state."""
@@ -808,7 +845,7 @@ class HomGarClient:
             return []
         
         # Extract models from data['data']['models'] structure
-        data_section = data.get("data", {})
+        data_section = _response_payload(data, {})
         if isinstance(data_section, dict):
             result = data_section.get("models", [])
         else:
