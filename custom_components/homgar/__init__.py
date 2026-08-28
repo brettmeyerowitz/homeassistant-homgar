@@ -615,15 +615,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     )
 
 
-async def async_get_diagnostic_info(hass: HomeAssistant, entry: ConfigEntry) -> dict:
-    """Return diagnostic information for this integration."""
-    return {
-        "entry_id": entry.entry_id,
-        "title": entry.title,
-        "domain": DOMAIN,
-        "supports_reload": True,
-    }
-
 
 async def async_reload_integration(hass: HomeAssistant, entry_id: str) -> bool:
     """Reload the HomGar integration."""
