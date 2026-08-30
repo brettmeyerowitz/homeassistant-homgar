@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.49] - 2026-08-30
+
+### 🐛 Bug Fixes
+- **Total Water Volume now actually counts** — the sensor added in v3.0.48 never left `0.00 L`. Reported on [#96](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/96) by [@thomasgraf99](https://github.com/thomasgraf99) and [@Semir333](https://github.com/Semir333), who between them field-tested it on real hardware and identified the failing code path.
+  - A session is counted using the device's event timestamp, but the accumulator read only `event_time_raw` — a field the **legacy** payload decoder sets. Devices on the **TLV** path, including the HTV245FRF, expose the same event solely as an ISO-8601 string in `event_time`. The key was therefore always absent, and the accumulator correctly declined to count a session it could not identify. It now accepts either representation.
+  - Measured against the payload corpus, the old logic produced a usable key for **0 of 12** TLV payload sections carrying an event time; it now produces 12.
+  - The v3.0.48 tests all passed while the sensor was incapable of counting anything, because they exercised the accumulator in isolation and never asked whether the field it reads exists in real decoded output. A regression test now runs every corpus payload through the decoder and asserts a usable key comes out of both decode paths.
+
+### ⬆️ Upgrading
+- Totals start from zero on upgrade. Sessions that ran while the sensor was stuck cannot be recovered — the cloud only ever exposes the most recent session.
+
+## [3.0.48] - 2026-08-28
+
+### 🐛 Bug Fixes
+- **Water volumes no longer produce negative readings on the Energy dashboard** — reported in [#96](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/96). **Last Session Volume** was declared as a cumulative meter (`state_class: total`), which makes Home Assistant derive long-term statistics from the difference between consecutive readings. It is not a meter — it is a snapshot of the most recent watering session, and it drops back down after every run. A 10 L session followed by a 2 L one was therefore recorded as **−8 L** of water use. It is now a `measurement`, so it reports its own value and contributes no bogus totals.
+  - Correcting the state class discards the `sum` statistics previously accumulated for these sensors. Those sums were the negative ones, so this is a cleanup rather than a loss, but Home Assistant may show a one-off statistics notice.
+
+### ✨ New
+- **Total Water Volume** — valves such as the HTV245FRF report only the last session's volume and carry no cumulative counter at all, so there was nothing to put on the Energy dashboard once the above was fixed. A running total is now derived per zone by summing completed sessions, exposed as `total_increasing` and restored across restarts.
+  - Sessions are counted using the device's own event timestamp rather than by watching the volume change. Two consecutive sessions using the same amount of water — the normal result of a fixed-duration schedule — are indistinguishable by value alone and would otherwise be silently counted once.
+  - Created only for valves that report no hardware total of their own. Devices that already expose a real cumulative counter keep using it and do not gain a second, competing meter.
+  - Sessions that complete while Home Assistant is stopped cannot be counted: the cloud only ever exposes the *most recent* session, so there is no history to catch up on.
+
+## [3.0.47] - 2026-08-28
+
+### 🐛 Bug Fixes
+- **A device with no cloud status no longer blocks the whole integration from starting** — reported in [#97](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/97). An account containing an HCS048B failed setup entirely with `Unexpected HomGar error: 'NoneType' object has no attribute 'get'`, retrying every five seconds forever. The cloud answers `{"code": 0, "msg": "SUCCESS", "data": null}` for a device that has no status to report, and `data.get("data", {})` does not defend against that — a default only applies when the key is *absent*, and here it is present and explicitly null. The `None` was stored and detonated one poll later. Every response now passes through a single guard that substitutes the default for a null while leaving a genuinely empty answer (`{}`, `[]`, `0`) untouched, since "the server said empty" and "the server said nothing" are different facts. Applied to all six extraction points, not just the one that crashed.
+  - The affected device is a Bluetooth water flow meter. Its readings reach the cloud only when the phone app uploads them over BLE, so the cloud holds nothing of its own to serve. It will now appear without readings rather than preventing every other device on the account from loading — the honest outcome, since there is nothing for this integration to read.
+
+### ✨ New
+- **Download diagnostics** — the integration now supports Home Assistant's standard diagnostics download (**Settings → Devices & Services → HomGar/RainPoint → ⋮ → Download diagnostics**). Device-support reports previously depended on hand-pasted logs, which routinely omitted the one line that mattered; #97's report began immediately after it. The download captures the shipped catalogue version, any model the catalogue has never seen, the full cloud device rows, and the raw status envelopes exactly as received — so an explicit `"data": null` arrives as null rather than being normalised away. Account identifiers and device credentials (email, tokens, `iotId`, `productKey`, `deviceName`, `mac`, `hid`, and the entry title, which embeds the account email) are redacted; `mid`, `model`, `modelCode` and the raw payload frames are deliberately kept, because they are the diagnostic content itself.
+
 ## [3.0.46] - 2026-08-27
 
 ### 🐛 Bug Fixes

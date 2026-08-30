@@ -15,6 +15,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -28,6 +29,7 @@ from .const import (
 )
 from .coordinator import HomGarCoordinator, _clean_firmware
 from .sensor_defs import FIELD_SENSOR_MAP, sensor_fields_for_data
+from .water_total import accumulate_session, session_key
 from .decoder import get_valve_ports
 from .diagnostic_sensors import (
     HomGarFirmwareVersionSensor,
@@ -142,6 +144,8 @@ async def async_setup_entry(
                         port_fields.update(_OPTIONAL_VALVE_PORT_SENSOR_FIELDS)
                     for field in sorted(port_fields):
                         entities.append(HomGarGenericSensor(coordinator, key, info, field, port=port))
+                    if _needs_derived_water_total(model, port_data):
+                        entities.append(HomGarWaterTotalSensor(coordinator, key, info, port=port))
                 # Shared top-level diagnostic fields (battery, rssi)
                 for field in sensor_fields_for_data(data):
                     if field not in (f for pd in [data.get(f"port_{p}", {}) for p in range(1, port_number + 1)] for f in pd):
@@ -153,6 +157,8 @@ async def async_setup_entry(
                     fields.update(_OPTIONAL_VALVE_PORT_SENSOR_FIELDS)
                 for field in sorted(fields):
                     entities.append(HomGarGenericSensor(coordinator, key, info, field))
+                if _needs_derived_water_total(model, data):
+                    entities.append(HomGarWaterTotalSensor(coordinator, key, info))
 
         # Only sub-devices that actually report a firmware version get the
         # sensor. RF accessories such as the rain gauge report nothing, and an
@@ -169,6 +175,22 @@ async def async_setup_entry(
 
     if entities:
         async_add_entities(entities)
+
+
+def _needs_derived_water_total(model: str | None, data: dict) -> bool:
+    """Whether this valve port needs a derived cumulative water total.
+
+    Only for devices that water and report no cumulative counter of their own.
+    A device already reporting ``total_water_volume`` from hardware keeps that
+    one — giving it a second, derived meter would double up the Energy
+    dashboard and invite the user to pick the wrong one. See issue #96.
+    """
+    if not model or not get_valve_ports(model):
+        return False
+    if "total_water_volume" in (data or {}):
+        return False
+    return "last_water_volume" in (data or {})
+
 
 
 class HomGarSensorBase(CoordinatorEntity, SensorEntity):
@@ -392,6 +414,72 @@ class HomGarGenericSensor(HomGarSensorBase):
                 value = None
         _LOGGER.debug("native_value for %s field=%s port=%s: %s", self._sensor_key, self._field_name, self._port, value)
         return value
+
+
+class HomGarWaterTotalSensor(HomGarGenericSensor, RestoreEntity):
+    """Cumulative water volume, derived by summing completed sessions.
+
+    Valves such as the HTV245FRF report only the most recent session's volume
+    and no cumulative counter, so Home Assistant's Energy / water dashboard had
+    nothing to consume. This accumulates each completed session instead. Created
+    only where the device reports no hardware total of its own, so a device that
+    has one never ends up with two competing meters. See issue #96.
+
+    The running total is restored across restarts via RestoreEntity. Sessions
+    that complete while Home Assistant is down are not visible to us at all —
+    the cloud only ever exposes the *latest* session — so they cannot be counted.
+    That is a property of the data, not of this implementation.
+    """
+
+    _ATTR_LAST_EVENT = "last_counted_event_time"
+
+    def __init__(self, coordinator, sensor_key, sensor_info, port=None) -> None:
+        super().__init__(coordinator, sensor_key, sensor_info, "water_total", port=port)
+        self._total: float = 0.0
+        self._last_event_time: int | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the running total before the first coordinator update."""
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        if last is None:
+            return
+        try:
+            self._total = float(last.state)
+        except (TypeError, ValueError):
+            # "unknown"/"unavailable" from a previous run: start clean rather
+            # than crash. A restart-time reset is visible on the dashboard as a
+            # TOTAL_INCREASING meter reset, which is the honest signal.
+            return
+        stored = last.attributes.get(self._ATTR_LAST_EVENT)
+        if stored is not None:
+            try:
+                self._last_event_time = int(stored)
+            except (TypeError, ValueError):
+                self._last_event_time = None
+
+    def _accumulate(self) -> None:
+        src = self._source_data or {}
+        self._total, self._last_event_time = accumulate_session(
+            self._total,
+            self._last_event_time,
+            session_key(src),
+            src.get("last_water_volume"),
+        )
+
+    def _handle_coordinator_update(self) -> None:
+        self._accumulate()
+        super()._handle_coordinator_update()
+
+    @property
+    def native_value(self):
+        return round(self._total, 2)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = dict(super().extra_state_attributes or {})
+        attrs[self._ATTR_LAST_EVENT] = self._last_event_time
+        return attrs
 
 
 class HomGarUnknownSensor(HomGarSensorBase):
