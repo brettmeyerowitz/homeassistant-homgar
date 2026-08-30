@@ -165,6 +165,85 @@ check(
 check("an unknown model does not", _needs_derived_water_total(None, {}) is False)
 
 
+print("\n🧪 session_key — the event time must be found on BOTH decode paths")
+
+from custom_components.homgar.water_total import session_key  # noqa: E402
+
+# Regression for the v3.0.48 field bug (#96). The accumulator read only
+# ``event_time_raw``, which the LEGACY decode path populates. Devices on the TLV
+# path — the HTV245FRF among them — expose the same event only as an ISO string
+# in ``event_time``, so the key was always None and the total never moved.
+# Two reporters confirmed it stuck at 0.00 L with last_counted_event_time unknown.
+check(
+    "legacy shape: reads the raw integer",
+    session_key({"event_time_raw": 1776110281,
+                 "event_time": "2026-04-13T19:58:01+00:00"}) == 1776110281,
+    f"got {session_key({'event_time_raw': 1776110281})!r}",
+)
+check(
+    "TLV shape: parses the ISO string when no raw value exists",
+    session_key({"event_time": "2026-04-11T20:51:43+00:00"}) == 1775940703,
+    f"got {session_key({'event_time': '2026-04-11T20:51:43+00:00'})!r}",
+)
+check(
+    "an integer event_time is accepted directly",
+    session_key({"event_time": 1776110281}) == 1776110281,
+)
+# Ordering must survive the string form, or a newer session could look older.
+a = session_key({"event_time": "2026-04-11T20:51:43+00:00"})
+b = session_key({"event_time": "2026-04-13T19:58:01+00:00"})
+check("parsed keys preserve chronological order", a < b, f"{a} !< {b}")
+
+print("\n🧪 session_key — never invent a key")
+
+for bad, label in [
+    ({}, "no fields at all"),
+    ({"event_time": None, "event_time_raw": None}, "explicit nulls"),
+    ({"event_time": ""}, "empty string"),
+    ({"event_time": "not a timestamp"}, "unparseable string"),
+    ({"event_time_raw": 0}, "zero raw value"),
+]:
+    check(f"returns None for {label}", session_key(bad) is None,
+          f"got {session_key(bad)!r}")
+
+
+print("\n🧪 end-to-end — a REAL decoded payload must yield a usable key")
+
+# The test that was missing in v3.0.48. Every unit test passed while the sensor
+# was incapable of counting anything, because none of them ran a real payload
+# through the decoder and asked whether the field the sensor reads is actually
+# there. This closes that gap: it fails if either decode path stops exposing an
+# event time under a name session_key() understands.
+import glob, json  # noqa: E402
+from custom_components.homgar.decoder import decode_payload  # noqa: E402
+
+checked = {}
+for path in sorted(glob.glob("/tmp/fx/payloads/*.json")):
+    doc = json.load(open(path))
+    model = doc.get("model")
+    for sample in doc.get("samples", []):
+        try:
+            out = decode_payload(model, sample["payload"])
+        except Exception:
+            continue
+        sections = [out] + [v for k, v in out.items()
+                            if k.startswith("port_") and isinstance(v, dict)]
+        for sec in sections:
+            if sec.get("event_time") is None and sec.get("event_time_raw") is None:
+                continue
+            fmt = sample.get("format", "?")
+            key = session_key(sec)
+            checked.setdefault(fmt, []).append((model, sample.get("id"), key))
+
+for fmt in ("tlv", "legacy"):
+    got = checked.get(fmt) or []
+    check(f"a {fmt} payload carrying an event time was found in the corpus",
+          bool(got), "no sample exercised this path")
+    for model, sid, key in got:
+        check(f"{fmt}: {model} {str(sid)[:22]} yields a usable key",
+              isinstance(key, int) and key > 0, f"got {key!r}")
+
+
 print("\n" + "=" * 50)
 print(f"Results: {PASS}/{PASS + FAIL} passed, {FAIL} failed")
 if FAIL:
