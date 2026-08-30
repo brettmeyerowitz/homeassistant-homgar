@@ -1,0 +1,93 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1200px;background:#0d1117;color:#e6edf3;
+ font-family:Inter,-apple-system,system-ui,sans-serif;padding:52px 56px 40px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;
+ border-bottom:1px solid #21262d;padding-bottom:26px;margin-bottom:34px}
+h1{font-size:38px;font-weight:800;letter-spacing:-.9px;line-height:1.1}
+h1 span{color:#3fb950}
+.sub{color:#8b949e;font-size:15px;margin-top:9px;font-weight:400}
+.badge{background:#14532d;color:#7ee787;border:1px solid #238636;border-radius:999px;
+ padding:7px 16px;font-size:13px;font-weight:600;white-space:nowrap}
+.hero{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:34px}
+.card{background:#161b22;border:1px solid #21262d;border-radius:12px;padding:22px 24px}
+.big{font-size:46px;font-weight:800;letter-spacing:-1.6px;line-height:1;color:#58a6ff}
+.card.g .big{color:#3fb950} .card.p .big{color:#bc8cff} .card.o .big{color:#f0883e}
+.lbl{color:#8b949e;font-size:13px;font-weight:600;margin-top:9px;
+ text-transform:uppercase;letter-spacing:.6px}
+.note{color:#6e7681;font-size:12px;margin-top:5px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:22px}
+.panel{background:#161b22;border:1px solid #21262d;border-radius:12px;padding:24px 26px}
+h2{font-size:15px;font-weight:700;margin-bottom:4px}
+.psub{color:#6e7681;font-size:12px;margin-bottom:18px}
+.row{display:flex;align-items:center;gap:12px;margin-bottom:9px;font-size:13px}
+.nm{width:118px;color:#c9d1d9;font-weight:500;white-space:nowrap;overflow:hidden;
+ text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.track{flex:1;height:15px;background:#0d1117;border-radius:4px;overflow:hidden}
+.fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#1f6feb,#58a6ff)}
+.fill.g{background:linear-gradient(90deg,#238636,#3fb950)}
+.ct{width:26px;text-align:right;color:#8b949e;font-weight:600;font-variant-numeric:tabular-nums}
+.tail{color:#6e7681;font-size:12px;margin-top:14px;padding-top:13px;border-top:1px solid #21262d}
+.foot{color:#6e7681;font-size:12px;line-height:1.65;border-top:1px solid #21262d;padding-top:18px}
+.foot b{color:#8b949e}
+</style></head><body>
+
+<div class="head">
+  <div>
+    <h1>RainPoint / HomGar <span>&mdash;</span> Field Snapshot</h1>
+    <div class="sub">Anonymous opt-in telemetry &middot; 12&ndash;24 August 2026</div>
+  </div>
+  <div class="badge">v3.0.45 shipped</div>
+</div>
+
+<div class="hero">
+  <div class="card"><div class="big">60</div><div class="lbl">Installs</div>
+    <div class="note">all active this week</div></div>
+  <div class="card g"><div class="big">13</div><div class="lbl">Countries</div>
+    <div class="note">55 chose to share</div></div>
+  <div class="card p"><div class="big">36</div><div class="lbl">Device models</div>
+    <div class="note">179 install&ndash;model pairs</div></div>
+  <div class="card o"><div class="big">7</div><div class="lbl">HA versions</div>
+    <div class="note">2026.6.1 &rarr; 2026.8.3</div></div>
+</div>
+
+<div class="grid">
+  <div class="panel">
+    <h2>Where installs are</h2>
+    <div class="psub">Monthly aggregate &middot; 55 sharing location</div>
+    <div class="row"><div class="nm">🇩🇪 Germany</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="ct">10</div></div>
+    <div class="row"><div class="nm">🇺🇸 United States</div><div class="track"><div class="fill" style="width:100%"></div></div><div class="ct">10</div></div>
+    <div class="row"><div class="nm">🇿🇦 South Africa</div><div class="track"><div class="fill" style="width:80%"></div></div><div class="ct">8</div></div>
+    <div class="row"><div class="nm">🇬🇧 United Kingdom</div><div class="track"><div class="fill" style="width:80%"></div></div><div class="ct">8</div></div>
+    <div class="row"><div class="nm">🇨🇭 Switzerland</div><div class="track"><div class="fill" style="width:50%"></div></div><div class="ct">5</div></div>
+    <div class="row"><div class="nm">🇫🇷 France</div><div class="track"><div class="fill" style="width:40%"></div></div><div class="ct">4</div></div>
+    <div class="row"><div class="nm">🇨🇦 Canada</div><div class="track"><div class="fill" style="width:30%"></div></div><div class="ct">3</div></div>
+    <div class="row"><div class="nm">🇪🇸 Spain</div><div class="track"><div class="fill" style="width:20%"></div></div><div class="ct">2</div></div>
+    <div class="tail">Plus 🇲🇾 🇱🇺 🇧🇪 🇲🇹 🇨🇿 with one each. Roughly two-thirds of installs sit in Europe.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Most common hardware</h2>
+    <div class="psub">Monthly aggregate &middot; 36 distinct models seen</div>
+    <div class="row"><div class="nm">HWG023WBRF-V2</div><div class="track"><div class="fill g" style="width:100%"></div></div><div class="ct">32</div></div>
+    <div class="row"><div class="nm">HCS026FRF</div><div class="track"><div class="fill g" style="width:50%"></div></div><div class="ct">16</div></div>
+    <div class="row"><div class="nm">HCS012ARF</div><div class="track"><div class="fill g" style="width:41%"></div></div><div class="ct">13</div></div>
+    <div class="row"><div class="nm">HCS021FRF</div><div class="track"><div class="fill g" style="width:41%"></div></div><div class="ct">13</div></div>
+    <div class="row"><div class="nm">HTV145FRF</div><div class="track"><div class="fill g" style="width:31%"></div></div><div class="ct">10</div></div>
+    <div class="row"><div class="nm">HTV245FRF</div><div class="track"><div class="fill g" style="width:28%"></div></div><div class="ct">9</div></div>
+    <div class="row"><div class="nm">HWG0538WRF</div><div class="track"><div class="fill g" style="width:22%"></div></div><div class="ct">7</div></div>
+    <div class="row"><div class="nm">HTV113FRF</div><div class="track"><div class="fill g" style="width:19%"></div></div><div class="ct">6</div></div>
+    <div class="tail">17 of the 36 models appear only once or twice &mdash; a long tail with almost no field coverage.</div>
+  </div>
+</div>
+
+<div class="foot">
+  <b>How to read this.</b> Telemetry is opt-in and off by default, so these are the installs that
+  chose to share &mdash; a lower bound, not the whole user base. Country and model figures are stored
+  as monthly aggregates with no link back to an install, so a model count is install&ndash;months
+  claiming that model, not distinct users. No account, location or device identifiers are ever sent.<br>
+  <b>github.com/brettmeyerowitz/homeassistant-homgar</b> &nbsp;&middot;&nbsp; worker source is public and independently checkable
+</div>
+</body></html>
