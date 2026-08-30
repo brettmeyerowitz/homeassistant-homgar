@@ -29,7 +29,7 @@ from .const import (
 )
 from .coordinator import HomGarCoordinator, _clean_firmware
 from .sensor_defs import FIELD_SENSOR_MAP, sensor_fields_for_data
-from .water_total import accumulate_session
+from .water_total import accumulate_session, session_key
 from .decoder import get_valve_ports
 from .diagnostic_sensors import (
     HomGarFirmwareVersionSensor,
@@ -463,7 +463,7 @@ class HomGarWaterTotalSensor(HomGarGenericSensor, RestoreEntity):
         self._total, self._last_event_time = accumulate_session(
             self._total,
             self._last_event_time,
-            src.get("event_time_raw"),
+            session_key(src),
             src.get("last_water_volume"),
         )
 

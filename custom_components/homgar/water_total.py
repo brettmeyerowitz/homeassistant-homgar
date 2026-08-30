@@ -16,6 +16,39 @@ distinguishes them.
 """
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Any, Mapping
+
+
+def session_key(source: Mapping[str, Any]) -> int | None:
+    """Return the session's event time as a Unix timestamp, or None.
+
+    The two decode paths expose the same event differently, and reading only one
+    of them shipped a sensor that could never count anything (v3.0.48, #96):
+
+    * legacy payloads set ``event_time_raw`` (int) *and* ``event_time`` (ISO)
+    * TLV payloads — the HTV245FRF and most current hardware — set only
+      ``event_time`` as an ISO-8601 string
+
+    Keying on ``event_time_raw`` alone therefore worked on exactly the devices
+    nobody reported, and never on the ones that did. Accept either shape.
+    """
+    raw = source.get("event_time_raw")
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
+        return int(raw)
+
+    value = source.get("event_time")
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+        return int(value)
+    if isinstance(value, str) and value:
+        try:
+            return int(datetime.fromisoformat(value).timestamp())
+        except ValueError:
+            # A malformed timestamp must not become a key: a wrong one either
+            # double counts a session or hides a real one.
+            return None
+    return None
+
 
 def accumulate_session(
     total: float,

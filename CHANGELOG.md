@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.49] - 2026-08-30
+
+### 🐛 Bug Fixes
+- **Total Water Volume now actually counts** — the sensor added in v3.0.48 never left `0.00 L`. Reported on [#96](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/96) by [@thomasgraf99](https://github.com/thomasgraf99) and [@Semir333](https://github.com/Semir333), who between them field-tested it on real hardware and identified the failing code path.
+  - A session is counted using the device's event timestamp, but the accumulator read only `event_time_raw` — a field the **legacy** payload decoder sets. Devices on the **TLV** path, including the HTV245FRF, expose the same event solely as an ISO-8601 string in `event_time`. The key was therefore always absent, and the accumulator correctly declined to count a session it could not identify. It now accepts either representation.
+  - Measured against the payload corpus, the old logic produced a usable key for **0 of 12** TLV payload sections carrying an event time; it now produces 12.
+  - The v3.0.48 tests all passed while the sensor was incapable of counting anything, because they exercised the accumulator in isolation and never asked whether the field it reads exists in real decoded output. A regression test now runs every corpus payload through the decoder and asserts a usable key comes out of both decode paths.
+
+### ⬆️ Upgrading
+- Totals start from zero on upgrade. Sessions that ran while the sensor was stuck cannot be recovered — the cloud only ever exposes the most recent session.
+
 ## [3.0.48] - 2026-08-28
 
 ### 🐛 Bug Fixes
