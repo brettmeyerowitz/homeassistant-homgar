@@ -9,7 +9,8 @@ Two distinct defects:
    the value is a cumulative meter and makes it derive long-term statistics from
    the deltas between readings. It is not cumulative — it is a per-session
    snapshot that drops back down after each run — so a 10 L session followed by
-   a 2 L one recorded a delta of -8 L. A per-session snapshot is MEASUREMENT.
+   a 2 L one recorded a delta of -8 L. It now declares no state class at all:
+   MEASUREMENT was tried first and is illegal for device_class water (#103).
 
 2. With that corrected there is still nothing to put on the dashboard, because
    valves like the HTV245FRF report no cumulative total at all (their dp table
@@ -46,9 +47,13 @@ def check(name, cond, detail=""):
 print("\n🧪 state class — a per-session snapshot is not a meter")
 
 lwv = FIELD_SENSOR_MAP["last_water_volume"]
+# Not TOTAL — that produced the negative Energy dashboard figures (#96) — and
+# not MEASUREMENT either, which Home Assistant rejects outright for
+# device_class water and warned about on every startup (#103). A per-session
+# snapshot simply has no state class; see run_sensor_def_validity_tests.py.
 check(
-    "last_water_volume is MEASUREMENT, not TOTAL",
-    lwv.state_class == SensorStateClass.MEASUREMENT,
+    "last_water_volume declares no state class",
+    lwv.state_class is None,
     f"got {lwv.state_class!r}",
 )
 # The derived total is the one that belongs on the Energy dashboard.
