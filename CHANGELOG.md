@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.50] - 2026-08-31
+
+### 🐛 Bug Fixes
+- **"Last Session Volume" no longer logs a warning on every startup** — reported in [#103](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/103) by [@deanpomerleau](https://github.com/deanpomerleau). Home Assistant logged `is using state class 'measurement' which is impossible considering device class ('water')` once per affected entity.
+  - Introduced by the v3.0.48 fix for [#96](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/96). That change moved the sensor off `total` — correctly, since a per-session snapshot is not a meter and `total` was producing negative figures on the Energy dashboard — but `measurement` is not a legal alternative: Home Assistant permits only `total` or `total_increasing` alongside `device_class: water`.
+  - The sensor now declares **no state class at all**. It keeps `device_class: water` so the value is still presented and converted as a volume, while generating no long-term statistics — which is exactly what the #96 fix needed. **Total Water Volume** remains the sensor for the Energy dashboard.
+  - Verified by reproduction rather than by reasoning: reinstating the old value produced 7 warnings on a live restart, and removing it produced none.
+  - Every sensor definition we ship is now validated against Home Assistant's own `DEVICE_CLASS_STATE_CLASSES` table in the test suite, so this class of mistake fails a test rather than a user's log. The audit found exactly one invalid pair — this one.
+
 ## [3.0.49] - 2026-08-30
 
 ### 🐛 Bug Fixes

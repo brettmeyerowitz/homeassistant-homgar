@@ -116,11 +116,14 @@ FIELD_SENSOR_MAP: dict[str, SensorDef | None] = {
     "last_water_volume": SensorDef(
         device_class=SensorDeviceClass.WATER,
         unit=UnitOfVolume.LITERS,
-        # A per-session snapshot, NOT a meter. TOTAL made Home Assistant derive
-        # long-term statistics from the deltas between readings, so a 10 L
-        # session followed by a 2 L one recorded -8 L on the water dashboard.
-        # See issue #96.
-        state_class=SensorStateClass.MEASUREMENT,
+        # No state class at all, deliberately. This is a per-session snapshot,
+        # not a meter: TOTAL made Home Assistant derive statistics from the
+        # deltas between readings, so a 10 L session followed by a 2 L one
+        # recorded -8 L on the water dashboard (#96). MEASUREMENT is not a legal
+        # alternative — HA permits only total/total_increasing with
+        # device_class water, and warned on every startup (#103). Omitting it
+        # keeps the volume formatting while generating no statistics, which is
+        # exactly what a snapshot warrants. Total Water Volume is the meter.
         name="Last Session Volume",
     ),
     "water_total": SensorDef(
