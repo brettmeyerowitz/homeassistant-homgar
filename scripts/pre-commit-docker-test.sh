@@ -230,6 +230,16 @@ else
     exit 1
 fi
 
+# ── Test: RSSI identity regressions ───────────────────────────────────────
+echo "🧪 Running RSSI identity regression tests..."
+docker cp tests/run_rssi_identity_tests.py ha-test:/tmp/tests/run_rssi_identity_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_rssi_identity_tests.py; then
+    echo "✅ RSSI identity regression tests passed"
+else
+    echo "❌ ERROR: RSSI identity regression tests failed"
+    exit 1
+fi
+
 # ── Test: MQTT parser regressions ─────────────────────────────────────────
 echo "🧪 Running MQTT parser regression tests..."
 docker cp tests/run_mqtt_parser_tests.py ha-test:/tmp/tests/run_mqtt_parser_tests.py > /dev/null

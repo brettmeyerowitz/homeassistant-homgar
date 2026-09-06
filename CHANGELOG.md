@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.0] - 2026-09-06
+
+### ✨ Added
+- **Device catalogue refreshed to the vendor's current version** (`1775119505345` → `1788493376838`, a snapshot from 2026-04-02 brought up to date). Adds **10 models**, removes none: `HTP626FRF`, `HTV124LT`, `HTV143WRFE-V7`, `HTV168FRF`, `HTV268FRF`, `HWG068WLRF-V1`, `HWG068WRF`, `HWS094WB-V2`, `HWS616WB-V1`, `HWS616WB-V2`.
+  - **Nothing decodes differently.** All 73 payloads in the test corpus were decoded under both the old and the new catalogue and produced byte-identical output on every field — not merely "no errors". Existing devices are unaffected.
+  - The vendor also shifted `endpoint` from 7 to 15 on most models. This is inert here: the dp index is keyed on `dpId` alone and `endpoint` never takes part in matching.
+- **`scripts/fetch-product-models.py`** — refreshes the catalogue reproducibly instead of by hand. Maintainer-only: decoding stays offline and the catalogue ships with the integration, so no user's Home Assistant depends on the vendor being reachable to decode a payload. It refuses to write if a fetch returns fewer than 90% of the shipped models, so a truncated response cannot quietly gut the catalogue.
+
+### 🐛 Bug Fixes
+- **Signal strength survives the vendor's dp rename.** The catalogue renamed the secondary RSSI slot's identity from `STA_RSSI2` to `STA_RSRP`, and the decoder looked that slot up by name — so refreshing the catalogue would have made the lookup match nothing, and signal strength would have stopped being published for devices that report on that slot, silently and with no error. The decoder now accepts both spellings, so it no longer depends on which catalogue is shipped.
+  - **Stated honestly: this path is latent, not observed.** No payload in the corpus reaches the secondary slot — all 73 resolve signal strength from the primary `STA_RSSI`. The fix prevents a regression the refresh would have introduced rather than repairing a fault users have seen, and its tests are synthetic by necessity because no real payload exercises the path.
+
 ## [3.0.50] - 2026-08-31
 
 ### 🐛 Bug Fixes

@@ -752,12 +752,18 @@ def _find_entry(entries, dp_index, identity, dp_code_name, port=None):
 
 
 def _dec_rssi(entries, dp_index):
-    # Try the primary slot, then STA_RSSI2. A slot that is present but holds a
-    # non-negative value is reporting "no reading" rather than a signal, so
-    # fall through to the next candidate instead of publishing it.
+    # Try the primary slot, then the secondary one. A slot that is present but
+    # holds a non-negative value is reporting "no reading" rather than a signal,
+    # so fall through to the next candidate instead of publishing it.
+    #
+    # The secondary slot is spelled STA_RSSI2 in catalogues up to the 2026-04-02
+    # snapshot and STA_RSRP in later ones. Both are accepted so the decoder does
+    # not depend on which catalogue is shipped, and product_models.json can be
+    # refreshed independently of this file.
     candidates = (
         _find_entry(entries, dp_index, "STA_RSSI", "RSSI"),
         _find_by_identity(entries, dp_index, "STA_RSSI2"),
+        _find_by_identity(entries, dp_index, "STA_RSRP"),
     )
     for e in candidates:
         if e is None or len(e["type_value"]) < 2:
