@@ -26,6 +26,12 @@ Control and monitor your RainPoint / HomGar irrigation devices directly from Hom
 ![Flow Meter](images/flowmeter.png)
 ![CO2](images/co2.png)
 
+### Device photos
+
+Every device carries a **Product image** entity in its **Diagnostic** section, showing the manufacturer's photograph of that model — useful for telling three identical-looking soil sensors apart on a dashboard. Home Assistant has no picture field on a device itself, so an entity is the only place it can appear.
+
+The photo is downloaded **once per model, ever**, and cached in your config directory. Home Assistant then serves it, so opening a dashboard never contacts the manufacturer — they cannot see who is looking, or when. A device whose model has no photo simply gets no entity, and a download that fails is not retried on every restart.
+
 ---
 
 ## Why use this?
@@ -183,6 +189,8 @@ Enable it under **Settings → Devices & Services → HomGar/RainPoint Cloud →
 If you upgrade from an earlier version, you'll see a one-time notification explaining this. Answering it any way — including declining — records your choice and it never appears again; simply dismissing the notification without answering also stops it from reappearing, but you can revisit the choice any time under Options.
 
 The claims above — that IP addresses are never stored, and the retention periods below — describe the worker's behavior, not this integration's: the client only ever sends the payload described above, and everything about what happens to it afterward is the worker's responsibility. The worker is published as its own separate open-source repository so those claims are independently checkable: [homgar-telemetry-worker](https://github.com/brettmeyerowitz/homgar-telemetry-worker). Its README has the complete disclosure, including exactly what Cloudflare's edge sees about a request before any of the worker's code runs, and the retention policy the worker enforces (activity dates only, kept 13 months; inactive installs purged after 90 days; aggregate counts kept indefinitely).
+
+**You can see exactly what is collected.** The aggregates are published as a public page — **[telemetry stats](https://homgar-telemetry-worker.funkypeople.workers.dev)** — showing install counts, countries, device models and version spread. Nothing on it identifies an install: it is the same aggregate tables described above, rendered, with no per-install identifier anywhere in the output. Because telemetry is opt-in, every figure on it is a floor rather than a user count. It is worth a look before you decide whether to turn any of this on.
 
 ---
 
