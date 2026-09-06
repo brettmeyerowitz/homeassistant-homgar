@@ -26,6 +26,12 @@ Control and monitor your RainPoint / HomGar irrigation devices directly from Hom
 ![Flow Meter](images/flowmeter.png)
 ![CO2](images/co2.png)
 
+### Device photos
+
+Every device carries a **Product image** entity in its **Diagnostic** section, showing the manufacturer's photograph of that model — useful for telling three identical-looking soil sensors apart on a dashboard. Home Assistant has no picture field on a device itself, so an entity is the only place it can appear.
+
+The photo is downloaded **once per model, ever**, and cached in your config directory. Home Assistant then serves it, so opening a dashboard never contacts the manufacturer — they cannot see who is looking, or when. A device whose model has no photo simply gets no entity, and a download that fails is not retried on every restart.
+
 ---
 
 ## Why use this?
