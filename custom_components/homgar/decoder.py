@@ -39,12 +39,32 @@ def _build_model_registry() -> dict[str, dict]:
     result: dict[str, dict] = {}
     for m in data["data"]["models"]:
         key = m["model"]
-        result[key] = m
+        current = result.get(key)
+        if current is None or _describes_device_better(m, current):
+            result[key] = m
         dm = m.get("displayModel", "")
         if dm and dm != key and dm not in result:
             result[dm] = m
     _LOGGER.debug("Loaded %d models from product_models.json", len(result))
     return result
+
+
+def _describes_device_better(candidate: dict, current: dict) -> bool:
+    """Whether ``candidate`` is the more useful of two rows for the same model.
+
+    The vendor lists some models twice: once as a category 1 "main device" row
+    with portNumber 0 and a few dp definitions, and once as a category 6 row
+    carrying the real port count and the full dp set. Taking whichever came
+    last (issue #108) meant seven multi-zone controllers — up to twelve zones —
+    resolved to the empty row and produced no valve entities at all.
+
+    Ports first, dp count as the tie-break: a row that knows how many zones a
+    device has is describing the device, not just naming it.
+    """
+    def rank(m: dict) -> tuple[int, int]:
+        return (m.get("portNumber") or 0, len(m.get("dp") or []))
+
+    return rank(candidate) > rank(current)
 
 
 _MODELS: dict[str, dict] = _build_model_registry()
