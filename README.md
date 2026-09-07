@@ -184,6 +184,8 @@ If you upgrade from an earlier version, you'll see a one-time notification expla
 
 The claims above — that IP addresses are never stored, and the retention periods below — describe the worker's behavior, not this integration's: the client only ever sends the payload described above, and everything about what happens to it afterward is the worker's responsibility. The worker is published as its own separate open-source repository so those claims are independently checkable: [homgar-telemetry-worker](https://github.com/brettmeyerowitz/homgar-telemetry-worker). Its README has the complete disclosure, including exactly what Cloudflare's edge sees about a request before any of the worker's code runs, and the retention policy the worker enforces (activity dates only, kept 13 months; inactive installs purged after 90 days; aggregate counts kept indefinitely).
 
+**You can see exactly what is collected.** The aggregates are published as a public page — **[telemetry stats](https://homgar-telemetry-worker.funkypeople.workers.dev)** — showing install counts, countries, device models and version spread. Nothing on it identifies an install: it is the same aggregate tables described above, rendered, with no per-install identifier anywhere in the output. Because telemetry is opt-in, every figure on it is a floor rather than a user count. It is worth a look before you decide whether to turn any of this on.
+
 ---
 
 ## 💬 Community & Support
