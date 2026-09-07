@@ -260,6 +260,16 @@ else
     exit 1
 fi
 
+# ── Test: README supported-device list ────────────────────────────────────
+# Runs on the host: it compares two files in the repo and needs no container.
+echo "🧪 Checking the README device list matches the catalogue..."
+if python3 tests/run_readme_device_list_tests.py; then
+    echo "✅ README device list is in sync"
+else
+    echo "❌ ERROR: README device list is stale — run scripts/generate-supported-devices.py"
+    exit 1
+fi
+
 # ── Test: model registry duplicate resolution ─────────────────────────────
 echo "🧪 Running model registry regression tests..."
 docker cp tests/run_model_registry_tests.py ha-test:/tmp/tests/run_model_registry_tests.py > /dev/null
