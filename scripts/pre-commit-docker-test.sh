@@ -260,6 +260,16 @@ else
     exit 1
 fi
 
+# ── Test: model registry duplicate resolution ─────────────────────────────
+echo "🧪 Running model registry regression tests..."
+docker cp tests/run_model_registry_tests.py ha-test:/tmp/tests/run_model_registry_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_model_registry_tests.py; then
+    echo "✅ Model registry regression tests passed"
+else
+    echo "❌ ERROR: Model registry regression tests failed"
+    exit 1
+fi
+
 # ── Test: RSSI identity regressions ───────────────────────────────────────
 echo "🧪 Running RSSI identity regression tests..."
 docker cp tests/run_rssi_identity_tests.py ha-test:/tmp/tests/run_rssi_identity_tests.py > /dev/null
