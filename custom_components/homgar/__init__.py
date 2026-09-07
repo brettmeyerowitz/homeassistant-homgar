@@ -31,7 +31,7 @@ from .mqtt_client import HomGarMQTTClient, PAHO_AVAILABLE
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[str] = ["sensor", "binary_sensor", "valve", "switch", "number"]
+PLATFORMS: list[str] = ["sensor", "binary_sensor", "valve", "switch", "number", "image"]
 _MQTT_RENEWAL_BACKOFF_SECONDS = (30, 60, 300, 900)
 
 

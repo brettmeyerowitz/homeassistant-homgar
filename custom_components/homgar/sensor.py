@@ -198,6 +198,7 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
 
     _attr_should_poll = False
 
+
     def __init__(
         self,
         coordinator: HomGarCoordinator,
@@ -225,45 +226,7 @@ class HomGarSensorBase(CoordinatorEntity, SensorEntity):
     @property
     def device_info(self) -> dict[str, Any]:
         """Represent each subDevice as its own HA device, child of hub."""
-        from .const import DOMAIN
-        hid = self._sensor_info["hid"]
-        mid = self._sensor_info["mid"]
-        addr = self._sensor_info["addr"]
-        sub_name = self._sensor_info.get("sub_name") or f"Sensor {addr}"
-        model = self._sensor_info.get("model") or "Unknown"
-        parent_ident = controller_device_identifier(self._sensor_info)
-        port = self._device_port()
-        group_multi_zone = (
-            port is not None
-            and self.coordinator._entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)
-            and len(get_valve_ports(model)) > 1
-        )
-
-        if group_multi_zone:
-            return {
-                "identifiers": {(DOMAIN, zone_device_identifier(mid, addr, port))},
-                "name": format_port_device_name(sub_name, self._sensor_info, port),
-                "manufacturer": "RainPoint",
-                "model": model,
-                "suggested_area": self._sensor_info.get("home_name"),
-                "via_device": (DOMAIN, parent_ident),
-            }
-        if self._sensor_info.get("type_flag") == 1:
-            return {
-                "identifiers": {(DOMAIN, f"rainpoint_hub_{mid}")},
-                "name": f"{sub_name}",
-                "manufacturer": "RainPoint",
-                "model": model,
-                "suggested_area": self._sensor_info.get("home_name"),
-            }
-        return {
-            "identifiers": {(DOMAIN, f"{mid}_{addr}")},
-            "name": f"{sub_name}",
-            "manufacturer": "RainPoint",
-            "model": model,
-            "suggested_area": self._sensor_info.get("home_name"),
-            "via_device": (DOMAIN, f"rainpoint_hub_{mid}"),
-        }
+        return build_device_info(self.coordinator, self._sensor_info, self._device_port())
 
     def _device_port(self) -> int | None:
         """Return the port number that owns this entity, if any."""
@@ -552,3 +515,50 @@ class HomGarRawPayloadSensor(HomGarSensorBase):
         value = raw_status.get("value")
         _LOGGER.debug("native_value for %s (raw_payload): %s", self._sensor_key, value)
         return value
+
+
+def build_device_info(coordinator, sensor_info: dict, port: int | None = None) -> dict[str, Any]:
+    """Device grouping for one sub-device, shared by every platform.
+
+    Kept as one function rather than duplicated per platform: if two platforms
+    disagreed about a device's identifiers, the same physical device would
+    silently appear twice in the UI with its entities split between them.
+    """
+    from .const import DOMAIN
+    hid = sensor_info["hid"]  # noqa: F841 - retained so a malformed record still raises here
+    mid = sensor_info["mid"]
+    addr = sensor_info["addr"]
+    sub_name = sensor_info.get("sub_name") or f"Sensor {addr}"
+    model = sensor_info.get("model") or "Unknown"
+    parent_ident = controller_device_identifier(sensor_info)
+    group_multi_zone = (
+        port is not None
+        and coordinator._entry.options.get(CONF_GROUP_MULTI_ZONE_DEVICES, False)
+        and len(get_valve_ports(model)) > 1
+    )
+
+    if group_multi_zone:
+        return {
+            "identifiers": {(DOMAIN, zone_device_identifier(mid, addr, port))},
+            "name": format_port_device_name(sub_name, sensor_info, port),
+            "manufacturer": "RainPoint",
+            "model": model,
+            "suggested_area": sensor_info.get("home_name"),
+            "via_device": (DOMAIN, parent_ident),
+        }
+    if sensor_info.get("type_flag") == 1:
+        return {
+            "identifiers": {(DOMAIN, f"rainpoint_hub_{mid}")},
+            "name": f"{sub_name}",
+            "manufacturer": "RainPoint",
+            "model": model,
+            "suggested_area": sensor_info.get("home_name"),
+        }
+    return {
+        "identifiers": {(DOMAIN, f"{mid}_{addr}")},
+        "name": f"{sub_name}",
+        "manufacturer": "RainPoint",
+        "model": model,
+        "suggested_area": sensor_info.get("home_name"),
+        "via_device": (DOMAIN, f"rainpoint_hub_{mid}"),
+    }

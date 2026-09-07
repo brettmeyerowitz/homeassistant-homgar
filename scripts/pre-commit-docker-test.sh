@@ -230,6 +230,46 @@ else
     exit 1
 fi
 
+# ── Test: product image selection ──────────────────────────────────────
+echo "🧪 Running product image selection tests..."
+docker cp tests/run_product_image_tests.py ha-test:/tmp/tests/run_product_image_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_product_image_tests.py; then
+    echo "✅ product image selection tests passed"
+else
+    echo "❌ ERROR: product image selection tests failed"
+    exit 1
+fi
+
+# ── Test: product image cache ──────────────────────────────────────
+echo "🧪 Running product image cache tests..."
+docker cp tests/run_product_image_cache_tests.py ha-test:/tmp/tests/run_product_image_cache_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_product_image_cache_tests.py; then
+    echo "✅ product image cache tests passed"
+else
+    echo "❌ ERROR: product image cache tests failed"
+    exit 1
+fi
+
+# ── Test: product image entity ──────────────────────────────────────
+echo "🧪 Running product image entity tests..."
+docker cp tests/run_product_image_entity_tests.py ha-test:/tmp/tests/run_product_image_entity_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_product_image_entity_tests.py; then
+    echo "✅ product image entity tests passed"
+else
+    echo "❌ ERROR: product image entity tests failed"
+    exit 1
+fi
+
+# ── Test: README supported-device list ────────────────────────────────────
+# Runs on the host: it compares two files in the repo and needs no container.
+echo "🧪 Checking the README device list matches the catalogue..."
+if python3 tests/run_readme_device_list_tests.py; then
+    echo "✅ README device list is in sync"
+else
+    echo "❌ ERROR: README device list is stale — run scripts/generate-supported-devices.py"
+    exit 1
+fi
+
 # ── Test: model registry duplicate resolution ─────────────────────────────
 echo "🧪 Running model registry regression tests..."
 docker cp tests/run_model_registry_tests.py ha-test:/tmp/tests/run_model_registry_tests.py > /dev/null
@@ -237,6 +277,16 @@ if docker exec ha-test python3 /tmp/tests/run_model_registry_tests.py; then
     echo "✅ Model registry regression tests passed"
 else
     echo "❌ ERROR: Model registry regression tests failed"
+    exit 1
+fi
+
+# ── Test: RSSI identity regressions ───────────────────────────────────────
+echo "🧪 Running RSSI identity regression tests..."
+docker cp tests/run_rssi_identity_tests.py ha-test:/tmp/tests/run_rssi_identity_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_rssi_identity_tests.py; then
+    echo "✅ RSSI identity regression tests passed"
+else
+    echo "❌ ERROR: RSSI identity regression tests failed"
     exit 1
 fi
 

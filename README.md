@@ -4,7 +4,78 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![HACS](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
 
-Unofficial Home Assistant integration for RainPoint Smart+ devices via the HomGar/RainPoint cloud API.
+Unofficial Home Assistant integration for **RainPoint Smart+ / HomGar** irrigation hardware — valve timers, hose timers, soil and rain sensors, flow meters and weather stations.
+
+It works through the HomGar/RainPoint **cloud** using your existing app account, so your hub needs an internet connection. There is no local-only mode, because the devices themselves do not offer one.
+
+**Looking for your model?** The list below is searchable — the model number is printed on the device and shown in the app. If it is not there, [tell us about it](#reporting-an-unsupported-device).
+
+## Does it work with my device?
+
+Device support is data-driven: every model in `product_models.json` is decoded automatically, with no code change needed. **120 models** are currently supported.
+
+Search this list for the model number on your device. `Ctrl+F` / `Cmd+F` is your friend.
+
+<!-- BEGIN SUPPORTED MODELS -->
+BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HCS012ARF, HCS014ARF, HCS015ARF, HCS015ARF+, HCS016ARF, HCS021FRF, HCS024FRF, HCS026FRF, HCS027ARF, HCS030FRF, HCS044FRF, HCS048B, HCS0528ARF, HCS0530THO, HCS0565ARF, HCS0600ARF, HCS596WB, HCS596WB-V4, HCS666FRF-X, HCS701B, HCS702B, HCS702B-V1, HCS706ARF, HCS802ARF, HCS888ARF-V1, HGW007, HIC1200W, HIC1204W, HIC1208W, HIC1604W, HIC1608W, HIC1612W, HIC406B, HIC801W, HIC819W-4, HIC819W-6, HIC819W-8, HIS019WRF-V2, HIS019WRF-V3, HIS019WRF-V4, HPS551WRF, HTP115FRF, HTP137FRF, HTP142FRF, HTP149FRF, HTP149W, HTP159W, HTP160FRF, HTP626FRF, HTV0535FRF, HTV0537FRF, HTV0540FRF, HTV0542FRF, HTV102B, HTV103FRF, HTV107B, HTV107FRF, HTV113FRF, HTV113FRF-V4, HTV124B, HTV124FRF, HTV124LT, HTV143WRFE, HTV143WRFE-V7, HTV145FRF, HTV157B, HTV168FRF, HTV203FRF, HTV210B, HTV213FRF, HTV214FRF, HTV224B, HTV224FRF, HTV245FRF, HTV268FRF, HTV311FRF, HTV345FRF, HTV405FRF, HTV445FRF, HWG004WBRF-V2, HWG004WRF, HWG007SRF, HWG007WRF, HWG009WB, HWG023WBRF-V2, HWG023WRF, HWG023WRF-V6, HWG023WRF-V8, HWG040WLBRF, HWG043WB, HWG0538WRF, HWG068WLRF-V1, HWG068WRF, HWS019WRF-V2, HWS094WB-V2, HWS388WRF-V13, HWS388WRF-V7, HWS397WRF-V12, HWS397WRF-V8, HWS578WRF, HWS616WB-V1, HWS616WB-V2, HWS616WRF, W01, W02, WG03, WG05, WG05E, WT-07W, WT-09W, WT-11W, WT-13W, WT-15R
+<!-- END SUPPORTED MODELS -->
+
+### Entities created (where reported by the device)
+
+| Sensor field | Device class | Unit |
+|---|---|---|
+| temperature | Temperature | °C |
+| humidity | Humidity | % |
+| soil_moisture | Moisture | % |
+| carbon_dioxide | CO₂ | ppm |
+| illuminance | Illuminance | lx |
+| air_pressure | Atmospheric pressure | hPa |
+| wind_speed | Wind speed | m/s |
+| battery_level | Battery | % |
+| signal_strength | Signal strength | dBm |
+| rain_detected | Binary moisture (`Rained`) | on/off |
+| total_water_volume | Water | L |
+| last_water_volume | Water | L |
+| today_water_volume | Water | L |
+| flow_rate | Volume flow rate | L/min |
+| current_session_duration | Duration | s |
+| cycle_type | Enum sensor | — |
+| Current Step End Time | Timestamp | — |
+| Rain Event Time | Timestamp | — |
+| Schedule End Time | Timestamp | — |
+| Irrigation End Time | Timestamp | — |
+| precipitation_total / _1h / _24h / _7d | Precipitation | mm |
+
+Valve devices additionally get a **valve open/close** entity and a **duration** number entity per zone. By default the duration is shown in minutes for backward compatibility. You can switch it to seconds in **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options**.
+
+Some WiFi valve controllers and tap timers are also their own controllable device. In Home Assistant these may appear as a parent hub/diagnostic device plus a child valve device, even when the hardware is a single physical unit. This preserves stable diagnostics, valve entities, and device identifiers across hub-as-device models such as `HIC801W` and `HTP159W`.
+
+### Optional multi-zone device grouping
+
+For multi-zone controllers, you can enable **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options** and turn on:
+
+- `Create a separate Home Assistant device for each controller zone`
+
+When enabled:
+
+- each valve zone gets its own Home Assistant device
+- the child device name uses the RainPoint zone label when available
+- valve, duration, and per-zone schedule sensors move under the child device
+- shared diagnostics such as MQTT payload/summary stay on the parent controller device
+
+This option is reversible and does not change entity IDs or unique IDs.
+
+---
+
+## Compatibility
+
+**HomGar** is the mobile app and cloud platform. **RainPoint** is the hardware manufacturer. This integration supports the **HomGar** app and **RainPoint Smart+ / RainPoint Home** app cloud accounts for RainPoint **H-series / Home ecosystem** devices, such as HCS\*, HTV\*, and HWG\* models.
+
+The **RainPoint-TY / Tuya** app and **T-series / Tuya ecosystem** devices are not supported by this integration. RainPoint's own compatibility guide explains that Tuya devices use T-series model numbers, Home devices use H-series model numbers, and the two ecosystems use different hardware protocols and incompatible hubs: [RainPoint Smart Irrigation Timer Guide: Tuya vs. Home APP](https://www.rainpointonline.com/blogs/lawn-garden/rainpoint-smart-irrigation-timer-guide-how-to-distinguish-between-tuya-vs-home-app-compatible-devices).
+
+Examples of unsupported Tuya/T-series models include TTV\*, TTP\*, TWG\*, and TCS\* devices. These cannot be added by selecting **RainPoint Smart+** in this integration; they need a Tuya-compatible Home Assistant integration or a separate RainPoint-TY/Tuya integration.
+
+See the wiki for a longer explanation: [RainPoint App and Device Compatibility](https://github.com/brettmeyerowitz/homeassistant-homgar/wiki/RainPoint-App-and-Device-Compatibility).
 
 ---
 
@@ -26,18 +97,59 @@ Control and monitor your RainPoint / HomGar irrigation devices directly from Hom
 ![Flow Meter](images/flowmeter.png)
 ![CO2](images/co2.png)
 
+### Device photos
+
+Every device carries a **Product image** entity in its **Diagnostic** section, showing the manufacturer's photograph of that model — useful for telling three identical-looking soil sensors apart on a dashboard. Home Assistant has no picture field on a device itself, so an entity is the only place it can appear.
+
+The photo is downloaded **once per model, ever**, and cached in your config directory. Home Assistant then serves it, so opening a dashboard never contacts the manufacturer — they cannot see who is looking, or when. A device whose model has no photo simply gets no entity, and a download that fails is not retried on every restart.
+
 ---
 
-## Why use this?
+## Installation
 
-This integration turns RainPoint hardware into a flexible, programmable irrigation system using Home Assistant.
+### Via HACS (recommended)
 
-- Build automations based on real sensor data
-- Combine RainPoint devices with other brands (Sonoff, Shelly, etc.)
-- Create smarter irrigation using weather, temperature, and moisture
-- Monitor water usage and detect leaks
+This integration is part of the **default HACS store** — no custom repository needed.
 
-Unlike the mobile app, you are not limited to predefined schedules — you can automate anything.
+[![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=brettmeyerowitz&repository=homeassistant-homgar&category=integration)
+
+1. In HACS, search for **HomGar/RainPoint Cloud** (or click the button above)
+2. Install the integration
+3. Restart Home Assistant
+4. Go to **Settings → Devices & Services → Add Integration**, search for **HomGar/RainPoint Cloud**
+
+### Manual installation
+
+1. Copy the `custom_components/homgar` folder to your `config/custom_components/` directory
+2. Restart Home Assistant
+3. Go to **Settings → Devices & Services → Add Integration**, search for **HomGar/RainPoint Cloud**
+
+---
+
+## Setup
+
+![Setup](images/setup.png)
+
+1. Go to **Settings → Devices & Services → Add Integration → HomGar/RainPoint Cloud**
+2. Select your app type — **HomGar** or **RainPoint Smart+** (choose whichever you use on your phone)
+3. Enter your account credentials (email and country code)
+4. Select which homes to include
+
+The **RainPoint-TY** app is not the same as **RainPoint Smart+ / RainPoint Home**. If your device is paired only in RainPoint-TY, or the model number starts with `T`, this integration will not be able to authenticate or discover it.
+
+> **⚠️ API session conflict:** Logging in via this integration will log you out of the mobile app. The API only supports one active session per account. **Create a dedicated API account** (invite it as a home member) to avoid this — see [Multiple Accounts](#multiple-accounts--sites) below.
+
+---
+
+## Quick sanity check
+
+After setup you should see:
+- A device for each hub
+- Switch entities for each valve
+- Sensor entities (moisture, temperature, battery, etc.) depending on your device
+
+If nothing appears, check logs under:
+**Settings → System → Logs**
 
 ---
 
@@ -153,6 +265,8 @@ action:
 
 Adjust `schedule.watering`, `sensor.next_watering`, and `cover.your_blinds` to match your setup.
 
+---
+
 ## Example dashboard
 
 A simple control panel combining valve control and live sensor data:
@@ -170,165 +284,20 @@ This gives you a simple "smart irrigation" control panel directly in Home Assist
 
 ---
 
-## Anonymous usage data (optional)
+## Multiple Accounts & Sites
 
-This integration can optionally send an anonymous telemetry ping, **off by default**. Custom HACS integrations don't report to Home Assistant's own analytics, and HACS doesn't publish install counts, so there's currently no way to know how many people use this or which Home Assistant versions are worth supporting — this exists to answer that, nothing more.
+You can add multiple HomGar/RainPoint accounts to a single Home Assistant instance — useful for multiple properties or if you use both apps.
 
-Enable it under **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options**. There are three independent toggles, all off unless you turn them on:
+Each instance is independent with its own polling schedule. Go to **Settings → Devices & Services → Add Integration** and add the integration again with a different account.
 
-- **Share anonymous usage data** — the master switch. With this off, no request is ever sent, regardless of the other two toggles. With it on, a ping (at most once per day, per config entry — two entries, e.g. two accounts, means two independent anonymous IDs) sends a random ID unrelated to your account plus the Home Assistant and integration version numbers.
-- **Include my country** — the client never sends your location; the worker derives your country from the request at the edge and stores it only as a monthly aggregate count that cannot be traced back to your install.
-- **Include my device models** — sends just the RainPoint/HomGar model names you own (e.g. `HTV103FRF`), stored as monthly counts, never serial numbers or device names.
+### Creating a dedicated API account (recommended)
 
-If you upgrade from an earlier version, you'll see a one-time notification explaining this. Answering it any way — including declining — records your choice and it never appears again; simply dismissing the notification without answering also stops it from reappearing, but you can revisit the choice any time under Options.
+To avoid being logged out of the mobile app:
 
-The claims above — that IP addresses are never stored, and the retention periods below — describe the worker's behavior, not this integration's: the client only ever sends the payload described above, and everything about what happens to it afterward is the worker's responsibility. The worker is published as its own separate open-source repository so those claims are independently checkable: [homgar-telemetry-worker](https://github.com/brettmeyerowitz/homgar-telemetry-worker). Its README has the complete disclosure, including exactly what Cloudflare's edge sees about a request before any of the worker's code runs, and the retention policy the worker enforces (activity dates only, kept 13 months; inactive installs purged after 90 days; aggregate counts kept indefinitely).
-
-**You can see exactly what is collected.** The aggregates are published as a public page — **[telemetry stats](https://homgar-telemetry-worker.funkypeople.workers.dev)** — showing install counts, countries, device models and version spread. Nothing on it identifies an install: it is the same aggregate tables described above, rendered, with no per-install identifier anywhere in the output. Because telemetry is opt-in, every figure on it is a floor rather than a user count. It is worth a look before you decide whether to turn any of this on.
-
----
-
-## 💬 Community & Support
-
-**[Join the Discord server](https://discord.gg/TtTvz9hWu5)** — the best place to get help, share your setup, discuss new device support, and chat with other HomGar/RainPoint users.
-
-[![Join Discord](https://img.shields.io/badge/Join%20the%20Community-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/TtTvz9hWu5)
-
-Whether you're troubleshooting a device, requesting a new model, or just want to show off your irrigation automation — come say hi!
-
-For reproducible bugs and new device support, please open a GitHub issue rather than a discussion so logs, device details, and payload samples are captured in the right format.
-
-## Compatibility
-
-**HomGar** is the mobile app and cloud platform. **RainPoint** is the hardware manufacturer. This integration supports the **HomGar** app and **RainPoint Smart+ / RainPoint Home** app cloud accounts for RainPoint **H-series / Home ecosystem** devices, such as HCS\*, HTV\*, and HWG\* models.
-
-The **RainPoint-TY / Tuya** app and **T-series / Tuya ecosystem** devices are not supported by this integration. RainPoint's own compatibility guide explains that Tuya devices use T-series model numbers, Home devices use H-series model numbers, and the two ecosystems use different hardware protocols and incompatible hubs: [RainPoint Smart Irrigation Timer Guide: Tuya vs. Home APP](https://www.rainpointonline.com/blogs/lawn-garden/rainpoint-smart-irrigation-timer-guide-how-to-distinguish-between-tuya-vs-home-app-compatible-devices).
-
-Examples of unsupported Tuya/T-series models include TTV\*, TTP\*, TWG\*, and TCS\* devices. These cannot be added by selecting **RainPoint Smart+** in this integration; they need a Tuya-compatible Home Assistant integration or a separate RainPoint-TY/Tuya integration.
-
-See the wiki for a longer explanation: [RainPoint App and Device Compatibility](https://github.com/brettmeyerowitz/homeassistant-homgar/wiki/RainPoint-App-and-Device-Compatibility).
-
----
-
-## Quick sanity check
-
-After setup you should see:
-- A device for each hub
-- Switch entities for each valve
-- Sensor entities (moisture, temperature, battery, etc.) depending on your device
-
-If nothing appears, check logs under:
-**Settings → System → Logs**
-
----
-
-## Installation
-
-### Via HACS (recommended)
-
-This integration is part of the **default HACS store** — no custom repository needed.
-
-[![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=brettmeyerowitz&repository=homeassistant-homgar&category=integration)
-
-1. In HACS, search for **HomGar/RainPoint Cloud** (or click the button above)
-2. Install the integration
-3. Restart Home Assistant
-4. Go to **Settings → Devices & Services → Add Integration**, search for **HomGar/RainPoint Cloud**
-
-### Manual installation
-
-1. Copy the `custom_components/homgar` folder to your `config/custom_components/` directory
-2. Restart Home Assistant
-3. Go to **Settings → Devices & Services → Add Integration**, search for **HomGar/RainPoint Cloud**
-
----
-
-## Setup
-
-![Setup](images/setup.png)
-
-1. Go to **Settings → Devices & Services → Add Integration → HomGar/RainPoint Cloud**
-2. Select your app type — **HomGar** or **RainPoint Smart+** (choose whichever you use on your phone)
-3. Enter your account credentials (email and country code)
-4. Select which homes to include
-
-The **RainPoint-TY** app is not the same as **RainPoint Smart+ / RainPoint Home**. If your device is paired only in RainPoint-TY, or the model number starts with `T`, this integration will not be able to authenticate or discover it.
-
-> **⚠️ API session conflict:** Logging in via this integration will log you out of the mobile app. The API only supports one active session per account. **Create a dedicated API account** (invite it as a home member) to avoid this — see [Multiple Accounts](#multiple-accounts--sites) below.
-
----
-
-## Upgrading from v2.x
-
-### ⚠️ Clean install required
-
-v3.0.0 changes entity unique IDs (now field-name-based: `rainpoint_{mid}_{addr}_temperature`). All existing entities will appear orphaned after upgrading. **A clean remove + re-add is required** — there is no in-place migration path.
-
-**Option A — Reconfigure with registry wipe (recommended):**
-1. **Settings → Devices & Services → HomGar/RainPoint Cloud → three-dot menu → Reconfigure**
-2. Enter your credentials and proceed to home selection
-3. Check **"Remove all existing devices and entities before reloading"**
-4. Submit — the integration will clear the old registry entries and reload fresh
-
-**Option B — Full delete and re-add:**
-1. **Settings → Devices & Services → HomGar/RainPoint Cloud → three-dot menu → Delete**
-2. Confirm deletion (sensor history will be lost)
-3. **+ Add Integration → HomGar/RainPoint Cloud** — set up fresh
-
-> If preserving history is critical, do not upgrade — pin your current version in HACS.
-
----
-
-## Supported Devices
-
-Device support is data-driven via `product_models.json` — **106 models** are currently supported. Any model in the file is automatically decoded with no code changes required.
-
-BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HCS012ARF, HCS014ARF, HCS015ARF, HCS015ARF+, HCS016ARF, HCS021FRF, HCS024FRF, HCS026FRF, HCS027ARF, HCS030FRF, HCS044FRF, HCS048B, HCS0528ARF, HCS0530THO, HCS0565ARF, HCS0600ARF, HCS596WB, HCS596WB-V4, HCS666FRF-X, HCS701B, HCS702B, HCS702B-V1, HCS706ARF, HCS802ARF, HCS888ARF-V1, HIC1200W, HIC1204W, HIC1208W, HIC1604W, HIC1608W, HIC1612W, HIC406B, HIC801W, HIC819W-4, HIC819W-6, HIC819W-8, HIS019WRF-V2, HIS019WRF-V3, HIS019WRF-V4, HPS551WRF, HTP115FRF, HTP137FRF, HTP142FRF, HTP149FRF, HTP149W, HTP159W, HTP160FRF, HTV0535FRF, HTV0537FRF, HTV0540FRF, HTV0542FRF, HTV102B, HTV103FRF, HTV107B, HTV107FRF, HTV113FRF, HTV113FRF-V4, HTV124B, HTV124FRF, HTV143WRFE, HTV145FRF, HTV157B, HTV203FRF, HTV210B, HTV213FRF, HTV214FRF, HTV224B, HTV224FRF, HTV245FRF, HTV311FRF, HTV345FRF, HTV405FRF, HTV445FRF, HWG004WBRF-V2, HWG004WRF, HWG007SRF, HWG007WRF, HWG007WRF-V2, HWG009WB, HWG023WBRF-V2, HWG023WRF, HWG023WRF-V6, HWG023WRF-V8, HWG040WLBRF, HWG043WB, HWG0538WRF, HWS019WRF-V2, HWS388WRF-V13, HWS388WRF-V7, HWS397WRF-V12, HWS397WRF-V8, HWS578WRF, HWS616WRF, WG03, WT-07W, WT-09W, WT-11W, WT-13W, WT-15R
-
-### Entities created (where reported by the device)
-
-| Sensor field | Device class | Unit |
-|---|---|---|
-| temperature | Temperature | °C |
-| humidity | Humidity | % |
-| soil_moisture | Moisture | % |
-| carbon_dioxide | CO₂ | ppm |
-| illuminance | Illuminance | lx |
-| air_pressure | Atmospheric pressure | hPa |
-| wind_speed | Wind speed | m/s |
-| battery_level | Battery | % |
-| signal_strength | Signal strength | dBm |
-| rain_detected | Binary moisture (`Rained`) | on/off |
-| total_water_volume | Water | L |
-| last_water_volume | Water | L |
-| today_water_volume | Water | L |
-| flow_rate | Volume flow rate | L/min |
-| current_session_duration | Duration | s |
-| cycle_type | Enum sensor | — |
-| Current Step End Time | Timestamp | — |
-| Rain Event Time | Timestamp | — |
-| Schedule End Time | Timestamp | — |
-| Irrigation End Time | Timestamp | — |
-| precipitation_total / _1h / _24h / _7d | Precipitation | mm |
-
-Valve devices additionally get a **valve open/close** entity and a **duration** number entity per zone. By default the duration is shown in minutes for backward compatibility. You can switch it to seconds in **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options**.
-
-Some WiFi valve controllers and tap timers are also their own controllable device. In Home Assistant these may appear as a parent hub/diagnostic device plus a child valve device, even when the hardware is a single physical unit. This preserves stable diagnostics, valve entities, and device identifiers across hub-as-device models such as `HIC801W` and `HTP159W`.
-
-### Optional multi-zone device grouping
-
-For multi-zone controllers, you can enable **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options** and turn on:
-
-- `Create a separate Home Assistant device for each controller zone`
-
-When enabled:
-
-- each valve zone gets its own Home Assistant device
-- the child device name uses the RainPoint zone label when available
-- valve, duration, and per-zone schedule sensors move under the child device
-- shared diagnostics such as MQTT payload/summary stay on the parent controller device
-
-This option is reversible and does not change entity IDs or unique IDs.
+1. Create a new account with a different email address
+2. In the mobile app: **Me → Home management → your home → Members → Invite**
+3. Accept the invitation on the new account
+4. Use the new account's credentials in Home Assistant
 
 ---
 
@@ -369,20 +338,21 @@ Check **Settings → System → Logs** and filter for `HomGar MQTT`. Key log lin
 
 ---
 
-## Multiple Accounts & Sites
+## Anonymous usage data (optional)
 
-You can add multiple HomGar/RainPoint accounts to a single Home Assistant instance — useful for multiple properties or if you use both apps.
+This integration can optionally send an anonymous telemetry ping, **off by default**. Custom HACS integrations don't report to Home Assistant's own analytics, and HACS doesn't publish install counts, so there's currently no way to know how many people use this or which Home Assistant versions are worth supporting — this exists to answer that, nothing more.
 
-Each instance is independent with its own polling schedule. Go to **Settings → Devices & Services → Add Integration** and add the integration again with a different account.
+Enable it under **Settings → Devices & Services → HomGar/RainPoint Cloud → Configure → Options**. There are three independent toggles, all off unless you turn them on:
 
-### Creating a dedicated API account (recommended)
+- **Share anonymous usage data** — the master switch. With this off, no request is ever sent, regardless of the other two toggles. With it on, a ping (at most once per day, per config entry — two entries, e.g. two accounts, means two independent anonymous IDs) sends a random ID unrelated to your account plus the Home Assistant and integration version numbers.
+- **Include my country** — the client never sends your location; the worker derives your country from the request at the edge and stores it only as a monthly aggregate count that cannot be traced back to your install.
+- **Include my device models** — sends just the RainPoint/HomGar model names you own (e.g. `HTV103FRF`), stored as monthly counts, never serial numbers or device names.
 
-To avoid being logged out of the mobile app:
+If you upgrade from an earlier version, you'll see a one-time notification explaining this. Answering it any way — including declining — records your choice and it never appears again; simply dismissing the notification without answering also stops it from reappearing, but you can revisit the choice any time under Options.
 
-1. Create a new account with a different email address
-2. In the mobile app: **Me → Home management → your home → Members → Invite**
-3. Accept the invitation on the new account
-4. Use the new account's credentials in Home Assistant
+The claims above — that IP addresses are never stored, and the retention periods below — describe the worker's behavior, not this integration's: the client only ever sends the payload described above, and everything about what happens to it afterward is the worker's responsibility. The worker is published as its own separate open-source repository so those claims are independently checkable: [homgar-telemetry-worker](https://github.com/brettmeyerowitz/homgar-telemetry-worker). Its README has the complete disclosure, including exactly what Cloudflare's edge sees about a request before any of the worker's code runs, and the retention policy the worker enforces (activity dates only, kept 13 months; inactive installs purged after 90 days; aggregate counts kept indefinitely).
+
+**You can see exactly what is collected.** The aggregates are published as a public page — **[telemetry stats](https://homgar-telemetry-worker.funkypeople.workers.dev)** — showing install counts, countries, device models and version spread. Nothing on it identifies an install: it is the same aggregate tables described above, rendered, with no per-install identifier anywhere in the output. Because telemetry is opt-in, every figure on it is a floor rather than a user count. It is worth a look before you decide whether to turn any of this on.
 
 ---
 
@@ -402,8 +372,19 @@ If your device model isn't in the supported list, the integration will log a war
 - **Logged out of mobile app**: Use a dedicated API account (see above)
 - **No devices found**: Ensure you selected the correct app type (HomGar vs RainPoint) — the two apps use separate account systems
 - **RainPoint-TY account fails to log in**: RainPoint-TY/Tuya accounts and T-series devices are not supported; use a HomGar or RainPoint Smart+ / RainPoint Home account with compatible H-series devices
-- **Entities unavailable after upgrade**: Follow the clean install steps in [Upgrading from v2.x](#upgrading-from-v2x)
 - **Wrong app type configured**: Go to the integration → three-dot menu → **Reconfigure**
+
+---
+
+## 💬 Community & Support
+
+**[Join the Discord server](https://discord.gg/TtTvz9hWu5)** — the best place to get help, share your setup, discuss new device support, and chat with other HomGar/RainPoint users.
+
+[![Join Discord](https://img.shields.io/badge/Join%20the%20Community-Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/TtTvz9hWu5)
+
+Whether you're troubleshooting a device, requesting a new model, or just want to show off your irrigation automation — come say hi!
+
+For reproducible bugs and new device support, please open a GitHub issue rather than a discussion so logs, device details, and payload samples are captured in the right format.
 
 ---
 
