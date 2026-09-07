@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.51] - 2026-09-07
+
+### 🐛 Bug Fixes
+- **Multi-zone WiFi controllers get their zones back** — reported in [#108](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/108) by [@geoffly](https://github.com/geoffly), whose six-zone HIC819W-6 was discovered correctly but produced no valve entities at all.
+  - The vendor catalogue lists some models **twice**: once as a category 1 "main device" row with `portNumber: 0` and a few dp definitions, and once as a category 6 row carrying the real port count and the full dp set. The model registry was built by assignment in list order, so the **last** row silently won — and for these models that is the empty one.
+  - Five shipped models were affected, losing every zone: `HIC1208W` (8), `HIC819W-6` (6), `HIC819W-4` (4), `HPS551WRF` and `HWS388WRF-V7`. The controller still appeared in Home Assistant with its diagnostic entities, so it read as an unsupported device rather than a lookup bug — which is likely why it went unreported.
+  - The registry now keeps the row that actually describes the device: ports first, dp count as the tie-break.
+  - Verified against the reporter's own payload from his diagnostics: it decoded to `port_number: 1` with no zones before the change and to six ports after. That payload is now part of the test corpus.
+  - This also removes an ordering dependency rather than patching one symptom. `HIC801W` was working only because its useful row happens to come last in the vendor's list; any reshuffle of the catalogue would have silently cost it all 8 zones.
+
 ## [3.0.50] - 2026-08-31
 
 ### 🐛 Bug Fixes
