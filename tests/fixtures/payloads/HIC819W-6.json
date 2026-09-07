@@ -1,0 +1,17 @@
+{
+  "model": "HIC819W-6",
+  "samples": [
+    {
+      "id": "issue-108-six-zone-idle",
+      "source_issue": 108,
+      "source_type": "live_capture",
+      "format": "tlv",
+      "payload": "10#108800AF00000000B700403F03D800F700000000F9FF00",
+      "expected": {
+        "port_number": 6,
+        "port_1": {"present": true},
+        "port_6": {"present": true}
+      }
+    }
+  ]
+}
