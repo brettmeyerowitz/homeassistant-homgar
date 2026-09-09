@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.1.0] - 2026-09-07
+## [3.1.0] - 2026-09-09
 
 ### ✨ Added
 - **Device catalogue refreshed to the vendor's current version** (`1775119505345` → `1788493376838`, a snapshot from 2026-04-02 brought up to date). Adds **10 models**, removes none: `HTP626FRF`, `HTV124LT`, `HTV143WRFE-V7`, `HTV168FRF`, `HTV268FRF`, `HWG068WLRF-V1`, `HWG068WRF`, `HWS094WB-V2`, `HWS616WB-V1`, `HWS616WB-V2`.
