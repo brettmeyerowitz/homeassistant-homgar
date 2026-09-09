@@ -464,6 +464,13 @@ async def _async_renew_mqtt_subscription(hass: HomeAssistant, entry: ConfigEntry
         connected = await hass.async_add_executor_job(new_mqtt_client.connect)
         if not connected:
             _LOGGER.error("HomGar [%s]: MQTT renewal - failed to connect new client", entry.title)
+            # connect() returning False does not mean nothing is running:
+            # _connect_client() starts the paho network loop before
+            # _wait_for_connection() polls, so the thread is already going. The
+            # client is only stored in entry_data on success, so if it is not
+            # disconnected here nothing can ever reach it — and each retry
+            # builds another one (issue #110).
+            await hass.async_add_executor_job(new_mqtt_client.disconnect)
             _schedule_mqtt_renewal_retry(hass, entry, entry_data, "new client failed to connect")
             return False
             

@@ -131,6 +131,10 @@ class HomGarMQTTClient:
         self._connected = False
         self._client_lock = threading.Lock()
         self._shutdown_requested = False
+        # Backoff reaches 300s. A plain time.sleep() cannot be cancelled, so a
+        # client shut down mid-backoff would still wake and connect minutes
+        # later (issue #110). Waiting on an Event lets shutdown interrupt it.
+        self._shutdown_event = threading.Event()
         self._reconnect_thread = None
         self._log_rate_state: dict[str, tuple[float, int]] = {}
         
@@ -178,6 +182,7 @@ class HomGarMQTTClient:
         """Connect to MQTT broker."""
         try:
             self._shutdown_requested = False
+            self._shutdown_event.clear()
             self._connection_attempts += 1
             self._connect_client()
             return self._wait_for_connection()
@@ -189,6 +194,7 @@ class HomGarMQTTClient:
         """Disconnect from MQTT broker."""
         _LOGGER.info("HomGar MQTT%s disconnect requested", self._label())
         self._shutdown_requested = True
+        self._shutdown_event.set()
         with self._client_lock:
             if self._client:
                 try:
@@ -304,7 +310,16 @@ class HomGarMQTTClient:
                     attempt,
                     delay,
                 )
-            time.sleep(delay)
+            # Interruptible: returns as soon as shutdown is requested.
+            if self._shutdown_event.wait(delay):
+                _LOGGER.info("HomGar MQTT reconnect cancelled during backoff")
+                return
+
+            # Re-checked after waiting: shutdown can land while we are asleep,
+            # and connecting anyway is what issue #110 described.
+            if self._shutdown_requested:
+                _LOGGER.info("HomGar MQTT reconnect cancelled (shutdown requested)")
+                return
 
             try:
                 self._connect_client()
