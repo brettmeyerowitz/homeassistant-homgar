@@ -9,7 +9,7 @@
       "payload": "1,84,0,0;R=4870(10/20/430/2340)",
       "comment": "The HomGar app exposes no signal field for this model (issue #92): Device Name, ID, Model, Address, Sensor Correction and Battery Level only. The legacy header's third field is the battery status slot, not an RSSI - every genuine legacy RSSI in this corpus sits in the second field and is negative. Publishing it as dBm produced a phantom '0 dBm' sensor.",
       "expected": {
-        "battery_level": {"present": true},
+        "battery_level": {"present": false},
         "signal_strength": {"present": false},
         "precipitation_total": {"present": true}
       }

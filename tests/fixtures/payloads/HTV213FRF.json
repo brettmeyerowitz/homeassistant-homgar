@@ -59,10 +59,10 @@
         "port_1.is_watering": false,
         "port_1.last_water_volume": {"approx": 0.3, "tolerance": 0.1},
         "port_2.is_watering": true,
-        "port_2.current_session_duration": 900,
+        "port_2.current_session_duration": 600,
         "port_2.event_time": {"present": true},
         "port_2.irrigation_end_time": {"present": true},
-        "port_2.last_water_volume": 0.0
+        "port_2.last_water_volume": 1.5
       }
     },
     {

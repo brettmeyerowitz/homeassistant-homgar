@@ -331,9 +331,11 @@ def _parse_legacy(status_param: str) -> dict:
         return base, inner
 
     out: dict = {}
+    # The header's second and third slots swap meaning by device class, so
+    # they are kept positional here and interpreted by the caller.
     out["_p1_online"] = p1i(0)
-    out["_p1_bat_or_rssi"] = p1i(1)
-    out["_p1_rssi"] = p1i(2)
+    out["_p1_f1"] = p1i(1)
+    out["_p1_f2"] = p1i(2)
     out["_p1_charge"] = p1i(3)
 
     t_base, t_inner = parse_named_value("T")
@@ -427,14 +429,20 @@ def _parse_legacy(status_param: str) -> dict:
         except (IndexError, ValueError):
             pass
 
+    def _not_sentinel(value, sentinel=0xFFFFFFFF):
+        return None if value == sentinel else value
+
     out["_leg_last_water_cons_raw"] = p2i(1)
     out["_leg_cur_water_raw"] = p2i(2)
     out["_leg_cur_duration"] = p2i(3)
     out["_leg_last_usage_raw"] = p2i(4)
     out["_leg_last_duration"] = p2i(5)
-    out["_leg_today_water_raw"] = p2i(6)
-    out["_leg_total_water_raw"] = p2i(7)
-    out["_leg_reset_water_raw"] = p2i(8)
+    # A running-total slot reads all-ones when the meter has no figure to
+    # report. Letting that through writes 429,496,729.5 L into long-term
+    # statistics, which cannot be un-recorded.
+    out["_leg_today_water_raw"] = _not_sentinel(p2i(6))
+    out["_leg_total_water_raw"] = _not_sentinel(p2i(7))
+    out["_leg_reset_water_raw"] = _not_sentinel(p2i(8))
 
     out["_leg_port_sections"] = [s.strip() for s in p2_raw.split("|")]
     return out
@@ -475,21 +483,28 @@ def _derive_cycle_type(
     return None
 
 
-def _decode_legacy_port_section(section: str, unit: str) -> dict:
-    """Decode one pipe-separated port section from a legacy multi-port valve payload.
+def _decode_legacy_valve_section(section: str, unit: str) -> dict:
+    """Decode one port section of a legacy valve/controller payload.
 
-    Field layout (comma-separated within the section):
-      [0] valve_state_code  — integer; lower nibble = work mode
-                              0=idle, 1=irrigation, 2=mist, 3=cycle, 7=soak
-                              The app checks != 0 for is_watering
-      [1] per-port value     — on idle payloads this appears to be the last
-                              water usage in tenths of liters; on active
-                              payloads it behaves like current duration in
-                              minutes
-      [2] unknown
-      [3] event_time        — Unix timestamp (last event)
-      [4] total_duration    — total programmed duration in seconds
-      [5] unknown
+    Single-port timers bridged through a weather gateway and multi-zone timers
+    use the same six-field layout; a multi-zone payload simply carries one such
+    section per port, separated by ``|``.
+
+      [0] state byte     lower nibble = work mode (0 idle, 1 irrigation,
+                         2 mist, 3 cycle, 7 soak); upper nibble = what started
+                         the session, which we decode but do not publish
+      [1] water volume   tenths of a litre, current session while open and the
+                         last session once closed
+      [2] reserved       zero in every payload we have
+      [3] end time       Unix epoch at which the session is due to finish
+      [4] duration       programmed run time in seconds
+      [5] reserved       zero in every payload we have
+
+    The state byte was previously read as a flow rate on single-port valves.
+    It is not one: every open valve in the corpus reports the same ``33``
+    regardless of model or session length, because ``33`` is ``0x21`` - work
+    mode 1 with an upper nibble of 2. Field [3] is likewise the moment the
+    session ends, not the moment it began.
     """
     result: dict = {}
     fields = section.split(",")
@@ -503,27 +518,29 @@ def _decode_legacy_port_section(section: str, unit: str) -> dict:
         except (IndexError, ValueError):
             return None
 
-    wk_raw = fi(0)
-    if wk_raw is not None:
-        wk = wk_raw & 0x0F
+    state_raw = fi(0)
+    watering = False
+    if state_raw is not None:
+        wk = state_raw & 0x0F
+        watering = wk != 0
         result["valve_state"] = _WORK_MODE_TO_VALVE_STATE.get(wk, str(wk))
-        result["is_watering"] = wk != 0
+        result["is_watering"] = watering
 
-    value1 = fi(1)
-    if value1 is not None:
-        if wk_raw is not None and (wk_raw & 0x0F) == 0:
-            result["last_water_volume"] = _vol(value1, unit)
-        else:
-            result["last_water_volume"] = 0.0
-            result["current_session_duration"] = value1 * 60
+    volume = fi(1)
+    if volume is not None:
+        result["last_water_volume"] = _vol(volume, unit)
 
-    ev_time = fi(3)
-    if ev_time is not None and ev_time > 1_000_000_000:
-        result["event_time_raw"] = ev_time
-        event_time_iso = datetime.fromtimestamp(ev_time, tz=timezone.utc).isoformat()
-        if wk_raw is not None and (wk_raw & 0x0F) != 0:
-            result["event_time"] = event_time_iso
-            result["irrigation_end_time"] = event_time_iso
+    duration = fi(4)
+    if watering and duration:
+        result["current_session_duration"] = duration
+
+    end_time = fi(3)
+    if end_time is not None and end_time > 1_000_000_000:
+        result["event_time_raw"] = end_time
+        end_iso = datetime.fromtimestamp(end_time, tz=timezone.utc).isoformat()
+        if watering:
+            result["event_time"] = end_iso
+            result["irrigation_end_time"] = end_iso
 
     cycle_type = _derive_cycle_type(result.get("valve_state"), False)
     if cycle_type is not None:
@@ -532,62 +549,9 @@ def _decode_legacy_port_section(section: str, unit: str) -> dict:
     return result
 
 
-def _decode_legacy_single_zone_valve(section: str, unit: str) -> dict:
-    """Decode a single-zone RF water-timer legacy payload (e.g. HTV103FRF).
-
-    Bridged through a weather-station gateway (e.g. a Bresser HWS388WRF-V7),
-    single-port valves emit a *legacy* payload. Its data array is neither the
-    temperature/humidity layout of a weather sensor nor the work-mode section
-    layout of a multi-zone valve — routing it through either produces bogus
-    negative temperatures and >100% humidity. The real layout is:
-
-      [0] flow rate        tenths of L/min  (0 when the valve is closed)
-      [1] session volume   tenths of L      (last / current session)
-      [2] reserved
-      [3] start_ts         Unix epoch of the current/last irrigation start
-      [4] target_duration  seconds
-      [5] reserved
-
-    Reported and app-verified in issue #81.
-    """
-    result: dict = {}
-    fields = section.split(",")
-
-    def fi(idx):
-        try:
-            v = fields[idx].strip()
-            if "(" in v:
-                v = v[:v.index("(")]
-            return int(v)
-        except (IndexError, ValueError):
-            return None
-
-    flow_raw = fi(0)
-    vol_raw = fi(1)
-    start_ts = fi(3)
-    dur_s = fi(4)
-
-    watering = bool(flow_raw)
-    result["is_watering"] = watering
-    result["valve_state"] = "irrigation" if watering else "idle"
-
-    if flow_raw is not None:
-        result["flow_rate"] = round(flow_raw / 10.0, 1)
-    if vol_raw is not None:
-        result["last_water_volume"] = _vol(vol_raw, unit)
-    if dur_s:
-        result["current_session_duration"] = dur_s
-    if start_ts and start_ts > 1_000_000_000:
-        end_ts = start_ts + (dur_s or 0)
-        result["irrigation_end_time"] = datetime.fromtimestamp(
-            end_ts, tz=timezone.utc
-        ).isoformat()
-
-    return result
-
-
 def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
-                          port_number: int = 1, model_str: str = "") -> dict:
+                          port_number: int = 1, model_str: str = "",
+                          p_code: int | None = None) -> dict:
     result: dict = {}
     is_valve_model = bool(model_str and get_valve_ports(model_str))
     is_display_hub_v2 = model_str == "HWS019WRF-V2"
@@ -597,17 +561,28 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
     # gateway) must use valve semantics, not the weather/positional parser.
     is_single_zone_valve = is_valve_model and port_number == 1
     suppress_weather = (is_valve_model and has_multi_port_sections) or is_single_zone_valve
+    # A flow meter packs eight water fields where a sensor would put its
+    # temperature and humidity, so the ambient readings must not be taken from
+    # it - the meter's flow slot was surfacing as a humidity of 0%.
+    first_section = port_sections[0] if port_sections else ""
+    is_meter_section = len(first_section.split(",")) >= 8
+    suppress_ambient = suppress_weather or is_meter_section
 
-    if not suppress_weather and "_leg_temp_raw" in leg:
+    if not suppress_ambient and "_leg_temp_raw" in leg:
         v = _leg_temp_display(leg["_leg_temp_raw"], temp_unit)
         if v is not None:
             result["temperature"] = v
 
-    if not suppress_weather and "_leg_rh" in leg and leg["_leg_rh"] is not None:
-        result["humidity"] = leg["_leg_rh"]
+    if not suppress_ambient and leg.get("_leg_rh") is not None:
+        # 255 is the "no reading" marker, not 255% humidity.
+        if leg["_leg_rh"] != 255:
+            result["humidity"] = leg["_leg_rh"]
 
-    if not suppress_weather and "_leg_pressure_raw" in leg and leg["_leg_pressure_raw"] is not None:
-        result["air_pressure"] = round(leg["_leg_pressure_raw"] / 10.0, 1)
+    if not suppress_ambient and leg.get("_leg_pressure_raw") is not None:
+        # 32767/32768 are placeholders the app renders as dashes; 65535 means
+        # no reading at all.
+        if leg["_leg_pressure_raw"] not in (32767, 32768, 65535):
+            result["air_pressure"] = round(leg["_leg_pressure_raw"] / 10.0, 1)
 
     if "_leg_co2" in leg and leg["_leg_co2"] is not None:
         result["carbon_dioxide"] = leg["_leg_co2"]
@@ -629,8 +604,10 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
     if "_leg_wind_raw" in leg and leg["_leg_wind_raw"] is not None:
         result["wind_speed"] = round(leg["_leg_wind_raw"] / 10.0, 1)
 
-    if "_leg_illuminance_raw10" in leg and leg["_leg_illuminance_raw10"] is not None:
-        result["illuminance"] = round(leg["_leg_illuminance_raw10"] / 10.0, 1)
+    if leg.get("_leg_illuminance_raw10") is not None:
+        # All-ones in a 24-bit slot means the sensor reported nothing.
+        if leg["_leg_illuminance_raw10"] != 16777215:
+            result["illuminance"] = round(leg["_leg_illuminance_raw10"] / 10.0, 1)
 
     if not suppress_weather:
         if leg.get("_leg_cur_water_raw") is not None:
@@ -646,42 +623,31 @@ def _decode_legacy_fields(leg: dict, unit: str, temp_unit: str,
         if leg.get("_leg_last_duration") is not None:
             result["last_water_duration"] = leg["_leg_last_duration"]
 
-    bat_or_rssi = leg.get("_p1_bat_or_rssi")
-    rssi = leg.get("_p1_rssi")
-    # HCS012ARF reports a legacy status slot rather than a useful battery
-    # percentage; the app presents it as full.
-    if model_str.upper() == "HCS012ARF":
-        result["battery_level"] = 100
-        signal = _valid_rssi(rssi)
+    # Header slot order depends on device class: a hub reports its battery in
+    # the second slot and its radio in the third, while the sub-devices that
+    # report through it do the reverse.
+    if p_code in _LEGACY_HUB_HEADER_PCODES:
+        bat_code, rssi_raw = leg.get("_p1_f1"), leg.get("_p1_f2")
+    else:
+        rssi_raw, bat_code = leg.get("_p1_f1"), leg.get("_p1_f2")
+
+    if not is_display_hub_v2:
+        signal = _valid_rssi(rssi_raw)
         if signal is not None:
             result["signal_strength"] = signal
-    elif not is_display_hub_v2:
-        if bat_or_rssi is not None:
-            if bat_or_rssi < 0:
-                result["signal_strength"] = bat_or_rssi
-            else:
-                result["battery_level"] = bat_or_rssi
-        if (
-            bat_or_rssi is not None
-            and bat_or_rssi < 0
-            and rssi in _LEGACY_SIMPLE_BATTERY_STATUS_TO_PCT
-        ):
-            result["battery_level"] = _LEGACY_SIMPLE_BATTERY_STATUS_TO_PCT[rssi]
-            result["battery_status_code"] = rssi
-            result["battery_status"] = "low" if rssi >= 2 else "normal"
-        if "signal_strength" not in result:
-            signal = _valid_rssi(rssi)
-            if signal is not None:
-                result["signal_strength"] = signal
+        if bat_code in _LEGACY_BATTERY_STATUS_TO_PCT:
+            result["battery_level"] = _LEGACY_BATTERY_STATUS_TO_PCT[bat_code]
+            result["battery_status_code"] = bat_code
+            result["battery_status"] = "low" if bat_code >= 2 else "normal"
 
     if port_number > 1 and len(port_sections) >= port_number:
         for p in range(1, port_number + 1):
             section = port_sections[p - 1]
             if section:
-                result[f"port_{p}"] = _decode_legacy_port_section(section, unit)
+                result[f"port_{p}"] = _decode_legacy_valve_section(section, unit)
 
     if is_single_zone_valve and port_sections:
-        result.update(_decode_legacy_single_zone_valve(port_sections[0], unit))
+        result.update(_decode_legacy_valve_section(port_sections[0], unit))
 
     return result
 
@@ -826,10 +792,15 @@ _BAT_LEVEL_TO_PCT = {
     3: 10,
     4: 10,
 }
-_LEGACY_SIMPLE_BATTERY_STATUS_TO_PCT = {
-    # Dean confirmed the app flips to low-battery when the legacy header's
-    # third field changes from 1 to 2 on HTV245FRF payloads. HCS021FRF legacy
-    # payloads use the same simple header shape for battery OK vs low.
+# Hubs and gateways order the legacy header differently to the sub-devices
+# that report through them; see _decode_legacy_fields.
+_LEGACY_HUB_HEADER_PCODES = frozenset({1, 3, 6, 74})
+
+_LEGACY_BATTERY_STATUS_TO_PCT = {
+    # A legacy header never carries a battery percentage, only a status: 1 is
+    # normal and 2 is low, which is the flip Dean confirmed against the app on
+    # HTV245FRF payloads. Zero means the device sent no battery information at
+    # all and must not be reported as an empty battery.
     1: 100,
     2: 10,
 }
@@ -1188,7 +1159,10 @@ def decode_payload(model: str, status_param: str,
     try:
         if _is_legacy(status_param):
             leg = _parse_legacy(status_param)
-            sensor_data = _decode_legacy_fields(leg, unit, temp_unit, port_number, model)
+            sensor_data = _decode_legacy_fields(
+                leg, unit, temp_unit, port_number, model,
+                model_dict.get("productCode"),
+            )
             if model.upper() in SOIL_MOISTURE_MODELS and "humidity" in sensor_data:
                 sensor_data["soil_moisture"] = sensor_data.pop("humidity")
         else:

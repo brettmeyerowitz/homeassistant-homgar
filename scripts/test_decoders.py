@@ -225,7 +225,14 @@ print("\n🧪 HCS012ARF — legacy ASCII rain gauge")
 r = decode_payload("HCS012ARF", "1,84,0,0;R=4870(10/20/430/2340)")
 check("no error",          "error" not in r)
 check("has rain fields",   any(k in r for k in ("precipitation_total", "precipitation_1h", "precipitation_24h")))
-check("battery present",   r.get("battery_level") is not None)
+# The battery slot reads 0 here, which means the gauge sent no battery
+# information. Reporting that as 0% gives every affected device a permanent
+# flat-battery reading and fires low-battery automations that should never
+# have triggered; the app draws no battery icon at all in this state.
+check("no phantom battery", r.get("battery_level") is None, str(r.get("battery_level")))
+dean_bat = decode_payload("HCS012ARF", "1,0,1;R=100(0/70/100)")
+check("battery reported when the slot carries a status",
+      dean_bat.get("battery_level") == 100, str(dean_bat.get("battery_level")))
 # Issue #92: the legacy header's third field is the battery status slot, not an
 # RSSI - every genuine legacy RSSI sits in the second field and is negative.
 # Reading it as dBm gave this gauge a phantom "0 dBm" sensor the HomGar app
