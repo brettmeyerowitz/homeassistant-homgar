@@ -157,7 +157,7 @@ check("payload2 is_watering",  r2.get("is_watering") is True or r2.get("current_
 
 # ── HTV213FRF — multi-port valve, TLV (issue #17, #24) ──────────────────────
 print("\n🧪 HTV213FRF — 2-zone valve (TLV)")
-r = decode_payload("HTV213FRF", "11#17E1AE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0FF5151519")
+r = decode_payload("HTV213FRF", "11#17E1CD0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299FC80000002A9F5D000000FEFF0F7A8AF818")
 check("no error",        "error" not in r)
 check("port_1 present",  "port_1" in r)
 check("port_2 present",  "port_2" in r)
@@ -179,9 +179,11 @@ check("ASCII closed port_2",  r3.get("port_2", {}).get("is_watering") is False,
       str(r3.get("port_2")))
 
 
-# ── HTV245FRF — 2-zone valve (issue #17) ────────────────────────────────────
+# ── HTV245FRF — 2-zone valve (issue #10) ────────────────────────────────────
+# No TLV payload for this model has ever been supplied; the legacy frame from
+# issue #10 is the real one we have, and exercises the same two-port split.
 print("\n🧪 HTV245FRF — 2-zone valve")
-r = decode_payload("HTV245FRF", "11#17E1AE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0FF5151519")
+r = decode_payload("HTV245FRF", "1,-65,1;0,0,0,0,0,0|0,539,0,0,0,0")
 check("no error",       "error" not in r)
 check("has port_1",     "port_1" in r)
 check("has port_2",     "port_2" in r)
@@ -189,7 +191,7 @@ check("has port_2",     "port_2" in r)
 
 # ── HTV0537FRF — 2-zone valve (issue #26) ───────────────────────────────────
 print("\n🧪 HTV0537FRF — 2-zone valve (issue #26)")
-r = decode_payload("HTV0537FRF", "11#17E1AE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0FF5151519")
+r = decode_payload("HTV0537FRF", "11#17E1C60019D8001AD8001D201E2018DC0121B70000000022B70000000025AD000026AD0000")
 check("no error",        "error" not in r)
 check("port_1 present",  "port_1" in r)
 check("port_2 present",  "port_2" in r)
