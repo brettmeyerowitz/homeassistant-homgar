@@ -117,6 +117,39 @@ def get_valve_ports(model: str) -> list[int]:
     return []
 
 
+def uses_minute_duration(model: str) -> bool:
+    """Return True when the controller expects a run length in minutes.
+
+    Multi-zone WiFi controllers expose a single global CTL_WATER at dpPort 0
+    and rely on portNumber for their zone count, where per-port timers carry
+    one CTL_WATER per dpPort. That structural split is exactly the set of
+    devices that read a run length as minutes rather than seconds: an HIC801W
+    sent 600 ran for ten hours, and sent 60 ran for one hour, both confirmed
+    against the hardware rather than against the app display.
+
+    The catalogue publishes structure but never units - CTL_WATER is byte
+    identical across both groups - so this is derived from device shape rather
+    than a hand-maintained model list, and per-port timers cannot be caught by
+    it.
+    """
+    info = get_model_info(model)
+    if not info or not get_valve_ports(model):
+        return False
+    dps = info.get("dp", [])
+    if any(
+        dp.get("identity") in ("CTL_WATER", "CTL_BT_WATER")
+        and dp.get("dpPort", 0) > 0
+        for dp in dps
+    ):
+        return False
+    has_global_ctl = any(
+        dp.get("identity") in ("CTL_WATER", "CTL_BT_WATER")
+        and dp.get("dpPort", 0) == 0
+        for dp in dps
+    )
+    return has_global_ctl and (info.get("portNumber", 0) or 0) > 1
+
+
 DP_VALVE_CONTROL_MODELS: frozenset[str] = frozenset({
     # These models expose CTL_WATER rather than CTL_BT_WATER in product
     # metadata, but the legacy controlWorkMode endpoint rejects them.

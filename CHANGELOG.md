@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.1-beta.1] - 2026-09-18
+
+### 🐛 Bug Fixes
+- **Multi-zone WiFi controllers ran 60x longer than asked.** A ten-minute run started from Home Assistant kept watering for ten hours on an `HIC801W`: the controller reads the run length as **minutes**, and the integration was sending **seconds**. Reported by [@mmcliveo](https://github.com/mmcliveo), who confirmed it against the hardware rather than the app display - a 1-minute run reported "59min9sec left" and a 10-minute run "9hr49min left", both exactly 60x, with the sprinkler still running past the deadline until it was stopped by hand.
+  - Affects the seven multi-zone WiFi controllers: `HIC801W`, `HIC819W-4`, `HIC819W-6`, `HIC1200W`, `HIC1204W`, `HIC1208W` and `HIC406B`. **Per-port timers are unchanged** - every `HTV`/`HTP` model still receives seconds, which is what they have always expected.
+  - The split is derived from device structure, not a hand-maintained list: these controllers expose one global `CTL_WATER` at `dpPort 0` and take their zone count from `portNumber`, where per-port timers carry one `CTL_WATER` per port. The catalogue publishes no unit anywhere - the `CTL_WATER` definition is byte-identical across both groups - so structure is the only honest discriminator available.
+  - Home Assistant continues to work in seconds throughout; only the value placed on the wire changes. The duration entity, its options and its stored values are untouched.
+  - This went unreported for so long because almost nobody could reach it: five of these models produced no valve entities at all before v3.1.0, and `HIC801W` only worked by accident of catalogue ordering.
+- **Why this is a beta.** The evidence is conclusive for `HIC801W` and structural for its six siblings, none of which anyone has tested. Published as a pre-release so the reporter can confirm the fix on real hardware before it reaches the stable channel.
+
 ## [3.1.0] - 2026-09-09
 
 ### ✨ Added

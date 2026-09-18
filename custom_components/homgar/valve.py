@@ -24,7 +24,7 @@ from .const import (
     zone_device_identifier,
 )
 from .coordinator import HomGarCoordinator
-from .decoder import get_valve_ports, uses_ble_valve_control
+from .decoder import get_valve_ports, uses_ble_valve_control, uses_minute_duration
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -317,14 +317,21 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
         device_name = hub.get("deviceName", "")
         product_key = hub.get("productKey", "")
 
+        model = self._sensor_info.get("model")
+        # Multi-zone WiFi controllers read the run length as minutes; per-port
+        # timers read it as seconds. Home Assistant keeps seconds throughout and
+        # only the value put on the wire changes. See uses_minute_duration().
+        wire_duration = duration
+        if model and uses_minute_duration(model):
+            wire_duration = max(1, round(duration / 60))
+
         _LOGGER.debug(
-            "Opening valve mid=%s addr=%s zone=%s duration=%ss",
-            mid, addr, self._zone_num, duration,
+            "Opening valve mid=%s addr=%s zone=%s duration=%ss (sent as %s)",
+            mid, addr, self._zone_num, duration, wire_duration,
         )
 
         hid = self._sensor_info.get("hid")
         client = self.coordinator._client
-        model = self._sensor_info.get("model")
         if model and uses_ble_valve_control(model):
             response_state = await client.control_work_mode_dp(
                 mid=mid,
@@ -333,7 +340,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
                 product_key=product_key,
                 port=self._zone_num,
                 mode=1,
-                duration=duration,
+                duration=wire_duration,
                 hid=hid,
             )
         else:
@@ -344,7 +351,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
                 product_key=product_key,
                 port=self._zone_num,
                 mode=1,
-                duration=duration,
+                duration=wire_duration,
                 hid=hid,
             )
         # Bypass _apply_response_state to avoid crash - use refresh instead
