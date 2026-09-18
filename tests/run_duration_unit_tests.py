@@ -22,7 +22,7 @@ for candidate in (Path(__file__).resolve().parent, Path.cwd(), Path("/config")):
         break
 sys.path.insert(0, str(ROOT))
 
-from custom_components.homgar import number  # noqa: E402
+from custom_components.homgar import decoder, number  # noqa: E402
 from custom_components.homgar.const import (  # noqa: E402
     CONF_VALVE_DURATION_UNIT,
     DEFAULT_VALVE_DURATION_UNIT,
@@ -102,6 +102,33 @@ def main() -> int:
     check(
         "minutes mode clamps to the 12-hour maximum",
         number._clamp_duration_seconds(50000, VALVE_DURATION_UNIT_MINUTES) == 43200,
+    )
+
+    # --- run length unit on the wire (issue: HIC801W ran 60x too long) ---
+    check(
+        "multi-zone WiFi controller expects minutes",
+        decoder.uses_minute_duration("HIC801W"),
+    )
+    check(
+        "per-port RF timer still expects seconds",
+        not decoder.uses_minute_duration("HTV213FRF"),
+    )
+    check(
+        "single-port RF timer still expects seconds",
+        not decoder.uses_minute_duration("HTV103FRF"),
+    )
+    check(
+        "a non-valve model is never treated as minutes",
+        not decoder.uses_minute_duration("HCS021FRF"),
+    )
+    minute_models = sorted(
+        m for m in decoder._load_models()
+        if decoder.uses_minute_duration(m)
+    )
+    check(
+        "exactly the bitmask-hub controllers expect minutes",
+        len(minute_models) == 7 and all(m.upper().startswith("HIC") for m in minute_models),
+        str(minute_models),
     )
 
     total = PASS + FAIL
