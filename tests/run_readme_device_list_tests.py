@@ -46,6 +46,17 @@ def check(name, cond, detail=""):
 
 BEGIN = "<!-- BEGIN SUPPORTED MODELS -->"
 END = "<!-- END SUPPORTED MODELS -->"
+BLE_BEGIN = "<!-- BEGIN BLUETOOTH ONLY -->"
+BLE_END = "<!-- END BLUETOOTH ONLY -->"
+
+# The exclusion rule lives with the generator so the two cannot drift apart.
+import importlib.util  # noqa: E402
+
+_spec = importlib.util.spec_from_file_location(
+    "gen_supported", ROOT / "scripts" / "generate-supported-devices.py"
+)
+_gen = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_gen)
 
 
 def catalogue_keys() -> set[str]:
@@ -57,7 +68,7 @@ def catalogue_keys() -> set[str]:
         dm = m.get("displayModel", "")
         if dm:
             keys.add(dm)
-    return keys
+    return keys - set(_gen.ble_only_names())
 
 
 readme = (ROOT / "README.md").read_text()
@@ -77,6 +88,21 @@ if BEGIN in readme and END in readme:
           f"missing: {sorted(expected - listed)}")
     check("the README lists nothing the catalogue does not have", not (listed - expected),
           f"stale: {sorted(listed - expected)}")
+
+    # A Bluetooth-only sensor must be named somewhere, so that someone
+    # searching for their model finds an answer instead of silence.
+    check("the Bluetooth-only block is present", BLE_BEGIN in readme and BLE_END in readme,
+          "run scripts/generate-supported-devices.py")
+    if BLE_BEGIN in readme and BLE_END in readme:
+        ble_block = readme.split(BLE_BEGIN, 1)[1].split(BLE_END, 1)[0]
+        ble_listed = {x.strip() for x in re.split(r"[,\n]", ble_block) if x.strip()}
+        ble_expected = set(_gen.ble_only_names())
+        check("the Bluetooth-only list matches the catalogue rule",
+              ble_listed == ble_expected,
+              f"missing: {sorted(ble_expected - ble_listed)} stale: {sorted(ble_listed - ble_expected)}")
+        check("no model is both supported and Bluetooth-only",
+              not (listed & ble_expected),
+              f"in both: {sorted(listed & ble_expected)}")
 
     m = re.search(r"\*\*(\d+) models?\*\* are currently supported", readme)
     check("the stated count is present and correct",
