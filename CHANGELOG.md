@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.1-beta.2] - 2026-09-30
+
+### 🐛 Bug Fixes
+- **A device the cloud lists but never reports on is no longer invisible.** The decoder walks the *status* response and looks each entry up in the device list, so a sub-device the cloud has no status for was never reached — and never appeared in Home Assistant in any form. No device, no entity, no error: the only signal was silence. Two people have now concluded their own setup was at fault when it was not ([#97](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/97), and a later discussion about an `HCS048B`).
+  - Devices are now registered from the device list, so one that reports nothing still appears with its diagnostic entities and reads as present-but-not-reporting rather than absent.
+  - A device that has reported before keeps its last known readings rather than being blanked, and one that has never reported starts empty rather than with fabricated values.
+  - It also gives a later MQTT frame something to attach to. That path only ever *updates* an existing entry, so a device the poll never registered could not be rescued by MQTT either.
+
 ## [3.1.1-beta.1] - 2026-09-18
 
 ### 🐛 Bug Fixes
