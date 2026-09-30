@@ -22,7 +22,7 @@ BZ501FRF, BZ601FRF, HCS003ARF, HCS003ARF-V1, HCS003FRF, HCS005FRF, HCS008FRF, HC
 
 #### Not supported: Bluetooth-only sensors
 
-These report over Bluetooth directly to the RainPoint phone app. Their readings are cached on the phone and never reach RainPoint's servers, so a cloud integration has nothing to read — this one included. If you own one, it will register fine in the app and simply never appear in Home Assistant. That is not a fault in your setup and there is no configuration that fixes it.
+These report over Bluetooth directly to the RainPoint phone app. Their readings are cached on the phone and never reach RainPoint's servers, so a cloud integration has nothing to read — this one included. If you own one it will work normally in the app, and Home Assistant will show you no readings for it. That is not a fault in your setup and there is no configuration that fixes it.
 
 <!-- BEGIN BLUETOOTH ONLY -->
 HCS048B, HCS596WB, HCS596WB-V4, HCS701B, HCS702B, HCS702B-V1, HWS094WB-V2, HWS616WB-V1, HWS616WB-V2, W01, W02
