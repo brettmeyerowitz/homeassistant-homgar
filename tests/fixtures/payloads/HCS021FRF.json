@@ -42,7 +42,8 @@
     {
       "id": "issue-36-legacy-battery-ok",
       "source_issue": 36,
-      "source_type": "github_issue",
+      "source_type": "unverified",
+      "provenance": "issue #36 is a feature request and contains no payloads; likely a live capture tagged with the motivating issue",
       "format": "legacy",
       "payload": "1,-78,1;838,84,G=49109",
       "expected": {
