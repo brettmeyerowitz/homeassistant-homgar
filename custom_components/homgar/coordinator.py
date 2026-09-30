@@ -114,6 +114,49 @@ def _hub_metadata_score(hub: dict) -> int:
 _MAX_STALE_STATUS_POLLS = 5
 
 
+def _listed_but_silent_entries(hub, mid, decoded_sensors, last_good):
+    """Sensor entries for sub-devices the cloud lists but reports no status for.
+
+    The main decode loop walks the *status* response and looks each entry up in
+    the device list, so a device with no status is never reached at all and
+    never appears in Home Assistant in any form. The only signal the user gets
+    is silence, and two reports have now concluded their own setup was at fault
+    when it was not (#97, and a later discussion thread about an HCS048B, whose
+    readings never leave the phone because it talks over Bluetooth).
+
+    Registering it from the device list instead means it shows up with its
+    diagnostic entities and reads as present-but-not-reporting rather than
+    absent. It also gives a later MQTT frame something to attach to, which it
+    could not do while the key did not exist.
+
+    Returns only the entries that are missing; anything already decoded this
+    poll is left untouched.
+    """
+    entries = {}
+    for sub in hub.get("subDevices") or []:
+        addr = sub.get("addr")
+        if addr is None:
+            continue
+        key = f"{mid}_{addr}"
+        if key in decoded_sensors or key in entries:
+            continue
+        entries[key] = {
+            "hid": hub.get("hid"),
+            "mid": mid,
+            "addr": addr,
+            "home_name": hub.get("homeName"),
+            "hub_name": hub.get("name", "Hub"),
+            "sub_name": sub.get("name"),
+            "port_describe": sub.get("portDescribe"),
+            "model": sub.get("model"),
+            "firmware_version": _clean_firmware(sub.get("softVer")),
+            "raw_status": None,
+            "data": (last_good or {}).get(key) or {},
+            "type_flag": sub.get("typeFlag", 0),
+        }
+    return entries
+
+
 def _status_on_fetch_failure(
     previous_status: dict | None, consecutive_misses: int, max_misses: int
 ) -> dict:
@@ -507,6 +550,17 @@ class HomGarCoordinator(DataUpdateCoordinator):
                                     "type_flag": 0,
                                 }
                                 _LOGGER.debug("Registered hub-as-device sensor key=%s model=%s", sensor_key, hub_model)
+
+                # A sub-device the cloud lists but sends no status for is never
+                # reached by the loop above, which walks the status response.
+                for listed_key, entry in _listed_but_silent_entries(
+                    hub, mid, decoded_sensors, self._last_good_data
+                ).items():
+                    decoded_sensors[listed_key] = entry
+                    _LOGGER.debug(
+                        "Registered listed-but-silent sub-device key=%s model=%s",
+                        listed_key, entry.get("model"),
+                    )
 
             _LOGGER.debug("Coordinator update complete: %d hubs, %d sensors", len(hubs), len(decoded_sensors))
             _LOGGER.debug("Final data: hubs=%s, sensors=%s", hubs, list(decoded_sensors.keys()))
