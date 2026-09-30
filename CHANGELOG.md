@@ -2,23 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.1.1-beta.2] - 2026-09-30
+## [3.1.1] - 2026-09-30
 
 ### 🐛 Bug Fixes
-- **A device the cloud lists but never reports on is no longer invisible.** The decoder walks the *status* response and looks each entry up in the device list, so a sub-device the cloud has no status for was never reached — and never appeared in Home Assistant in any form. No device, no entity, no error: the only signal was silence. Two people have now concluded their own setup was at fault when it was not ([#97](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/97), and a later discussion about an `HCS048B`).
-  - Devices are now registered from the device list, so one that reports nothing still appears with its diagnostic entities and reads as present-but-not-reporting rather than absent.
-  - A device that has reported before keeps its last known readings rather than being blanked, and one that has never reported starts empty rather than with fabricated values.
-  - It also gives a later MQTT frame something to attach to. That path only ever *updates* an existing entry, so a device the poll never registered could not be rescued by MQTT either.
 
-## [3.1.1-beta.1] - 2026-09-18
+**Watering ran 60x longer than asked on multi-zone WiFi controllers.** A ten-minute run started from Home Assistant kept watering for ten hours on an `HIC801W`: the controller reads the run length as **minutes**, and the integration was sending **seconds**. Reported and then confirmed on real hardware by [@mmcliveo](https://github.com/mmcliveo) — a 1-minute run reported "59min9sec left" and a 10-minute run "9hr49min left", both exactly 60x, with the sprinkler still running past the deadline until it was stopped by hand.
+- Affects `HIC801W`, `HIC819W-4`, `HIC819W-6`, `HIC1200W`, `HIC1204W`, `HIC1208W` and `HIC406B`. **Per-port timers are unchanged** — every `HTV`/`HTP` model still receives seconds, which is what they have always expected.
+- The split is derived from device structure rather than a hand-maintained list: these controllers expose one global `CTL_WATER` at `dpPort 0` and take their zone count from `portNumber`, where per-port timers carry one `CTL_WATER` per port. The catalogue publishes no unit anywhere, so structure is the only honest discriminator available.
+- Home Assistant still works in seconds throughout; only the value put on the wire changes. A sub-minute request rounds up to one minute, since this family has no finer resolution.
 
-### 🐛 Bug Fixes
-- **Multi-zone WiFi controllers ran 60x longer than asked.** A ten-minute run started from Home Assistant kept watering for ten hours on an `HIC801W`: the controller reads the run length as **minutes**, and the integration was sending **seconds**. Reported by [@mmcliveo](https://github.com/mmcliveo), who confirmed it against the hardware rather than the app display - a 1-minute run reported "59min9sec left" and a 10-minute run "9hr49min left", both exactly 60x, with the sprinkler still running past the deadline until it was stopped by hand.
-  - Affects the seven multi-zone WiFi controllers: `HIC801W`, `HIC819W-4`, `HIC819W-6`, `HIC1200W`, `HIC1204W`, `HIC1208W` and `HIC406B`. **Per-port timers are unchanged** - every `HTV`/`HTP` model still receives seconds, which is what they have always expected.
-  - The split is derived from device structure, not a hand-maintained list: these controllers expose one global `CTL_WATER` at `dpPort 0` and take their zone count from `portNumber`, where per-port timers carry one `CTL_WATER` per port. The catalogue publishes no unit anywhere - the `CTL_WATER` definition is byte-identical across both groups - so structure is the only honest discriminator available.
-  - Home Assistant continues to work in seconds throughout; only the value placed on the wire changes. The duration entity, its options and its stored values are untouched.
-  - This went unreported for so long because almost nobody could reach it: five of these models produced no valve entities at all before v3.1.0, and `HIC801W` only worked by accident of catalogue ordering.
-- **Why this is a beta.** The evidence is conclusive for `HIC801W` and structural for its six siblings, none of which anyone has tested. Published as a pre-release so the reporter can confirm the fix on real hardware before it reaches the stable channel.
+**A device the cloud lists but never reports on is no longer invisible.** The decoder walked the *status* response and looked each entry up in the device list, so a sub-device the cloud has no status for was never reached — and never appeared in Home Assistant in any form. No device, no entity, no error: the only signal was silence, and two people concluded their own setup was at fault when it was not ([#97](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/97), and a later discussion about an `HCS048B`).
+- Devices are now registered from the device list, so one that reports nothing still appears with its diagnostic entities and reads as present-but-not-reporting.
+- A device that has reported before keeps its last known readings; one that never has starts empty rather than with fabricated values.
+- It also gives a later MQTT frame something to attach to. That path only ever *updates* an existing entry, so a device the poll never registered could not be rescued by MQTT either.
+
+**Six errors in the legacy payload field map.** These affect the older ASCII payloads used by RF timers bridged through a weather-station gateway, and by multi-zone timers.
+- **Legacy temperature/humidity sensors reported a flat battery.** The header slot being read is a signal-strength field on these devices, and a `0` in it meant "not reported", not 0%. Every `HCS014ARF` and `HCS0530THO` on a legacy payload showed a permanent 0% battery, which would fire any low-battery automation pointed at it.
+- **Single-zone valves reported a flow rate that did not exist.** Field 0 is a packed state byte — its lower nibble is the work mode, its upper nibble records what started the session — so every open valve reported exactly `3.3 L/min` regardless of model or plumbing. The entity is removed rather than corrected: the payload carries no flow rate.
+- **Multi-zone session duration was the water volume multiplied by 60**, which put an 11,760-second "current session" on a 45-minute programme. Duration now comes from the field that carries it.
+- **Multi-zone last-session volume was forced to zero while watering**, instead of reporting the running total.
+- **Single-zone irrigation end time was one full duration late.** Field 3 is when the session ends, not when it began; the integration was adding the duration to it a second time. Issue [#17](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/17) settles this: the reporter stated he opened a zone at 17:13:26 and the payload's field 3 reads 21:23:27 UTC with a 600-second programme — start plus duration, to the second.
+- **The `HCS008FRF` flow meter published a phantom humidity of 0%**, read out of the slot where that meter keeps its flow rate.
+- Legacy payloads now also honour the "no reading" markers the TLV path already did (`255` humidity, `16777215` illuminance, `32767`/`32768`/`65535` pressure, and an all-ones running water total). An unguarded total would have written 429,496,729.5 L into long-term statistics, which cannot be un-recorded.
+
+### 📝 Documentation
+
+**Bluetooth-only sensors are no longer advertised as supported.** Nine models report over Bluetooth directly to the phone app — their readings are cached there and never reach RainPoint's servers, so a cloud integration has nothing to read. Listing them sent people hunting for a fault that was never theirs. `HCS048B`, `HCS596WB`, `HCS596WB-V4`, `HCS701B`, `HCS702B`, `HCS702B-V1`, `HWS094WB-V2`, `HWS616WB-V1` and `HWS616WB-V2` (plus the `W01`/`W02` aliases) move to their own section that explains why, so someone searching for their model finds an answer rather than silence. 120 listed models becomes 109. Bluetooth **valves** are unaffected and stay supported, since those are still commanded through the cloud.
+
+### 🧪 Internal
+
+- The payload corpus now declares where each sample came from. Of 38 samples claiming to be quoted in a GitHub issue, 10 could not be found there; one identical payload had been filed as the idle state of three different models. That one is removed, `HTV0537FRF` gets the payload actually present in its issue, and the rest are relabelled `unverified` with a note. A new test enforces the invariants that can be checked offline — most usefully, that no payload string is filed under more than one model.
 
 ## [3.1.0] - 2026-09-09
 
