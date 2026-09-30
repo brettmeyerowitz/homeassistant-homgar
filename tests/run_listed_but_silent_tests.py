@@ -81,6 +81,25 @@ check("a sub-device with no addr is skipped",
       _listed_but_silent_entries(
           {"subDevices": [{"name": "nameless"}]}, "m1", {}, {}) == {})
 
+# During a sustained outage the coordinator deliberately blanks a hub's status
+# so entities go Unavailable and the problem stops being masked (#82). Reusing
+# cached readings here would quietly undo that and hold a stale "watering"
+# state forever, so last-good is reused only while the hub is still reporting.
+entries = _listed_but_silent_entries(
+    HUB, "m1", {}, {"m1_1": {"is_watering": True}}, hub_reporting=False
+)
+check("an outage does not resurrect cached readings",
+      entries["m1_1"]["data"] == {}, str(entries["m1_1"]["data"]))
+check("devices are still registered during an outage",
+      set(entries) == {"m1_1", "m1_5"}, str(sorted(entries)))
+
+entries = _listed_but_silent_entries(
+    HUB, "m1", {}, {"m1_1": {"is_watering": True}}, hub_reporting=True
+)
+check("a reporting hub still reuses last-good for a silent device",
+      entries["m1_1"]["data"] == {"is_watering": True},
+      str(entries["m1_1"]["data"]))
+
 total = PASS + FAIL
 print(f"\n{'=' * 50}")
 print(f"Listed-but-silent results: {PASS}/{total} passed, {FAIL} failed")

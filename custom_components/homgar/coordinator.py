@@ -114,7 +114,7 @@ def _hub_metadata_score(hub: dict) -> int:
 _MAX_STALE_STATUS_POLLS = 5
 
 
-def _listed_but_silent_entries(hub, mid, decoded_sensors, last_good):
+def _listed_but_silent_entries(hub, mid, decoded_sensors, last_good, hub_reporting=True):
     """Sensor entries for sub-devices the cloud lists but reports no status for.
 
     The main decode loop walks the *status* response and looks each entry up in
@@ -131,6 +131,15 @@ def _listed_but_silent_entries(hub, mid, decoded_sensors, last_good):
 
     Returns only the entries that are missing; anything already decoded this
     poll is left untouched.
+
+    ``hub_reporting`` is False when the hub sent no sub-device status at all,
+    which is what a sustained outage looks like after _status_on_fetch_failure
+    blanks it. Last-good readings are *not* reused in that case: the blanking
+    is deliberate, so that a real outage stops being masked and entities go
+    Unavailable rather than holding a stale "watering" state forever (#82).
+    Re-registering every device with its cached readings would quietly undo
+    that. The devices are still registered, so they do not vanish from the
+    registry mid-outage - they simply carry no readings.
     """
     entries = {}
     for sub in hub.get("subDevices") or []:
@@ -151,7 +160,7 @@ def _listed_but_silent_entries(hub, mid, decoded_sensors, last_good):
             "model": sub.get("model"),
             "firmware_version": _clean_firmware(sub.get("softVer")),
             "raw_status": None,
-            "data": (last_good or {}).get(key) or {},
+            "data": ((last_good or {}).get(key) or {}) if hub_reporting else {},
             "type_flag": sub.get("typeFlag", 0),
         }
     return entries
@@ -554,7 +563,8 @@ class HomGarCoordinator(DataUpdateCoordinator):
                 # A sub-device the cloud lists but sends no status for is never
                 # reached by the loop above, which walks the status response.
                 for listed_key, entry in _listed_but_silent_entries(
-                    hub, mid, decoded_sensors, self._last_good_data
+                    hub, mid, decoded_sensors, self._last_good_data,
+                    hub_reporting=bool(sub_status),
                 ).items():
                     decoded_sensors[listed_key] = entry
                     _LOGGER.debug(
