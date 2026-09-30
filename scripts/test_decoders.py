@@ -157,7 +157,7 @@ check("payload2 is_watering",  r2.get("is_watering") is True or r2.get("current_
 
 # ── HTV213FRF — multi-port valve, TLV (issue #17, #24) ──────────────────────
 print("\n🧪 HTV213FRF — 2-zone valve (TLV)")
-r = decode_payload("HTV213FRF", "11#17E1AE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0FF5151519")
+r = decode_payload("HTV213FRF", "11#17E1CD0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299FC80000002A9F5D000000FEFF0F7A8AF818")
 check("no error",        "error" not in r)
 check("port_1 present",  "port_1" in r)
 check("port_2 present",  "port_2" in r)
@@ -179,9 +179,11 @@ check("ASCII closed port_2",  r3.get("port_2", {}).get("is_watering") is False,
       str(r3.get("port_2")))
 
 
-# ── HTV245FRF — 2-zone valve (issue #17) ────────────────────────────────────
+# ── HTV245FRF — 2-zone valve (issue #10) ────────────────────────────────────
+# No TLV payload for this model has ever been supplied; the legacy frame from
+# issue #10 is the real one we have, and exercises the same two-port split.
 print("\n🧪 HTV245FRF — 2-zone valve")
-r = decode_payload("HTV245FRF", "11#17E1AE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0FF5151519")
+r = decode_payload("HTV245FRF", "1,-65,1;0,0,0,0,0,0|0,539,0,0,0,0")
 check("no error",       "error" not in r)
 check("has port_1",     "port_1" in r)
 check("has port_2",     "port_2" in r)
@@ -189,7 +191,7 @@ check("has port_2",     "port_2" in r)
 
 # ── HTV0537FRF — 2-zone valve (issue #26) ───────────────────────────────────
 print("\n🧪 HTV0537FRF — 2-zone valve (issue #26)")
-r = decode_payload("HTV0537FRF", "11#17E1AE0019D8001AD8001D201E2021B70000000022B70000000018DC0125AD000026AD0000299F000000002A9F00000000FEFF0FF5151519")
+r = decode_payload("HTV0537FRF", "11#17E1C60019D8001AD8001D201E2018DC0121B70000000022B70000000025AD000026AD0000")
 check("no error",        "error" not in r)
 check("port_1 present",  "port_1" in r)
 check("port_2 present",  "port_2" in r)
@@ -225,7 +227,14 @@ print("\n🧪 HCS012ARF — legacy ASCII rain gauge")
 r = decode_payload("HCS012ARF", "1,84,0,0;R=4870(10/20/430/2340)")
 check("no error",          "error" not in r)
 check("has rain fields",   any(k in r for k in ("precipitation_total", "precipitation_1h", "precipitation_24h")))
-check("battery present",   r.get("battery_level") is not None)
+# The battery slot reads 0 here, which means the gauge sent no battery
+# information. Reporting that as 0% gives every affected device a permanent
+# flat-battery reading and fires low-battery automations that should never
+# have triggered; the app draws no battery icon at all in this state.
+check("no phantom battery", r.get("battery_level") is None, str(r.get("battery_level")))
+dean_bat = decode_payload("HCS012ARF", "1,0,1;R=100(0/70/100)")
+check("battery reported when the slot carries a status",
+      dean_bat.get("battery_level") == 100, str(dean_bat.get("battery_level")))
 # Issue #92: the legacy header's third field is the battery status slot, not an
 # RSSI - every genuine legacy RSSI sits in the second field and is negative.
 # Reading it as dBm gave this gauge a phantom "0 dBm" sensor the HomGar app

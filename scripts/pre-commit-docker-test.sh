@@ -210,6 +210,36 @@ else
     exit 1
 fi
 
+# ── Test: payload corpus provenance ───────────────────────────────────────
+echo "🧪 Running fixture provenance tests..."
+docker cp tests/run_fixture_provenance_tests.py ha-test:/tmp/tests/run_fixture_provenance_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_fixture_provenance_tests.py; then
+    echo "✅ Fixture provenance passed"
+else
+    echo "❌ ERROR: Fixture provenance failed"
+    exit 1
+fi
+
+# ── Test: listed-but-silent sub-devices still appear ──────────────────────
+echo "🧪 Running listed-but-silent device tests..."
+docker cp tests/run_listed_but_silent_tests.py ha-test:/tmp/tests/run_listed_but_silent_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_listed_but_silent_tests.py; then
+    echo "✅ Listed-but-silent device tests passed"
+else
+    echo "❌ ERROR: Listed-but-silent device tests failed"
+    exit 1
+fi
+
+# ── Test: a silent device still produces entities ─────────────────────────
+echo "🧪 Running silent-device entity tests..."
+docker cp tests/run_silent_device_entities_tests.py ha-test:/tmp/tests/run_silent_device_entities_tests.py > /dev/null
+if docker exec ha-test python3 /tmp/tests/run_silent_device_entities_tests.py; then
+    echo "✅ Silent-device entity tests passed"
+else
+    echo "❌ ERROR: Silent-device entity tests failed"
+    exit 1
+fi
+
 # ── Test: no phantom Firmware Version entity (issue #92) ──────────────────
 echo "🧪 Running firmware sensor tests..."
 docker cp tests/run_firmware_sensor_tests.py ha-test:/tmp/tests/run_firmware_sensor_tests.py > /dev/null

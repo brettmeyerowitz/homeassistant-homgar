@@ -4,7 +4,8 @@
     {
       "id": "issue-55-state-payload",
       "source_issue": 55,
-      "source_type": "github_issue",
+      "source_type": "unverified",
+      "provenance": "not present in issue #55, which contains no payloads",
       "format": "tlv",
       "payload": "10#DC0103E1C900D82020B778445B19AF00000000",
       "expected": {
