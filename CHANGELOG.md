@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.2] - 2026-10-11
+
+### 🐛 Bug Fixes
+- **No more device-registry deprecation warnings on every startup.** Home Assistant 2026.9 deprecated two things the integration relied on, both removed in Core **2027.8.0**, and both warned on each restart. Reported in [#113](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/113) by [@BastiPrivat](https://github.com/BastiPrivat).
+  - `async_get_device(identifiers={...})` → `async_get_device_by_identifier`, at seven call sites in `areas.py` and `migrate.py`. The replacement takes a single identifier plus the config entry to scope it to, which is also a quiet correctness fix: the same identifier can legitimately belong to two entries, and the old global lookup could return either. Anyone running two accounts had a latent ambiguity there.
+  - `via_device` → `via_device_id` in `DeviceInfo`, at eight sites. This one is not a rename — the replacement takes the parent's registry ID rather than an identifier tuple, so each site now resolves the parent first.
+  - **Parent links are preserved.** If the parent is not in the registry yet — a child built before its hub on first setup — the identifier tuple is used instead of dropping the link, because a missing parent reference silently reparents the device to the top level. Verified against a real instance: 11 of 14 devices linked to their hub, 3 top-level hubs, no dangling references.
+  - Both replacements landed in Core 2026.8, so they are feature-detected rather than assumed. Installs older than that keep working on the previous calls, which remain valid until 2027.8.
+
 ## [3.1.1] - 2026-09-30
 
 ### 🐛 Bug Fixes

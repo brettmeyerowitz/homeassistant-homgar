@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .registry_compat import find_device
 from .const import CONF_GROUP_MULTI_ZONE_DEVICES, DOMAIN, zone_device_identifier
 from .decoder import get_valve_ports
 
@@ -74,7 +75,7 @@ def seed_device_areas(
         if not mid:
             continue
 
-        hub_device = device_reg.async_get_device(identifiers={(DOMAIN, f"rainpoint_hub_{mid}")})
+        hub_device = find_device(device_reg, (DOMAIN, f"rainpoint_hub_{mid}"), entry.entry_id)
         if not hub_device:
             continue
 
@@ -112,15 +113,13 @@ def seed_device_areas(
         if not area:
             continue
 
-        device = device_reg.async_get_device(identifiers={(DOMAIN, f"{mid}_{addr}")})
+        device = find_device(device_reg, (DOMAIN, f"{mid}_{addr}"), entry.entry_id)
         if device and device.area_id is None:
             device_reg.async_update_device(device.id, area_id=area.id)
 
         model = sensor_info.get("model")
         if group_multi_zone and model and len(get_valve_ports(model)) > 1:
             for port in get_valve_ports(model):
-                zone_device = device_reg.async_get_device(
-                    identifiers={(DOMAIN, zone_device_identifier(mid, addr, port))}
-                )
+                zone_device = find_device(device_reg, (DOMAIN, zone_device_identifier(mid, addr, port)), entry.entry_id)
                 if zone_device and zone_device.area_id is None:
                     device_reg.async_update_device(zone_device.id, area_id=area.id)

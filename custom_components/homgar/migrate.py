@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import entity_registry as er, device_registry as dr
 
+from .registry_compat import find_device, via_device_fields
 from .const import (
     CONF_GROUP_MULTI_ZONE_DEVICES,
     controller_device_identifier,
@@ -137,7 +138,7 @@ async def async_migrate_unique_ids(
         mid = hub_info.get("mid")
         if mid is None:
             continue
-        hub_dev = device_reg.async_get_device(identifiers={(DOMAIN, f"rainpoint_hub_{mid}")})
+        hub_dev = find_device(device_reg, (DOMAIN, f"rainpoint_hub_{mid}"), entry.entry_id)
         if hub_dev is None:
             continue
         update: dict = {}
@@ -234,8 +235,8 @@ async def async_merge_wifi_devices(
         addr = sensor_info.get("addr")
         if mid is None or addr is None:
             continue
-        old_dev = device_reg.async_get_device(identifiers={(DOMAIN, f"{mid}_{addr}")})
-        hub_dev = device_reg.async_get_device(identifiers={(DOMAIN, f"rainpoint_hub_{mid}")})
+        old_dev = find_device(device_reg, (DOMAIN, f"{mid}_{addr}"), entry.entry_id)
+        hub_dev = find_device(device_reg, (DOMAIN, f"rainpoint_hub_{mid}"), entry.entry_id)
         if not (old_dev and hub_dev and old_dev.id != hub_dev.id):
             continue
         for entity_entry in er.async_entries_for_device(entity_reg, old_dev.id, include_disabled_entities=True):
@@ -294,7 +295,7 @@ async def async_rehome_multi_zone_entities(
 
         parent_ident_str = controller_device_identifier(sensor_info)
         parent_ident = (DOMAIN, parent_ident_str)
-        parent_dev = device_reg.async_get_device(identifiers={parent_ident})
+        parent_dev = find_device(device_reg, parent_ident, entry.entry_id)
         if parent_dev is None:
             create_kwargs = {
                 "config_entry_id": entry.entry_id,
@@ -305,7 +306,7 @@ async def async_rehome_multi_zone_entities(
                 "suggested_area": sensor_info.get("home_name"),
             }
             if sensor_info.get("type_flag") != 1:
-                create_kwargs["via_device"] = (DOMAIN, f"rainpoint_hub_{mid}")
+                create_kwargs.update(via_device_fields(hass, entry.entry_id, (DOMAIN, f"rainpoint_hub_{mid}")))
             parent_dev = device_reg.async_get_or_create(**create_kwargs)
 
         target_dev = parent_dev
@@ -321,7 +322,7 @@ async def async_rehome_multi_zone_entities(
                     sensor_info,
                     port,
                 ),
-                via_device=parent_ident,
+                **via_device_fields(hass, entry.entry_id, parent_ident),
                 suggested_area=sensor_info.get("home_name"),
             )
 

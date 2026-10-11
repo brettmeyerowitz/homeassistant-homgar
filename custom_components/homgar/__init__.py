@@ -15,6 +15,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .registry_compat import via_device_fields
 from .const import (
     CONF_GROUP_MULTI_ZONE_DEVICES,
     DOMAIN,
@@ -379,7 +380,7 @@ def _ensure_device_registry_parents(
             model=model,
             name=sensor_info.get("sub_name") or f"Controller {addr}",
             suggested_area=sensor_info.get("home_name"),
-            via_device=(DOMAIN, f"rainpoint_hub_{mid}"),
+            **via_device_fields(hass, entry.entry_id, (DOMAIN, f"rainpoint_hub_{mid}")),
         )
 
 
