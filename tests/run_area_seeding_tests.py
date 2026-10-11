@@ -66,6 +66,7 @@ sys.modules.setdefault("custom_components", types.ModuleType("custom_components"
 sys.modules.setdefault("custom_components.homgar", types.ModuleType("custom_components.homgar"))
 _load_module("custom_components.homgar.const", "custom_components/homgar/const.py")
 _load_module("custom_components.homgar.decoder", "custom_components/homgar/decoder.py")
+_load_module("custom_components.homgar.registry_compat", "custom_components/homgar/registry_compat.py")
 areas = _load_module("custom_components.homgar.areas", "custom_components/homgar/areas.py")
 
 
@@ -137,8 +138,11 @@ class FakeDeviceRegistry:
 
 
 class FakeEntry:
-    def __init__(self, options=None):
+    def __init__(self, options=None, entry_id="test_entry"):
         self.options = options or {}
+        # Device lookups are scoped to the config entry on HA 2026.8+, so the
+        # fake needs an id like the real ConfigEntry has.
+        self.entry_id = entry_id
 
 
 class FakeCoordinator:

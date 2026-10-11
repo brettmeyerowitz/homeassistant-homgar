@@ -19,6 +19,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from .registry_compat import via_device_for
 from .const import (
     DOMAIN,
     CONF_GROUP_MULTI_ZONE_DEVICES,
@@ -544,7 +545,7 @@ def build_device_info(coordinator, sensor_info: dict, port: int | None = None) -
             "manufacturer": "RainPoint",
             "model": model,
             "suggested_area": sensor_info.get("home_name"),
-            "via_device": (DOMAIN, parent_ident),
+            **via_device_for(coordinator, (DOMAIN, parent_ident)),
         }
     if sensor_info.get("type_flag") == 1:
         return {
@@ -560,5 +561,5 @@ def build_device_info(coordinator, sensor_info: dict, port: int | None = None) -
         "manufacturer": "RainPoint",
         "model": model,
         "suggested_area": sensor_info.get("home_name"),
-        "via_device": (DOMAIN, f"rainpoint_hub_{mid}"),
+        **via_device_for(coordinator, (DOMAIN, f"rainpoint_hub_{mid}")),
     }
