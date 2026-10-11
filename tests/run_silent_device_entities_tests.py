@@ -38,13 +38,15 @@ TALKING_KEY = "m1_8"
 
 
 def build(sensors):
+    entry = SimpleNamespace(entry_id="e1", options={})
+    hass = SimpleNamespace(data={})
     coordinator = SimpleNamespace(
         data={"hubs": [], "sensors": sensors},
-        _entry=SimpleNamespace(options={}),
+        _entry=entry,
+        hass=hass,
         async_add_listener=lambda *a, **k: (lambda: None),
     )
-    entry = SimpleNamespace(entry_id="e1", options={})
-    hass = SimpleNamespace(data={DOMAIN: {"e1": {"coordinator": coordinator}}})
+    hass.data = {DOMAIN: {"e1": {"coordinator": coordinator}}}
     created = []
     asyncio.run(sensor_mod.async_setup_entry(hass, entry, created.extend))
     return created

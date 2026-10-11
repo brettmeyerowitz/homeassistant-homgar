@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.2-beta.1] - 2026-10-11
+
+### ✨ Added
+- **Device catalogue refreshed** (`1788493376838` → `1790755216823`). Adds **3 models**, removes none: `HTV368FRF` (3-zone valve), `HTV468FRF` (4-zone valve) and `HWS578WRF-V8` (weather station, also listed as `W04`). The supported list goes from 109 names to 113.
+  - **Nothing decodes differently.** All 72 payloads in the test corpus were decoded under both the old and the new catalogue and produced byte-identical output on every field — not merely "no errors".
+  - The vendor also rewrote a large number of existing rows, so the structural predicates were compared model by model across both catalogues as well: valve ports, switch ports, duration unit and control endpoint are **unchanged on every one of the 120 existing models**. That check matters more than it sounds — a shift in `CTL_WATER`'s `dpPort` would silently move a controller between the per-port and multi-zone groups, and those two disagree about whether a run length is seconds or minutes.
+  - None of the three new models is Bluetooth-only, so the supported list needs no exclusions beyond the nine already there.
+
+### 🐛 Bug Fixes
+- **No more device-registry deprecation warnings on every startup.** Home Assistant 2026.9 deprecated two things the integration relied on, both removed in Core **2027.8.0**, and both warned on each restart. Reported in [#113](https://github.com/brettmeyerowitz/homeassistant-homgar/issues/113) by [@BastiPrivat](https://github.com/BastiPrivat).
+  - `async_get_device(identifiers={...})` → `async_get_device_by_identifier`, at seven call sites in `areas.py` and `migrate.py`. The replacement takes a single identifier plus the config entry to scope it to, which is also a quiet correctness fix: the same identifier can legitimately belong to two entries, and the old global lookup could return either. Anyone running two accounts had a latent ambiguity there.
+  - `via_device` → `via_device_id` in `DeviceInfo`, at eight sites. This one is not a rename — the replacement takes the parent's registry ID rather than an identifier tuple, so each site now resolves the parent first.
+  - **Parent links are preserved.** If the parent is not in the registry yet — a child built before its hub on first setup — the identifier tuple is used instead of dropping the link, because a missing parent reference silently reparents the device to the top level. Verified against a real instance: 11 of 14 devices linked to their hub, 3 top-level hubs, no dangling references.
+  - Both replacements landed in Core 2026.8, so they are feature-detected rather than assumed. Installs older than that keep working on the previous calls, which remain valid until 2027.8.
+
 ## [3.1.1] - 2026-09-30
 
 ### 🐛 Bug Fixes

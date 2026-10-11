@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .registry_compat import via_device_for
 from .const import (
     DOMAIN,
     CONF_GROUP_MULTI_ZONE_DEVICES,
@@ -191,7 +192,7 @@ class HomGarValveEntity(CoordinatorEntity, ValveEntity):
                 "name": format_port_device_name(sub_name, self._sensor_info, self._zone_num),
                 "manufacturer": "RainPoint",
                 "model": model,
-                "via_device": (DOMAIN, parent_ident),
+                **via_device_for(self.coordinator, (DOMAIN, parent_ident)),
             }
         if self._sensor_info.get("type_flag") == 1:
             return {
