@@ -2,9 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## [3.1.2-beta.1] - 2026-10-11
+## [3.1.2] - 2026-10-20
 
 ### ✨ Added
+- **Brand assets now ship with the integration.** Home Assistant 2026.3 and newer let a custom integration carry its own icon in `custom_components/homgar/brand/` rather than relying on the central brands repository. Contributed by [@frenck](https://github.com/frenck) ([#120](https://github.com/brettmeyerowitz/homeassistant-homgar/pull/120)). The files are byte-identical to the ones already published upstream, so nothing changes visually and older Home Assistant versions are unaffected.
 - **Device catalogue refreshed** (`1788493376838` → `1790755216823`). Adds **3 models**, removes none: `HTV368FRF` (3-zone valve), `HTV468FRF` (4-zone valve) and `HWS578WRF-V8` (weather station, also listed as `W04`). The supported list goes from 109 names to 113.
   - **Nothing decodes differently.** All 72 payloads in the test corpus were decoded under both the old and the new catalogue and produced byte-identical output on every field — not merely "no errors".
   - The vendor also rewrote a large number of existing rows, so the structural predicates were compared model by model across both catalogues as well: valve ports, switch ports, duration unit and control endpoint are **unchanged on every one of the 120 existing models**. That check matters more than it sounds — a shift in `CTL_WATER`'s `dpPort` would silently move a controller between the per-port and multi-zone groups, and those two disagree about whether a run length is seconds or minutes.
